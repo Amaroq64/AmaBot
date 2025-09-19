@@ -1,0 +1,65 @@
+generic
+2 work	 200
+1 move	  50
+1 carry	  50
+=============
+	300
+
+ideal fatty
+5 work		500	//Owned or reserved sources are 10 per tick.
+7 work cent 700	//4x rooms are 14 (rounded up) per tick.
+1 move		50
+sitting on a container
+==============
+				550
+
+				5 expansions
+
+ideal transport
+==============
+1 move per 2 carry
+
+				150 increments
+				1-2 carries with left over
+				
+initial upgrader
+==============
+4 work		400
+1 move		50
+2 carry		100
+==============
+				550
+
+				5 expansions
+
+ideal upgrader
+==============
+many work
+1 move
+1 carry
+leftovers go to carry
+
+Work Part
+=================================
+Creeps mine 2 energy per work.
+Creeps mine 1 mineral per work.
+Creeps upgrade 1 energy per work.
+Creeps build 5 energy per work.
+Creeps repair 1 energy / 100 hits per work.
+Creeps dismantle 50 hits for 0.25 energy per work.
+
+Melee creeps do 30 per attack.
+Ranged creeps do 10/4/1.
+Towers do full damage within 5.
+Heals do 12/4/4.
+
+Max Energy Per Lvel
+========================
+1	300
+2	300 +  250 =	  550
+3	300 +  500 =	  800
+4	300 +  1000=	 1300
+5	300 +  1500=	 1800
+6	300 +  2000=	 2300
+7	600 +  5000=	 5600
+8	900 + 12000=	12900

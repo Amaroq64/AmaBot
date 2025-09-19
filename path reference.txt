@@ -1,0 +1,27 @@
+init.run()
+========================
+Memory.rooms[room_name]
+	.upgrade
+Memory.rooms[room_name].sources[i]
+	.mine
+	.mreturn
+	.upgrade
+	.ureturn
+
+defender.init()
+========================
+Memory.rooms[room_name].sources[i]
+	.defpaths[exit]
+	.dreturn[exit]
+
+defender.structures()	//called by defender.init()
+========================
+Memory.rooms[room_name].defense.
+	.patrol[exit]
+	.preturn[exit]
+
+empire.room.exitpaths()
+========================
+Memory.rooms[room_name]
+	.exitpaths[room_name]
+	.exitreturn[room_name]

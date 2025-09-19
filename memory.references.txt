@@ -1,0 +1,84 @@
+//Auto-generated
+Memory.creeps[creep_name]
+
+//Init-generated
+Memory.creeps	//Creeps assigned broadly to the empire.
+Memory.rooms[room_name]
+										.sources[]
+													//Properties of the source.
+													.id
+													.pos{}
+													.creeps{}	//Creeps assigned to each source.
+														harvester[creep]
+															.length
+														mtransport[creep]
+															.length
+														utransport[creep]
+															.length
+														builder[creep]
+															.length
+													.buildings{}//Current number of each building assigned to each source.
+														miningcontainer
+															.length
+													//paths relating to the source
+													.mine[].{}
+													.mreturn[].{}
+													.mfat[].{}
+													.minedir
+													.upgrade[].{}
+													.ureturn[].{}
+													.ideal{}	//Target number of each entity type.
+										.upgrade[].{}
+										.ufat[].{}
+										.upgradedir
+										.creeps{}	//Creeps assigned to the room.
+											upgrader[creep]
+												.length
+										.buildings{}//Current number of each building assigned to the room.
+											upgradecontainer
+												.length
+										.ideal{}	//Target number of each entity type.
+											upgrader
+											upgradecontainer
+										.level		//The last remembered level of our room's controller.
+										.goals{}	//This is a stage of our plan to be reached. We should react whenever our goals are completed.
+										
+//Roomplanner-generated
+Memory.rooms[room_name]
+										.role
+
+Memory.rooms[room_name].roles[]	//Array of role objects.
+													//Properties of a role object. Contains one of this object for each desired body type in the room.
+													[bodyType]{}
+															.target		//Number of this body type the room should have.
+															.number	//What the room currently has of this.
+															.role			//What role this body type is serving.
+
+Memory.rooms[room_name].structures{}
+													[structureType]	//Number of this structure type the room should have.
+													
+Memory.rooms[room_name].goals[]	//Array of goal objects. When a goal is met, roomplanner is loaded and called.
+													//Properties of a goal object.
+
+													//If the goal is a creeps goal.
+													.creeps{}
+															[role]		//Our goal is to reach this number of this creep role. This is a fragment of the containing goal.
+															.met			//Boolean. Whether we've met this goal fragment.
+													.met			//Boolean. Whether all fragments of this goal object have been met.
+
+													//If the goal is a controller goal.
+													.controller{}
+															.level		//Our goal is to reach this controller level.
+															.met			//Boolean. Whether we've met this goal.
+
+													//If the goal is a structure goal.
+													.structures{}
+															[structureType]	//Our goal is to reach this number of this structure type.
+															.met					//Boolean. Whether we've met this goal.
+
+//Builder-generated
+Memory.rooms[room_name].flipper[role]		//Builder sets this to the last source a creep was made for. (Though it intelligently decides whether to alternate before building.)
+
+Memory.rooms[room_name].sources[i].creeps[bodyType]	//Builder adds new source-specific creeps to this.
+
+Memory.rooms[room_name].creeps[bodyType]					//Builder adds new room-wide creeps to this.
