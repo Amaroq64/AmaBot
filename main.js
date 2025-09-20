@@ -62,7 +62,7 @@ module.exports.loop = function()
 						{
 							if (!Game.creeps[Memory[roomactions[t]][a].creeps[role][c]])
 							{
-								console.log("Purging Creep.");
+								console.log('Purging Creep: ' + Memory[roomactions[t]][a].creeps[role][c] + '.');
 								Memory[roomactions[t]][a].creeps[role].splice(c, 1);
 							}
 						}
@@ -89,9 +89,8 @@ module.exports.loop = function()
 		cpu_usage.Build = Game.cpu.getUsed();
 
 		let test = require('test');
-
-		//paths, extensions, defenses, [room_name, action[a]]
-		//test.run(true, false, false, /*['E48S14', Memory.attack[0]]*/);
+		//paths, extensions, defenses, newpath, [room_name, action[a]]
+		//test.run(false, false, false, true, /*['E48S14', Memory.attack[0]]*/);
 		//cpu_usage.Test = Game.cpu.getUsed();
 
 		require('tower').monitor();
@@ -121,5 +120,8 @@ module.exports.loop = function()
 	}
 
 	//Load our console commands.
-	require('commands');
+	if (typeof global.help !== 'string')
+	{
+		require('commands');
+	}
 };

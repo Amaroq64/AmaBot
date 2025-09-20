@@ -1,6 +1,6 @@
 var test =
 {
-	run: function(paths, extensions_sources, defenses, actionpath = false)
+	run: function(paths, extensions_sources, defenses, newpath = false, actionpath = false)
 	{
 		let extensions_room = false;
 		try
@@ -8,6 +8,10 @@ var test =
 			//Visualize paths if we're testing them.
 			for (let room_name in Memory.rooms)
 			{
+				if (room_name != 'E49S15')
+				{
+					break;
+				}
 				if (actionpath)
 				{
 					//[room_name, action]
@@ -24,6 +28,99 @@ var test =
 				test.paint.exitpath(room_name, ["purple", "magenta"]);
 				test.paint.patrolpath(room_name, ["blue", "red"]);
 				test.paint.defensepath(room_name, ["green", "yellow"]);
+			}
+
+			for (let room_name in Memory.rooms)
+			{
+				if (!newpath)
+				{
+					break;
+				}
+
+				let vis;
+				let style = {color: 'white', opacity: 0.5};
+				for (let x in Memory.rooms[room_name].path)
+				{
+					for (let y in Memory.rooms[room_name].path[x])
+					{
+						for (let path in Memory.rooms[room_name].path[x][y])
+						{
+							x = +x;
+							y = +y;
+							style.backgroundColor = false;
+							switch(path)
+							{
+								default:
+									Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path]], x, y, style);
+									break;
+
+								case 'mine':
+								case 'mreturn':
+								case 'mfat':
+									style.backgroundColor = 'blue';
+								case 'upgrade':
+								case 'ureturn':
+									if(!style.backgroundColor)
+									{
+										style.backgroundColor = 'red';
+									}
+
+									for (i = 0; i < Memory.rooms[room_name].path[x][y][path].length; i++)
+									{
+										if (Memory.rooms[room_name].path[x][y][path][i] === null)
+										{
+											continue;
+										}
+
+										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i]], x, y, style);
+									}
+									break;
+
+								case 'defpath':
+								case 'dreturn':
+									style.backgroundColor = 'purple';
+
+									for (i = 0; i < Memory.rooms[room_name].path[x][y][path].length; i++)
+									{
+										if (!Array.isArray(Memory.rooms[room_name].path[x][y][path][i]))
+										{
+											/*if (room_name == 'E49S15')
+											{
+												console.log('1st test. x: ' + x + ' y: ' + y);
+											}*/
+											continue;
+										}
+
+										for (let e in Memory.rooms[room_name].path[x][y][path][i])
+										{
+											Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i][e]], x, y, style);
+										}
+									}
+									break;
+
+								case 'patrol':
+								case 'preturn':
+									style.backgroundColor = 'orange';
+
+									for (let e in Memory.rooms[room_name].path[x][y][path])
+									{
+										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][e]], x, y, style);
+									}
+									break;
+
+								case 'exitpath':
+								case 'exitreturn':
+									style.backgroundColor = 'green';
+
+									for (let e in Memory.rooms[room_name].path[x][y][path])
+									{
+										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][e]], x, y, style);
+									}
+									break;
+							}
+						}
+					}
+				}
 			}
 
 			//Visualize extensions if we're testing them.
@@ -238,6 +335,8 @@ var test =
 			Game.rooms[room_name].visual.poly(tpath2, {stroke: color[1], lineStyle: "dashed"});
 		}
 	},
+
+	direction: [null, "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
 
 	cpu: function()
 	{
