@@ -63,7 +63,7 @@ var roomPlanner =
 			//At level 1, we gain access to 1 spawn (obviously).
 			//At level 2 we gain access to extensions, ramparts, and walls.
 			//At level 3, we gain access to 1 tower.
-			//At level 4, we gain access to storage (always 1 maximum).
+			//At level 4, we gain access to 1 storage.
 			//At level 5, we gain access to 2 towers and 2 links.
 			//At level 6, we gain access to 3 links, 3 labs, a terminal, and an extractor.
 			//At level 7, we gain access to 2 spawns, 3 towers, 4 links, 6 labs, and a factory.
