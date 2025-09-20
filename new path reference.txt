@@ -1,0 +1,28 @@
+init.run()
+========================
+Memory.rooms[room_name].path[x][y]
+	.upgrader
+Memory.rooms[room_name].path[x][y]
+	.mine[]
+	.mreturn[]
+	.mfat[]	//The step that moves the harvester onto the container.
+	.upgrade[]
+	.ureturn[]
+
+defender.init()
+========================
+Memory.rooms[room_name].path[x][y][]
+	.defpath[exit]
+	.dreturn[exit]
+
+defender.structures()	//called by defender.init()
+========================
+Memory.rooms[room_name].path[x][y]
+	.patrol[exit]
+	.preturn[exit]
+
+empire.room.exitpaths()
+========================
+Memory.rooms[room_name].path[x][y]
+	.exitpath[room_name]
+	.exitreturn[room_name]
