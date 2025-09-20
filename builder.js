@@ -169,6 +169,7 @@ var builder =
 			{
 				case "harvester":	//It could be helpful to store this to make checks easier.
 				{
+					options.memory.direction = false;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mfat.slice(0, 1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mfat.slice(0, 1)[0].y;
@@ -177,6 +178,7 @@ var builder =
 				}
 				case "mtransport":	//We might not have a container yet. Store the desired position.
 				{
+					options.memory.direction = false;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].y;
@@ -192,6 +194,7 @@ var builder =
 				case "ubuilder":
 				case "upgrader":	//It could be helpful to store this to make checks easier.
 				{
+					options.memory.direction = false;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
@@ -201,6 +204,7 @@ var builder =
 				case "utransport":	//We might not have a container yet. Store the desired position.
 				{
 					//Our target is the last step in the upgrader's path, since that's where it will be waiting.
+					options.memory.direction = false;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
@@ -218,6 +222,7 @@ var builder =
 				}
 				case "builder":
 				{
+					options.memory.direction = false;
 					options.memory.target = {};	//We need to flip the utrip bool every time we visit the source.
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].y;
@@ -265,8 +270,9 @@ var builder =
 					}
 
 					//Now deploy onto that path.
-					options.memory.target = {};
+					options.memory.direction = false;
 					options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need]);
+					options.memory.target = {};
 					options.memory.target.x = options.memory.movenow.slice(-1)[0].x;
 					options.memory.target.y = options.memory.movenow.slice(-1)[0].y;
 					options.memory.dtarget = {};
