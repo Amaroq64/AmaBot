@@ -5,6 +5,7 @@ Memory.rooms[room_name]
 Memory.rooms[room_name].sources[i]
 	.mine
 	.mreturn
+	.mfat	//The step that moves the harvester onto the container.
 	.upgrade
 	.ureturn
 
@@ -16,7 +17,7 @@ Memory.rooms[room_name].sources[i]
 
 defender.structures()	//called by defender.init()
 ========================
-Memory.rooms[room_name].defense.
+Memory.rooms[room_name].defense
 	.patrol[exit]
 	.preturn[exit]
 
