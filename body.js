@@ -140,48 +140,27 @@ var body =
 		let body = [];
 		if (fatbuilder)
 		{
-			while (energy >= 350 && body.length < 46)
+			while (energy >= 350 && body.length < 36)	//Since our endgame builders only hold 800, the fatty only needs to hold 800 too.
 			{
-				body.push(MOVE, WORK, WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty.
+				body.push(MOVE, WORK, WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty and traveling to its patrol route.
 				energy -= 350;
 			}
 		}
-		while (energy >= 200 && body.length < 48)
+		while (!fatbuilder && energy >= 200 && body.length < 48)
 		{
-			if (fatbuilder)
-			{
-				body.unshift(MOVE);
-			}
-			else
-			{
-				body.push(MOVE);
-			}
+			body.push(MOVE);
 			body.push(WORK, CARRY);	//The ideal builder can move at full speed while carrying.
 			energy -= 200;
 		}
-		if (energy >= 150 && body.length < 49)
+		if (!fatbuilder && energy >= 150 && body.length < 49)
 		{
-			if (fatbuilder)
-			{
-				body.unshift(MOVE);
-			}
-			else
-			{
-				body.push(MOVE);
-			}
+			body.push(MOVE);
 			body.push(WORK);
 			energy -= 150;
 		}
-		else if (energy >= 100 && body.length < 49)
+		else if (!fatbuilder && energy >= 100 && body.length < 49)
 		{
-			if (fatbuilder)
-			{
-				body.unshift(MOVE);
-			}
-			else
-			{
-				body.push(MOVE);
-			}
+			body.push(MOVE);
 			body.push(CARRY);
 			energy -= 100;
 		}
