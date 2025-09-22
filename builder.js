@@ -232,6 +232,7 @@ var builder =
 					options.memory.utrip = false;	//This breaks movement if we try to be clever by starting it as true.
 					options.memory.return = false;
 					options.memory.dtrip = false;
+					options.memory.need = 0;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
 					break;
 				}
@@ -304,14 +305,9 @@ var builder =
 			//Build what's needed.
 			console.log("Building " + name + ".");
 
-			//Manually spawn a defense transport if needed.
-			//Memory.rooms.E49S15.sources[0].creeps.builder.push('Ama1DBuilder_emergency0'); Game.spawns.Amaroq1.spawnCreep([MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,WORK], 'Ama1DBuilder_emergency0', {memory: {movenow: [], target: {x: 17, y: 23}, dtarget: {x: 44, y: 11}, return: false}, directions: [TOP_LEFT]});
-			//Memory.rooms.E49S15.sources[1].creeps.builder.push('Ama1DBuilder_emergency1'); Game.spawns.Amaroq1.spawnCreep([MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,CARRY,CARRY,MOVE,WORK], 'Ama1DBuilder_emergency1', {memory: {movenow: [], target: {x: 16, y: 34}, dtarget: {x: 44, y: 11}, return: false}, directions: [BOTTOM]});
-			//Memory.rooms.E49S15.sources[0].creeps.builder.push('Ama1Builder_emergency0'); Game.spawns.Amaroq1.spawnCreep([MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK], 'Ama1Builder_emergency0', {memory: {movenow: [], target: {x: 17, y: 23}, dtarget: {x: 44, y: 11}, return: false}, directions: [TOP_LEFT]});
-			//Memory.rooms.E49S15.sources[1].creeps.builder.push('Ama1Builder_emergency1'); Game.spawns.Amaroq1.spawnCreep([MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK], 'Ama1Builder_emergency1', {memory: {movenow: [], target: {x: 16, y: 34}, dtarget: {x: 44, y: 11}, return: false}, directions: [BOTTOM]});
-			//Memory.rooms.E49S14.sources[1].creeps.builder.push('Ama10Builder_emergency1'); Game.spawns.Amaroq10.spawnCreep([MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK], 'Ama10Builder_emergency1', {memory: {movenow: [], target: {x: 36, y: 28}, dtarget: {x: 44, y: 17}, return: false}, directions: [RIGHT]});
-
-			switch (spawn.spawnCreep(body[role](Game.rooms[room_name].energyAvailable), name, options))	//Options are defined before the direction switch so we can assign our transport targets too.
+			//Options are defined before the direction switch so we can assign our transport targets too.
+			//If there are no construction sites, our builder should be a minbuilder, but still considered a builder in all other ways.
+			switch (spawn.spawnCreep(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable), name, options))
 			{
 				case OK:
 				{
@@ -455,6 +451,10 @@ builder.anticipate.checkCreeps = function(room_name)
 	//Get room-wide roles and calculate replacement time.
 	for (let role in Memory.rooms[room_name].creeps)
 	{
+		if (role == 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)
+		{
+			role = 'minbuilder';
+		}
 		temp.roles[role] = [];
 		temp.costs[role] = [];
 		if (Memory.rooms[room_name].creeps[role].length > 0)

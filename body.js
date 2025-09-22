@@ -121,11 +121,11 @@ var body =
 			body.push(MOVE, CARRY, CARRY);	//The ideal transport has two carries for every move.
 			energy -= 150;
 		}
-		if (starting_energy > level_seven_energy && energy >= 100 && body.length < 49 )		//Use the leftovers to squeeze out a little more transport capacity at level 8.
+		/*if (starting_energy > level_seven_energy && energy >= 100 && body.length < 49 )		//Use the leftovers to squeeze out a little more transport capacity at level 8.
 		{
 			body.push(CARRY, CARRY);
 			energy -= 100;
-		}
+		}*/
 		
 		return body;
 	},
@@ -146,19 +146,31 @@ var body =
 				energy -= 350;
 			}
 		}
-		while (!fatbuilder && energy >= 200 && body.length < 48)
+		if (minimumbuilder)
 		{
-			body.push(MOVE);
-			body.push(WORK, CARRY);	//The ideal builder can move at full speed while carrying.
-			energy -= 200;
+			energy -= 250;
+			while (!fatbuilder && energy >= 150 && body.length < 24)
+			{
+				body.push(MOVE, CARRY, CARRY);	//The minimum builder has only 1 work part. We'll be maintaining the 800 capacity of its full sized counterpart.
+				energy -= 150;
+			}
+			body.push(MOVE, WORK, WORK);	//The whole point of a minimum builder is to repair. Without its work part, it's just a transport.
 		}
-		if (!fatbuilder && energy >= 150 && body.length < 49)
+		else
+		{
+			while (!fatbuilder && energy >= 200 && body.length < 48)
+			{
+				body.push(MOVE, WORK, CARRY);	//The ideal builder can move at full speed while carrying.
+				energy -= 200;
+			}
+		}
+		if (!fatbuilder && !minimumbuilder && energy >= 150 && body.length < 49)
 		{
 			body.push(MOVE);
 			body.push(WORK);
 			energy -= 150;
 		}
-		else if (!fatbuilder && energy >= 100 && body.length < 49)
+		else if (!fatbuilder && !minimumbuilder && energy >= 100 && body.length < 49)
 		{
 			body.push(MOVE);
 			body.push(CARRY);
@@ -186,7 +198,7 @@ var body =
 	{
 		let body = [];
 
-		while (energy >= 700)
+		while (energy >= 700 && body.length < 34)
 		{
 			body.unshift(MOVE);
 			body.push(CLAIM);
@@ -280,6 +292,10 @@ body.latebuilder = function(energy)
 body.dbuilder = function(energy)
 {
 	return body.builder(energy, true);
+}
+body.minbuilder = function(energy)
+{
+	return body.builder(energy, false, true);
 }
 body.mattacker = body.attacker;
 body.rattacker = function(energy, attack = 1)
