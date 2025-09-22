@@ -55,42 +55,172 @@ var control =
 						}
 					}
 				}
-
-				//This is more trouble than it's worth.
-				/*//If we only have one creep in this source, we need to alternate between harvesting and transporting.
-				if (totalcreeps == 1 && Memory.rooms[room_name].sources[i].creeps.harvester.length == 1 &&
-					Game.creeps[Memory.rooms[room_name].sources[i].creeps.harvester[0]].store[RESOURCE_ENERGY] == Game.creeps[Memory.rooms[room_name].sources[i].creeps.harvester[0]].store.getCapacity())
-				{
-					//This harvester is full, deliver the energy.
-					Memory.rooms[room_name].sources[i].creeps.mtransport.push(Memory.rooms[room_name].sources[i].creeps.harvester[0]);
-					Memory.rooms[room_name].sources[i].creeps.harvester = [];
-					//We need to push it back onto its path.
-					Memory.creeps[Memory.rooms[room_name].sources[i].creeps.mtransport[0]].movenow.push(
-						{dx: Memory.rooms[room_name].sources[i].mine[Memory.rooms[room_name].sources[i].mine.length - 1].x - Memory.rooms[room_name].sources[i].mfat[0].x,
-						 dy: Memory.rooms[room_name].sources[i].mine[Memory.rooms[room_name].sources[i].mine.length - 1].y - Memory.rooms[room_name].sources[i].mfat[0].y,
-						 direction: function()
-							{
-								let direction = Memory.rooms[room_name].sources[i].mfat[0].direction + 4;
-								direction = direction + 4;
-								if (direction > 8)
-								{
-									direction = direction - 8;
-									console.log("Correcting direction to " + direction + ".");
-								}
-								return direction;
-							}
-						});
-					console.log("Changing from harvester to transport.");
-				}
-				else if (totalcreeps == 1 && Memory.rooms[room_name].sources[i].creeps.mtransport.length == 1 &&
-					Game.creeps[Memory.rooms[room_name].sources[i].creeps.mtransport[0]].store[RESOURCE_ENERGY] == 0)
-				{
-					//This transport is empty, gather more energy.
-					Memory.rooms[room_name].sources[i].creeps.harvester.push(Memory.rooms[room_name].sources[i].creeps.mtransport[0]);
-					Memory.rooms[room_name].sources[i].creeps.mtransport = [];
-					console.log("Changing from transport to harvester.");
-				}*/
 			}
+		}
+	},
+
+	move2: function(creep, role, source = false)
+	{
+		let status;
+		let pos = creep.pos;
+		let room_name = creep.room.name;
+
+		if(creep.spawning)
+		{
+			return;
+		}
+		else if(creep.memory.movenow.length != 0)	//If the creep has immediate move orders, follow them.
+		{
+			status = creep.moveByPath(creep.memory.movenow)
+			if(status == OK || status == ERR_TIRED)
+			{
+				//console.log(creep.name + ": Using stored move.");
+			}
+			else if (status == ERR_NOT_FOUND)	//We've presumably completed our move orders. Switch back to normal movement.
+			{
+				Memory.creeps[creep.name].movenow = [];
+				console.log(creep.name + ": Switching to normal pathing.");
+				return control.move(creep, role, source);
+			}
+			else
+			{
+				//console.log(creep.name + " stored move status " + status + ".");
+			}
+			return;
+		}
+		else if(Memory.rooms[room_name].path[pos.x] && Memory.rooms[room_name].path[pos.x][pos.y])	//Otherwise, follow its routine path.
+		{
+			let room_name = creep.room.name
+			let tempdir;	//We'll be assigning to this within all of our comparisons for ease of use.
+			let path = [];
+			//console.log(role + " " + creep.name);
+
+			switch (role)
+			{
+				case "harvester":
+				{
+					if ((tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine) || (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mfat))
+					{
+						creep.memory.direction = tempdir;
+					}
+					break;
+				}
+
+				case "builder":
+				{
+					if(creep.memory.dtrip)	//We're going to the defense.
+					{
+						if ((!creep.memory.return &&
+							(Array.isArray(Memory.rooms[room_name].path[pos.x][pos.y].defpath) && typeof Memory.rooms[room_name].path[pos.x][pos.y].defpath[source] === 'object' &&
+								(tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath[source][creep.memory.need])))
+						  || (creep.memory.return &&
+							(Array.isArray(Memory.rooms[room_name].path[pos.x][pos.y].dreturn) && typeof Memory.rooms[room_name].path[pos.x][pos.y].dreturn[source] === 'object' &&
+								(tempdir = Memory.rooms[room_name].path[pos.x][pos.y].dreturn[source][creep.memory.need]))))
+						{
+							creep.memory.direction = tempdir;
+						}
+					}
+				}
+				case "mtransport":
+				{
+					if (!Memory.creeps[creep.name].dtrip && Memory.creeps[creep.name].utrip)	//We're going to the upgrader.
+					{
+						if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].ureturn[source])))
+						{
+							creep.memory.direction = tempdir;
+						}
+					}
+					else if (!Memory.creeps[creep.name].dtrip)	//We're going to the source.
+					{
+						if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source])) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mreturn[source])))
+						{
+							creep.memory.direction = tempdir;
+						}
+					}
+					break;
+				}
+
+				case "utransport":
+				{
+					//We're going to the upgrader.
+					if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].ureturn[source])))
+					{
+						creep.memory.direction = tempdir;
+					}
+					break;
+				}
+
+				case "upgrader":
+				{
+					//We're going to park on the upgrading container.
+					if (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrader)	//Note the spelling difference.
+					{
+						creep.memory.direction = tempdir;
+					}
+					break;
+				}
+
+				case "dbuilder":
+				{
+					if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath)) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].dreturn)))
+					{
+						creep.memory.direction = tempdir;
+					}
+				}
+			}
+
+			//If we're at the end of our path, we swich to the other one.
+			if (Memory.rooms[room_name].path[pos.x] && Memory.rooms[room_name].path[pos.x][pos.y] && Memory.rooms[room_name].path[pos.x][pos.y].flipper)
+			{
+				Memory.creeps[creep.name].return = !Memory.creeps[creep.name].return;
+				switch(role)
+				{
+					
+				}
+			}
+
+			status = creep.move(creep.memory.direction);
+
+			switch (status)
+			{
+				case ERR_NOT_FOUND:
+				{
+					console.log(creep.pos.x + ", " + creep.pos.y + " - " + creep.name + ": " + " - Path Not Found.");
+					//console.log("Utrip: " + creep.memory.utrip + ". Dtrip: " + creep.memory.dtrip + ". Return: " + creep.memory.return + ".");
+					
+					let tpath = [];
+					for (p = 0; p < path.length; p++)
+					{
+						tpath.push(Game.rooms[room_name].getPositionAt(path[p].x, path[p].y));
+					}
+					Memory.creeps[creep.name].movenow = creep.pos.findPathTo(creep.pos.findClosestByPath(tpath));
+
+					/*let pathstr = "";
+					for (let p = 0; p < path.length; p++)
+					{
+						if (p > 0)
+						{
+							pathstr += " ";
+						}
+						pathstr += "(" + path[p].x + ", " + path[p].y + ", " + path[p].direction + ")";
+						if(p > 1 && p % 22 == 0)
+						{
+							pathstr +="\n";
+						}
+					}
+					console.log(pathstr);*/
+					//console.log(JSON.stringify(path));
+					//creep.room.visual.poly(path, {stroke: "blue", lineStyle: "dashed"});
+					break;
+				}
+				case ERR_INVALID_ARGS:
+				{
+					console.log(creep.name + ": " + role + " Invalid Path.");
+					break;
+				}
+			}
+			//console.log(JSON.stringify(path));
+			return status;
 		}
 	},
 

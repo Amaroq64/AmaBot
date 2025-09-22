@@ -238,6 +238,15 @@ var calculate =
 				if (exit === false)	//Room-wide.
 				{
 					Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name] = tiles[t].direction;	//Assign our direction to the [x][y][name] of this tile.
+					//Write our flipper.
+					if (t == tiles.length - 1)
+					{
+						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+						}
+						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = true;
+					}
 				}
 				else
 				{
@@ -251,6 +260,19 @@ var calculate =
 					}
 
 					Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name][exit] = tiles[t].direction;	//Assign our direction to the [x][y][name][exit] of this tile.
+					//Write our flipper.
+					if (t == tiles.length - 1)
+					{
+						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+						}
+						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] !== 'object')
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = {};
+						}
+						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][exit] = true;
+					}
 				}
 			}
 			else
@@ -263,6 +285,19 @@ var calculate =
 				if (exit === false)	//Source-based.
 				{
 					Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name][source] = tiles[t].direction;	//Assign our direction to the [x][y][name][source] of this tile.
+					//Write our flipper.
+					if (t == tiles.length - 1)
+					{
+						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+						}
+						if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name]))
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = [];
+						}
+						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] = true;
+					}
 				}
 				else if (typeof exit === 'number')	//Source-based with an indexed exit.
 				{
@@ -276,6 +311,23 @@ var calculate =
 					}
 
 					Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name][source][exit] = tiles[t].direction;
+					//Write our flipper.
+					if (t == tiles.length - 1)
+					{
+						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+						}
+						if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name]))
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = [];
+						}
+						if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source]))
+						{
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] = {}
+						}
+						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source][exit] = true;
+					}
 				}
 			}
 		}

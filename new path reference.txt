@@ -8,21 +8,32 @@ Memory.rooms[room_name].path[x][y]
 	.mfat[]	//The step that moves the harvester onto the container.
 	.upgrade[]
 	.ureturn[]
+	.flipper.mine[]			= true
+	.flipper.mreturn[]		= true
+	.flipper.mfat[]			= true
+	.flipper.upgrade[]		= true
+	.flipper.ureturn[]		= true
 
 defender.init()
 ========================
-Memory.rooms[room_name].path[x][y][]
-	.defpath[exit]
-	.dreturn[exit]
+Memory.rooms[room_name].path[x][y]
+	.defpath[][exit]
+	.dreturn[][exit]
+	.flipper.defpath[][exit]	= true
+	.flipper.dreturn[][exit]	= true
 
 defender.structures()	//called by defender.init()
 ========================
 Memory.rooms[room_name].path[x][y]
 	.patrol[exit]
 	.preturn[exit]
+	.flipper.patrol[exit]		= true
+	.flipper.preturn[exit]		= true
 
 empire.room.exitpaths()
 ========================
 Memory.rooms[room_name].path[x][y]
 	.exitpath[room_name]
 	.exitreturn[room_name]
+	.flipper.exitpath[room_name]	= true
+	.flipper.exitreturn[room_name]	= true

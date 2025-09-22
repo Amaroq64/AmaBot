@@ -34,7 +34,8 @@ var roleBuilder =
 			filter: function(structure)
 			{
 				//Repair roads when they're missing 100. Repair everything else if it's not at max.
-				return ((structure.structureType == STRUCTURE_ROAD && structure.hitsMax - structure.hits > 99) || (structure.structureType != STRUCTURE_ROAD && structure.hits < structure.hitsMax));
+				return ((structure.structureType == STRUCTURE_ROAD && structure.hitsMax - structure.hits > 99) || (structure.structureType != STRUCTURE_ROAD && structure.hits < structure.hitsMax
+					&& ((structure.structureType != STRUCTURE_WALL && creep.name.indexOf("Builder") != -1) || (structure.structureType == STRUCTURE_WALL && creep.name.indexOf("Dbuilder") != -1))));	//Only Dbuilders should repair walls.
 			}
 		});
 

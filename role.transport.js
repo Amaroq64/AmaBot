@@ -153,6 +153,8 @@ var roleTransport =
 			{
 				//If we're a builder and the builder exists, visit the builder.
 				Memory.creeps[creep.name].dtrip = true;
+				//When we decide to visit the builder, record which exit to visit.
+				Memory.creeps[creep.name].need = Memory.rooms[creep.room.name].defense.need;
 			}
 
 			return true;
