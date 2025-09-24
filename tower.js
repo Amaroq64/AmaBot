@@ -61,7 +61,7 @@ var tower =
 				{
 					if (!ramparts[r].isPublic)
 					{
-						ramparts[r].setPublic(true);	//If there's neither enemies nor allies, open the rampart.
+						ramparts[r].setPublic(true);	//If there's no enemies, open the rampart.
 					}
 				}
 			}
