@@ -1,10 +1,13 @@
 global.help =
+"flags\n" +
 "attack(attack_number, x, y)\n" +
 "attackdisplay\n" +
 "attackrole(attack_number, role_type, number_of_role)\n" +
 "movenow(creep_name, x, y)\n" +
 "clearcreep(creep_name)\n" +
 "oversign(creep_name)";
+
+global.flags = "Attack\nClaims\nReserves\nSigns\nTransfer\nSafe\nJoin\nRoad";
 
 global.attack = function(i = false, x = false, y = false, room_name = false)
 {
