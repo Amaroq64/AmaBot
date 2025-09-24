@@ -1,11 +1,11 @@
 //Certain creeps have target .x/.y positions in their memory.
 //This allows for flipping them from one path to another when they hit that position.
 //These will have to be preserved or accounted for when switching to the new pathing.
-harvester uses mfat (which should only be one element).
-mtransport and builder uses mine.slice(-1).
-ubuilder (unused), upgrader, and utransport use upgrade.slice(-1).
-upgrader code also uses upgrade.slice(-1).
-transport code also uses upgrade.slice(-1).
-builder also uses defpaths[need].slice(-1).
-dbuilder uses the full mine path concat defpaths[need] as a movenow.
-dbuilder also uses slice(-1) from this movenow. (Effectively defpaths[need].slice(-1).
+harvester uses []mfat (which should only be one element).
+mtransport and builder uses []mine.slice(-1).
+ubuilder (unused), upgrader, and utransport use []upgrade.slice(-1).
+upgrader code also uses []upgrade.slice(-1).
+transport code also uses []upgrade.slice(-1).
+builder also uses []defpaths[need].slice(-1).
+dbuilder uses the full []mine with concat []defpaths[need] as a movenow.
+dbuilder also uses slice(-1) from this movenow.
