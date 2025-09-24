@@ -1,8 +1,8 @@
-//Certain creeps have target.x/.y positions in their memory.
+//Certain creeps have target .x/.y positions in their memory.
 //This allows for flipping them from one path to another when they hit that position.
-harvester uses mfat.
+harvester uses mfat (which should only be one element).
 mtransport and builder uses mine.slice(-1).
-ubuilder (unused), upgrader, and utransport uses upgrade.slice(-1).
+ubuilder (unused), upgrader, and utransport use upgrade.slice(-1).
 upgrader code also uses upgrade.slice(-1).
 transport code also uses upgrade.slice(-1).
 builder also uses defpaths[need].slice(-1).
