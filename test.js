@@ -338,7 +338,7 @@ var test =
 
 	direction: ['F', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
 
-	cpu: function()
+	/*cpu: function()
 	{
 		for (let module in test.cpu_usage)
 		{
@@ -346,7 +346,7 @@ var test =
 		}
 	},
 
-	cpu_usage: undefined
+	cpu_usage: undefined*/
 };
 
 module.exports = test;
