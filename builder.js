@@ -77,7 +77,7 @@ var builder =
 			let need = -1;
 			let role = false;
 
-			for (let creep_role in Memory.rooms[room_name].creeps)	//Check each role we have stored in the room itself. (Currently that's only the upgrader.)
+			for (let creep_role in Memory.rooms[room_name].creeps)	//Check each role we have stored in the room itself.
 			{
 				//console.log("anyharvest: " + anyharvest);
 				if (anyharvest && Memory.rooms[room_name].creeps[creep_role].length - anticipate[creep_role] < Memory.rooms[room_name].ideal[creep_role]) //If we already have transports from both sources and we're missing any room-wide creeps.
@@ -451,10 +451,6 @@ builder.anticipate.checkCreeps = function(room_name)
 	//Get room-wide roles and calculate replacement time.
 	for (let role in Memory.rooms[room_name].creeps)
 	{
-		if (role == 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)
-		{
-			role = 'minbuilder';
-		}
 		temp.roles[role] = [];
 		temp.costs[role] = [];
 		if (Memory.rooms[room_name].creeps[role].length > 0)
@@ -480,7 +476,8 @@ builder.anticipate.checkCreeps = function(room_name)
 				for (let r = 0; r < Memory.rooms[room_name].sources[i].creeps[role].length; r++)
 				{
 					temp.sources[i].roles[role].push(Memory.rooms[room_name].sources[i].creeps[role][r]);
-					temp.sources[i].costs[role].push((body[role](calculate.maximumEnergy(room_name)).length * 3) + pathlengths.sources[i][role]);
+					temp.sources[i].costs[role].push((body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](calculate.maximumEnergy(room_name)).length * 3)
+						+ pathlengths.sources[i][role]);
 				}
 			}
 		}
