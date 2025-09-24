@@ -232,19 +232,21 @@ var roomPlanner =
 		}
 
 		//Are there flags?
-		let myflags = {Attack: [], Spawn: [], Reserve: [], Sign: [], Transfer: []/*, Safe: [], Road: []*/};
+		let myflags = {Attack: [], Claims: [], Reserves: [], Signs: [], Transfer: []/*, Safe: [], Road: []*/};
 		for (let flag in Game.flags)
 		{
 			//We currently aren't doing anything with Road flags.
-			//Safe flags are currently handled elsewhere.
-			/*for (let type in myflags)
+			//Safe flags are handled elsewhere.
+			for (let type in myflags)
 			{
-				if ()
+				if (flag.indexOf(type) != -1)
 				{
-					
+					myflags[type].push(Game.flags[flag]);
+					Game.flags[flag].remove();
+					continue;
 				}
-			}*/
-			if (flag.indexOf("Attack") != -1)
+			}
+			/*if (flag.indexOf("Attack") != -1)
 			{
 				myflags.Attack.push(Game.flags[flag]);
 				Game.flags[flag].remove();
@@ -268,10 +270,28 @@ var roomPlanner =
 			{
 				myflags.Transfer.push(Game.flags[flag]);
 				Game.flags[flag].remove();
-			}
+			}*/
 		}
 
-		if(myflags.Attack.length != 0)
+		for (let type in myflags)
+		{
+			if(myflags[type].length != 0)
+			{
+				if (!Array.isArray(Memory[type.toLowerCase()]))
+				{
+					Memory[type.toLowerCase()] = myflags[type];
+				}
+				else
+				{
+					for (let c = 0; c < myflags[type].length; c++)
+					{
+						Memory[type.toLowerCase()].push({name: myflags[type][c].name, pos: myflags[type][c].pos});
+						require('claim').init(Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1], type.toLowerCase());
+					}
+				}
+			}
+		}
+		/*if(myflags.Attack.length != 0)
 		{
 			if (!Array.isArray(Memory.attack))
 			{
@@ -287,7 +307,7 @@ var roomPlanner =
 			}
 			
 		}
-		if(myflags.Spawn.length != 0)
+		/*if(myflags.Spawn.length != 0)
 		{
 			if (!Array.isArray(Memory.claims))
 			{
@@ -334,23 +354,7 @@ var roomPlanner =
 				}
 			}
 			
-		}
-		if(myflags.Sign.length != 0)
-		{
-			if (!Array.isArray(Memory.signs))
-			{
-				Memory.withdraw = myflags.Sign;
-			}
-			else
-			{
-				for (let c = 0; c < myflags.Sign.length; c++)
-				{
-					Memory.signs.push({name: myflags.Sign[c].name, pos: myflags.Sign[c].pos});
-					require('claim').init(Memory.signs[Memory.signs.length - 1], "signs");
-				}
-			}
-			
-		}
+		}*/
 
 		return true;	//We made it this far without any errors.
 	},
