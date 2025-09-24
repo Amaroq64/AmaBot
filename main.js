@@ -88,8 +88,8 @@ module.exports.loop = function()
 		require('builder').run();
 		cpu_usage.Build = Game.cpu.getUsed();
 
-		let test = require('test');
 		//paths, extensions, defenses, newpath, [room_name, action[a]]
+		//let test = require('test');
 		//test.run(false, false, false, true, /*['E48S14', Memory.attack[0]]*/);
 		//cpu_usage.Test = Game.cpu.getUsed();
 
@@ -99,7 +99,7 @@ module.exports.loop = function()
 		require('empire').check();
 		cpu_usage.Empire = Game.cpu.getUsed();
 
-		test.cpu_usage = cpu_usage;
+		//test.cpu_usage = cpu_usage;
 
 		if(cpu_usage[Object.keys(cpu_usage)[Object.keys(cpu_usage).length - 1]] >= 20)
 		{
