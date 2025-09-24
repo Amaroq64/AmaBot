@@ -140,7 +140,7 @@ var body =
 		let body = [];
 		if (fatbuilder)
 		{
-			while (energy >= 350 && body.length < 36)	//Since our endgame builders only hold 800, the fatty only needs to hold 800 too.
+			while (energy >= 350 && body.length < 46)	//Since a container can hold 2000, we should hold 1000. A T1 boost would make it match.
 			{
 				body.push(MOVE, WORK, WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty and traveling to its patrol route.
 				energy -= 350;
@@ -149,9 +149,9 @@ var body =
 		if (minimumbuilder)
 		{
 			energy -= 250;
-			while (!fatbuilder && energy >= 150 && body.length < 24)
+			while (!fatbuilder && energy >= 150 && body.length < 30)
 			{
-				body.push(MOVE, CARRY, CARRY);	//The minimum builder has only 1 work part. We'll be maintaining the 800 capacity of its full sized counterpart.
+				body.push(MOVE, CARRY, CARRY);	//The minimum builder has only 2 work part. We'll be maintaining the 1000 capacity of its full sized counterpart.
 				energy -= 150;
 			}
 			body.push(MOVE, WORK, WORK);	//The whole point of a minimum builder is to repair. Without its work part, it's just a transport.
