@@ -467,7 +467,6 @@ var init =
 			}
 		}
 
-		
 		return true; //We made it this far without any errors.
     },
 
@@ -547,27 +546,38 @@ var init =
 		return true;	//We made it this far without any errors.
 	},
 
-	clean: function()	//For testing.
+	clean: function(room_name = false)	//For testing.
 	{
+		if (!room_name)
+		{
+			return false;
+		}
 		for (let creep in Memory.creeps)
 		{
-			Game.creeps[creep].suicide();
+			if (Game.creeps[creep].room.name == room_name)
+			{
+				Game.creeps[creep].suicide();
+			}
 		}
-		RawMemory._parsed = {};
-		Memory = {};
+		//RawMemory._parsed = {};
+		Memory.rooms[room_name] = {};
 		return true;
 	},
 
-	cleanExtensions: function()	//For testing.
+	cleanExtensions: function(room_name = false)	//For testing.
 	{
-		for (let room_name in Memory.rooms)
+		if (room_name)
 		{
 			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 			{
 				Memory.rooms[room_name].sources[i].buildings.extensions = [];
 			}
+			return true;
 		}
-		return true;
+		else
+		{
+			return false;
+		}
 	}
 };
 
