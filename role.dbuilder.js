@@ -62,10 +62,11 @@ var roleDBuilder =
 					{
 						if (sites[c].pos.isEqualTo(farwalls[f]))
 						{
-							//If we found one nearby, go to it.
+							//If we found one nearby, go to it, then come back from it.
 							if (Memory.creeps[creep.name].movenow.length == 0)
 							{
 								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(sites[c].pos, {range: 3});
+								Memory.creeps[creep.name].movenow.concat(creep.room.findPath(creep.room.getPositionAt(Memory.creeps[creep.name].movenow.slice(-1)[0].x, Memory.creeps[creep.name].movenow.slice(-1)[0].y), creep.pos));
 							}
 						}
 					}
@@ -96,7 +97,7 @@ var roleDBuilder =
 
 		//Now prioritize them.
 		let chosen;
-		let command;
+		//let command;
 		let lowesthp = Infinity;
 		let farwalls;
 		for (let r = 0; r < rstructures.length; r++)
@@ -105,31 +106,6 @@ var roleDBuilder =
 			{
 				lowesthp = rstructures[r].hits;
 				chosen = rstructures[r];
-
-				/*if ()
-				{
-					
-				}
-				else	//It was a clever idea to have the dbuilder command the towers to heal, but it's not worth the effort.
-				{
-					if (!Array.isArray(farwalls) && !command)
-					{
-						farwalls = [];
-						for (let f = 0; f < Memory.rooms[creep.room.name].defense.farwalls.length; f++)
-						{
-							let tpos = Game.rooms[creep.room.name].getPositionAt(Memory.rooms[creep.room.name].defense.farwalls[f].x, Memory.rooms[creep.room.name].defense.farwalls[f].y)
-							if (rstructures[r].pos.isEqualTo(tpos))
-							{
-								farwalls.push(tpos);
-							}
-						}
-					}
-					lowesthp = rstructures[r].hits;
-					if (farwalls.length != 0)
-					{
-						command = rstructures[r];
-					}
-				}*/
 			}
 		}
 
@@ -137,17 +113,6 @@ var roleDBuilder =
 		{
 			return true;	//We've performed our repair action for this tick.
 		}
-		/*if (command)
-		{
-			let towers = Game.rooms[creep.room.name].find(MY_STRUCTURES, {filter: {structureType: STRUCTURE_TOWER}});
-			for (t = 0; t < towers.length; t++)
-			{
-				if (towers[t].store.getUsedCapacity() > towers[t].store.getCapacity() / 2)
-				{
-					towers[t].heal(command);
-				}
-			}
-		}*/
 		
 		return false;	//If we made it this far, there was nothing to repair.
 	},
@@ -156,26 +121,29 @@ var roleDBuilder =
 	{
 		//console.log("Depositing.");
 		//Find towers that aren't full.
-		let towers = creep.room.find(FIND_MY_STRUCTURES,
-		{
-			filter: function(tower)
-			{
-				return (tower.structureType == STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) >= 500);	//If a tower is more than half empty, we should fill it.
-			}
-		});
-		let tlength = towers.length;	//This is the number of towers in the room that absolutely need energy.
+		let towers;
+		let found = 0;
+		let tlength = 0;
+
 		//If we are defending more than one exit, we can't be picky about this or we'll never repair a wall again.
-		for (let s = 0, found = 0; s < Memory.rooms[creep.room.name].defense.safe.length; s++)
+		for (let s = 0; s < Memory.rooms[creep.room.name].defense.safe.length; s++)
 		{
 			if (!Memory.rooms[creep.room.name].defense.safe[s])
 			{
-				found++
+				found++;
 			}
-			if (found > 1)
+		}
+
+		if (found > 1)	//We've found two or more exits that are being defended, therefore we shouldn't withhold energy from our walls in this room.
+		{
+			towers = creep.room.find(FIND_MY_STRUCTURES,
 			{
-				tlength = 0;	//We've found two or more exits that are being defended, therefore we shouldn't withhold energy from our walls in this room.
-				break;
-			}
+				filter: function(tower)
+				{
+					return (tower.structureType == STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) >= 500);	//If a tower is more than half empty, we should fill it.
+				}
+			});
+			tlength = towers.length;	//This is the number of towers in the room that absolutely need energy.
 		}
 
 		towers = creep.room.find(FIND_MY_STRUCTURES,
