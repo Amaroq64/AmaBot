@@ -9,3 +9,7 @@ transport code also uses []upgrade.slice(-1).
 builder also uses []defpaths[need].slice(-1).
 dbuilder uses the full []mine with concat []defpaths[need] as a movenow.
 dbuilder also uses slice(-1) from this movenow.
+
+//There is a new flag now that dbuilder can use.
+Memory.rooms[room_name].defense.dshort[exit]
+dbuilder can now use [dshort[exit]]mine and [dshort[exit]]defpaths[need].
