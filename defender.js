@@ -167,6 +167,40 @@ var defender =
 			//console.log(JSON.stringify(topaths[i]));
 		}
 
+		//Now figure out which path is shortest for each exit.
+		let shortest = [];
+		let shortestchosen = [];
+		let test = [];
+		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+		{
+			for (let e = 0; e < Memory.rooms[room_name].sources[i].defpaths.length; e++)
+			{
+				if (shortest[e] === undefined)	//This is the first time we're checking this exit.
+				{
+					shortest[e] = Infinity;
+					shortestchosen[e] = 0;
+				}
+
+				test[e] = Memory.rooms[room_name].sources[i].mine.length + Memory.rooms[room_name].sources[i].defpaths[e].length;
+				if (test[e] < shortest[e])
+				{
+					shortestchosen[e] = i;
+					shortest[e] = test[e];
+					console.log("Shortest found for " + e + " so far: " + shortestchosen[e]);
+				}
+			}
+		}
+
+		//Now mark the shortest path for each exit.
+		for (let e = 0; e < shortestchosen.length; e++)
+		{
+			if (!Array.isArray(Memory.rooms[room_name].defense.dshort))
+			{
+				Memory.rooms[room_name].defense.dshort = [];
+			}
+			Memory.rooms[room_name].defense.dshort[e] = shortestchosen[e];
+		}
+
 		//Now mark the walls that are unreachable from the patrol paths.
 		defender.outofreach(room_name);
 
