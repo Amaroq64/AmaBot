@@ -157,8 +157,10 @@ var calculate =
 
 						//The sources' defpaths to each exit.																				//A matching dreturn for every defpath is a safe assumption.
 						//We have a problem with our defpath extending one too far. Leaving that concat out should help.
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e]/*.concat(Memory.rooms[room_name].sources[i].dreturn[e][0])*/), 'defpath', i, e);
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e]/*.concat(Memory.rooms[room_name].sources[i].defpaths[e][0]*/), false), 'dreturn', i, e);
+						//calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e].concat(Memory.rooms[room_name].sources[i].dreturn[e][0])), 'defpath', i, e);
+						//calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e].concat(Memory.rooms[room_name].sources[i].defpaths[e][0]), false), 'dreturn', i, e);
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e]), 'defpath', i, e);
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e]), false, 'dreturn', i, e);
 					}
 				}
 

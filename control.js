@@ -71,7 +71,7 @@ var control =
 		}
 		else if(creep.memory.movenow.length != 0)	//If the creep has immediate move orders, follow them.
 		{
-			status = creep.moveByPath(creep.memory.movenow)
+			status = creep.move(creep.memory.movenow)
 			if(status == OK || status == ERR_TIRED)
 			{
 				//console.log(creep.name + ": Using stored move.");
@@ -99,7 +99,8 @@ var control =
 			{
 				case "harvester":
 				{
-					if ((tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine) || (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mfat))
+					if (Memory.rooms[room_name].path[pos.x][pos.y].mfat && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mfat[source])
+						|| Memory.rooms[room_name].path[pos.x][pos.y].mine && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source]))
 					{
 						creep.memory.direction = tempdir;
 					}
@@ -110,6 +111,13 @@ var control =
 				{
 					if(creep.memory.dtrip)	//We're going to the defense.
 					{
+						//If we're at the end of our path, we swich to the other one.
+						if (Memory.rooms[room_name].path[pos.x][pos.y].flipper
+							&& (Memory.rooms[room_name].path[pos.x][pos.y].flipper.defpath[source][creep.memory.need]
+							||  Memory.rooms[room_name].path[pos.x][pos.y].flipper.dreturn[source][creep.memory.need]))
+						{
+							creep.memory.return = !creep.memory.return;
+						}
 						if ((!creep.memory.return &&
 							(Array.isArray(Memory.rooms[room_name].path[pos.x][pos.y].defpath) && typeof Memory.rooms[room_name].path[pos.x][pos.y].defpath[source] === 'object' &&
 								(tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath[source][creep.memory.need])))
@@ -125,14 +133,30 @@ var control =
 				{
 					if (!Memory.creeps[creep.name].dtrip && Memory.creeps[creep.name].utrip)	//We're going to the upgrader.
 					{
-						if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].ureturn[source])))
+						//If we're at the end of our path, we swich to the other one.
+						if (Memory.rooms[room_name].path[pos.x][pos.y].flipper
+							&& ((Memory.rooms[room_name].path[pos.x][pos.y].flipper.upgrade && Memory.rooms[room_name].path[pos.x][pos.y].flipper.upgrade[source])
+							||  (Memory.rooms[room_name].path[pos.x][pos.y].flipper.ureturn && Memory.rooms[room_name].path[pos.x][pos.y].flipper.ureturn[source])))
+						{
+							creep.memory.return = !creep.memory.return;
+						}
+						if ((!creep.memory.return && Memory.rooms[room_name].path[pos.x][pos.y].upgrade && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source]))
+							|| (creep.memory.return && Memory.rooms[room_name].path[pos.x][pos.y].ureturn && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].ureturn[source])))
 						{
 							creep.memory.direction = tempdir;
 						}
 					}
 					else if (!Memory.creeps[creep.name].dtrip)	//We're going to the source.
 					{
-						if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source])) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mreturn[source])))
+						//If we're at the end of our path, we swich to the other one.
+						if (Memory.rooms[room_name].path[pos.x][pos.y].flipper
+							&& ((Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine[source])
+							||  (Memory.rooms[room_name].path[pos.x][pos.y].flipper.mreturn && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mreturn[source])))
+						{
+							creep.memory.return = !creep.memory.return;
+						}
+						if ((!creep.memory.return && Memory.rooms[room_name].path[pos.x][pos.y].mine && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source]))
+							|| (creep.memory.return && Memory.rooms[room_name].path[pos.x][pos.y].mreturn && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mreturn[source])))
 						{
 							creep.memory.direction = tempdir;
 						}
@@ -142,8 +166,16 @@ var control =
 
 				case "utransport":
 				{
+					//If we're at the end of our path, we swich to the other one.
+					if (Memory.rooms[room_name].path[pos.x][pos.y].flipper
+						&& ((Memory.rooms[room_name].path[pos.x][pos.y].flipper.upgrade && Memory.rooms[room_name].path[pos.x][pos.y].flipper.upgrade[source])
+						||  (Memory.rooms[room_name].path[pos.x][pos.y].flipper.ureturn && Memory.rooms[room_name].path[pos.x][pos.y].flipper.ureturn[source])))
+					{
+						creep.memory.return = !creep.memory.return;
+					}
 					//We're going to the upgrader.
-					if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].ureturn[source])))
+					if ((!creep.memory.return && Memory.rooms[room_name].path[pos.x][pos.y].upgrade && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source]))
+						|| (creep.memory.return && Memory.rooms[room_name].path[pos.x][pos.y].ureturn && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].ureturn[source])))
 					{
 						creep.memory.direction = tempdir;
 					}
@@ -162,66 +194,91 @@ var control =
 
 				case "dbuilder":
 				{
-					if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath)) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].dreturn)))
+					//If we've reached our destination, then we stay here forever.
+					if (Memory.rooms[room_name].path[pos.x][pos.y].flipper
+						&& ((Memory.rooms[room_name].path[pos.x][pos.y].flipper.patrol[creep.memory.need] && (creep.memory.destination || (creep.memory.destination = true)))
+						||  (Memory.rooms[room_name].path[pos.x][pos.y].flipper.preturn[creep.memory.need])))
+					{
+						creep.memory.return = !creep.memory.return;
+					}
+					if ((!creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath)) || (creep.memory.return && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].dreturn))
+						//If we haven't reached our patrol path yet, then we use mine and exitpath to get there.
+						|| (!creep.memory.destination && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath[Memory.rooms[room_name].defense.dshort[creep.memory.need]][creep.memory.need]))
+						|| (!creep.memory.destination && (tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[Memory.rooms[room_name].defense.dshort[creep.memory.need]])))
 					{
 						creep.memory.direction = tempdir;
 					}
 				}
 			}
 
-			//If we're at the end of our path, we swich to the other one.
-			if (Memory.rooms[room_name].path[pos.x] && Memory.rooms[room_name].path[pos.x][pos.y] && Memory.rooms[room_name].path[pos.x][pos.y].flipper)
+			/*//If we're at the end of our path, we swich to the other one.
+			if (Memory.rooms[room_name].path[pos.x] && Memory.rooms[room_name].path[pos.x][pos.y] && Memory.rooms[room_name].path[pos.x][pos.y].flipper && Memory.rooms[room_name].path[pos.x][pos.y].flipper[])
 			{
 				Memory.creeps[creep.name].return = !Memory.creeps[creep.name].return;
 				switch(role)
 				{
-					
+					case "builder":
+					case "mtransport":
+						break;
+					case "utransport":
+						break;
+					case "dbuilder":
 				}
-			}
+				status = creep.move(creep.memory.direction);
 
-			status = creep.move(creep.memory.direction);
-
-			switch (status)
-			{
-				case ERR_NOT_FOUND:
+				switch (status)
 				{
-					console.log(creep.pos.x + ", " + creep.pos.y + " - " + creep.name + ": " + " - Path Not Found.");
-					//console.log("Utrip: " + creep.memory.utrip + ". Dtrip: " + creep.memory.dtrip + ". Return: " + creep.memory.return + ".");
-					
-					let tpath = [];
-					for (p = 0; p < path.length; p++)
+					case ERR_NOT_FOUND:
 					{
-						tpath.push(Game.rooms[room_name].getPositionAt(path[p].x, path[p].y));
-					}
-					Memory.creeps[creep.name].movenow = creep.pos.findPathTo(creep.pos.findClosestByPath(tpath));
+						console.log(creep.pos.x + ", " + creep.pos.y + " - " + creep.name + ": " + " - Path Not Found.");
+						//console.log("Utrip: " + creep.memory.utrip + ". Dtrip: " + creep.memory.dtrip + ". Return: " + creep.memory.return + ".");
+						
+						let tpath = [];
+						for (p = 0; p < path.length; p++)
+						{
+							tpath.push(Game.rooms[room_name].getPositionAt(path[p].x, path[p].y));
+						}
+						Memory.creeps[creep.name].movenow = creep.pos.findPathTo(creep.pos.findClosestByPath(tpath));
 
-					/*let pathstr = "";
-					for (let p = 0; p < path.length; p++)
-					{
-						if (p > 0)
-						{
-							pathstr += " ";
-						}
-						pathstr += "(" + path[p].x + ", " + path[p].y + ", " + path[p].direction + ")";
-						if(p > 1 && p % 22 == 0)
-						{
-							pathstr +="\n";
-						}
+						break;
 					}
-					console.log(pathstr);*/
-					//console.log(JSON.stringify(path));
-					//creep.room.visual.poly(path, {stroke: "blue", lineStyle: "dashed"});
-					break;
+					case ERR_INVALID_ARGS:
+					{
+						console.log(creep.name + ": " + role + " Invalid Path.");
+						break;
+					}
 				}
-				case ERR_INVALID_ARGS:
-				{
-					console.log(creep.name + ": " + role + " Invalid Path.");
-					break;
-				}
-			}
-			//console.log(JSON.stringify(path));
-			return status;
+				//console.log(JSON.stringify(path));
+				return status;
+			}*/
 		}
+
+		status = creep.move(creep.memory.direction);
+
+		switch (status)
+		{
+			case ERR_NOT_FOUND:
+			{
+				console.log(creep.pos.x + ", " + creep.pos.y + " - " + creep.name + ": " + " - Path Not Found.");
+				//console.log("Utrip: " + creep.memory.utrip + ". Dtrip: " + creep.memory.dtrip + ". Return: " + creep.memory.return + ".");
+				
+				let tpath = [];
+				for (p = 0; p < path.length; p++)
+				{
+					tpath.push(Game.rooms[room_name].getPositionAt(path[p].x, path[p].y));
+				}
+				Memory.creeps[creep.name].movenow = creep.pos.findPathTo(creep.pos.findClosestByPath(tpath));
+
+				break;
+			}
+			case ERR_INVALID_ARGS:
+			{
+				console.log(creep.name + ": " + role + " Invalid Path.");
+				break;
+			}
+		}
+		//console.log(JSON.stringify(path));
+		return status;
 	},
 
 	move: function(creep, role, source = false)
