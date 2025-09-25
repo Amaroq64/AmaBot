@@ -116,6 +116,12 @@ var calculate =
 	{
 		switch(type)
 		{
+			case 'all':
+				Memory.rooms[room_name].path = undefined;
+				calculate.cleanpaths(room_name, 'init');
+				calculate.cleanpaths(room_name, 'defender');
+				calculate.cleanpaths(room_name, 'empire');
+				break;
 			//Since moveByPath() compliant steps state the direction of move from the previous step, we will need to concatenate one step from the followup path to be sure of any direction changes.
 			case 'init':
 				//We need to do the room-wide one-time upgrade path, and the sources' mine, mreturn, upgrade, and ureturn.
@@ -127,13 +133,13 @@ var calculate =
 				{
 					//Mine goes from spawn to source, then mreturn comes back.
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mine.concat(Memory.rooms[room_name].sources[i].mreturn[0])), 'mine', i);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mreturn.concat(Memory.rooms[room_name].sources[i].mine[0]), true), 'mreturn', i);
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mreturn.concat(Memory.rooms[room_name].sources[i].mine[0]), false), 'mreturn', i);
 					//Mfat is the direction from the end of mine to the mining container.
-					calculate.writethispath(room_name, calculate.cleanthispath([Memory.rooms[room_name].sources[i].mine.slice(-1)[0], Memory.rooms[room_name].sources[i].mfat[0]], true), 'mfat', i);
+					calculate.writethispath(room_name, calculate.cleanthispath([Memory.rooms[room_name].sources[i].mine.slice(-1)[0], Memory.rooms[room_name].sources[i].mfat[0]], false), 'mfat', i);
 
 					//Upgrade goes from source to the upgrader, then comes back.
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].upgrade.concat(Memory.rooms[room_name].sources[i].ureturn[0])), 'upgrade', i);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].ureturn.concat(Memory.rooms[room_name].sources[i].upgrade[0]), true), 'ureturn', i);
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].ureturn.concat(Memory.rooms[room_name].sources[i].upgrade[0]), false), 'ureturn', i);
 				}
 
 				break;
@@ -150,9 +156,9 @@ var calculate =
 						}
 
 						//The sources' defpaths to each exit.																				//A matching dreturn for every defpath is a safe assumption.
-						//console.log(room_name + ' Def: i: ' + i + ', e: ' + e);
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e].concat(Memory.rooms[room_name].sources[i].dreturn[e][0])), 'defpath', i, e);
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e].concat(Memory.rooms[room_name].sources[i].defpaths[e][0]), true), 'dreturn', i, e);
+						//We have a problem with our defpath extending one too far. Leaving that concat out should help.
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e]/*.concat(Memory.rooms[room_name].sources[i].dreturn[e][0])*/), 'defpath', i, e);
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e]/*.concat(Memory.rooms[room_name].sources[i].defpaths[e][0]*/), false), 'dreturn', i, e);
 					}
 				}
 
@@ -166,7 +172,7 @@ var calculate =
 					//The room-wide patrol paths for each exit.																				//A matching preturn for every patrol is a safe assumption.
 					//console.log(room_name + ' Pat: e: ' + e);
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.patrol[e].concat(Memory.rooms[room_name].defense.preturn[e][0])), 'patrol', false, e);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.preturn[e].concat(Memory.rooms[room_name].defense.patrol[e][0]), true), 'preturn', false, e);
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.preturn[e].concat(Memory.rooms[room_name].defense.patrol[e][0]), false), 'preturn', false, e);
 				}
 				
 				break;
@@ -176,7 +182,7 @@ var calculate =
 				for (let e in Memory.rooms[room_name].exitpaths)
 				{																															//A matching exitreturn for every exitpath is a safe assumption.
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitpaths[e].concat(Memory.rooms[room_name].exitreturn[e][0])), 'exitpath', false, e);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitreturn[e].concat(Memory.rooms[room_name].exitpaths[e][0]), true), 'exitreturn', false, e);
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitreturn[e].concat(Memory.rooms[room_name].exitpaths[e][0]), false), 'exitreturn', false, e);
 				}
 				break;
 		}
@@ -187,16 +193,16 @@ var calculate =
 	cleanthispath: function(path, dir = false)	//If it's not false, it's a returning path taking the outbound path's last known direction. This handles cases where the start of the return path is still the same direction.
 	{
 		let temp;
-		if (dir)
+		if (dir)	//dir = true is broken. It leaves crucial steps out.
 		{
 			temp = [];
 		}
 		else
 		{
-			if (path[0] === undefined || path[0].x === undefined || path[0].y === undefined || path[0].direction === undefined)
+			/*if (path[0] === undefined || path[0].x === undefined || path[0].y === undefined || path[0].direction === undefined)
 			{
 				console.log(JSON.stringify(path[0]));
-			}
+			}*/
 			temp = [{x: path[0].x, y: path[0].y, direction: path[0].direction}];
 			dir = temp.direction;
 		}
@@ -252,7 +258,7 @@ var calculate =
 				{
 					if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name]) && (typeof exit === 'number' || typeof exit === 'string'))	//Room-wide with an indexed or string exit.
 					{
-						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name] = {};	//If it's a numeric exit based path, make sure path[x][y][name][exit] exists.
+						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name] = {};	//If it's an exit based path, make sure path[x][y][name][exit] exists.
 					}
 					else
 					{
