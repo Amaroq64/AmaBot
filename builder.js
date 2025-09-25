@@ -259,7 +259,7 @@ var builder =
 					//Figure out which path is shortest.
 					let shortest = Infinity;
 					let shortestchosen = 0;
-					for (let i = 0; i < Memory.rooms[room_name].sources[i].length; i++)
+					for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 					{
 						let test = Memory.rooms[room_name].sources[i].mine.length + Memory.rooms[room_name].sources[i].defpaths[Memory.rooms[room_name].defense.need].length;
 						if (test < shortest)
@@ -279,8 +279,10 @@ var builder =
 					options.memory.dtarget = {};
 					options.memory.dtarget.x = options.memory.movenow.slice(-1)[0].x;
 					options.memory.dtarget.y = options.memory.movenow.slice(-1)[0].y;
-					options.memory.movenow = [];	//Until we find out why shortestchosen is always 0.
+					//options.memory.movenow = [];	//Until we find out why shortestchosen is always 0.
 					options.memory.return = false;
+					options.memory.destination = false;
+					options.memory.need = defense.need;
 					direction = [Memory.rooms[room_name].sources[shortestchosen].minedir];
 
 					//When we build a new dbuilder, our builders need their dtarget updated.
