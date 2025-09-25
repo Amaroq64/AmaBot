@@ -156,6 +156,7 @@ var roleTransport =
 				//When we decide to visit the builder, record which exit to visit.
 				Memory.creeps[creep.name].need = Memory.rooms[creep.room.name].defense.need;
 			}
+			//We don't need a check for dbuilders because their need is decided when they're built.
 
 			return true;
 		}
