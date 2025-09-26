@@ -1,0 +1,34 @@
+Builder Created (To Source)
+utrip 	false
+return 	false
+dtrip 	false
+
+To Upgrade
+utrip 	true
+return 	false
+dtrip 	false
+
+Return from Upgrade
+utrip 	true
+return 	true
+dtrip 	false
+
+To Spawn
+utrip 	false
+return 	true
+dtrip 	false
+
+To Dtrip
+utrip	false
+return	false
+dtrip	true
+
+Return from Dtrip
+utrip	false
+return	true
+dtrip	true
+
+To Source
+utrip 	false
+return 	false
+dtrip 	false
