@@ -4,6 +4,8 @@ var roleMTransport =
 
 	flip: undefined,
 
+	calculate: require('calculate'),
+
 	run: function(creep)
 	{
 		//Flip, but only if we're not stuck under fatigue.
@@ -19,7 +21,7 @@ var roleMTransport =
 		//Deposit wherever we go.
 		if (creep.carry.energy > 0)
 		{
-			//We're taking the spawn as an extensions so the code can be agnostic of the particulars.
+			/*//We're taking the spawn as an extensions so the code can be agnostic of the particulars.
 			let extensions = creep.room.find(FIND_MY_STRUCTURES,
 			{
 				filter: function(structure)
@@ -30,7 +32,23 @@ var roleMTransport =
 			});
 
 			//Only iterate the extensions that are near us.
-			extensions = creep.pos.findInRange(extensions, 1);
+			extensions = creep.pos.findInRange(extensions, 1);*/
+
+			let extensions = [];
+			let room_extensions = roleMTransport.calculate.extensions[creep.room.name];
+			let tempextension;
+			//Find extensions that are near us.
+			for (let x = -1; x <= 1; x++)
+			{
+				for (let y = -1; y <= 1; y++)
+				{
+					//Assignment within comparison.
+					if ((tempextension = room_extensions[creep.pos.x + x]) && (tempextension = tempextension[creep.pos.y + y]) && (tempextension = Game.getObjectById(tempextension)) && tempextension.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
+					{
+						extensions.push(tempextension);
+					}
+				}
+			}
 
 			for (let e = 0; e < extensions.length; e++)
 			{

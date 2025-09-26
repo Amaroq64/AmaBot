@@ -3,6 +3,7 @@ var body = require('body');
 var calculate =
 {
 	extensions: {},
+	sortedextensions: {},
 
 	idealTransports: function(room)
 	{
@@ -114,6 +115,7 @@ var calculate =
 
 	cleanpaths: function(room_name, type)	//We are renaming some of these paths slightly different, so pay attention.
 	{
+		let dir;
 		switch(type)
 		{
 			case 'all':
@@ -133,13 +135,15 @@ var calculate =
 				{
 					//Mine goes from spawn to source, then mreturn comes back.
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mine.concat(Memory.rooms[room_name].sources[i].mreturn[0])), 'mine', i);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mreturn.concat(Memory.rooms[room_name].sources[i].mine[0]), false), 'mreturn', i);
+					dir = Memory.rooms[room_name].sources[i].mine[0].direction;
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mreturn.concat(Memory.rooms[room_name].sources[i].mine[0]), dir), 'mreturn', i);
 					//Mfat is the direction from the end of mine to the mining container.
 					calculate.writethispath(room_name, calculate.cleanthispath([Memory.rooms[room_name].sources[i].mine.slice(-1)[0], Memory.rooms[room_name].sources[i].mfat[0]], false), 'mfat', i);
 
-					//Upgrade goes from source to the upgrader, then comes back.
+					//Upgrade goes from source to the upgrader, then comes back to mine.
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].upgrade.concat(Memory.rooms[room_name].sources[i].ureturn[0])), 'upgrade', i);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].ureturn.concat(Memory.rooms[room_name].sources[i].upgrade[0]), false), 'ureturn', i);
+					dir = Memory.rooms[room_name].sources[i].ureturn[0].direction;
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].ureturn.concat(Memory.rooms[room_name].sources[i].mine[0]), dir), 'ureturn', i);
 				}
 
 				break;
@@ -152,15 +156,14 @@ var calculate =
 					{
 						if (Memory.rooms[room_name].sources[i].defpaths[e].length == 0 || Memory.rooms[room_name].sources[i].defpaths[e].length == 0)
 						{
-							continue;	//Some of my patrols are broken, possibly due to safety flags.
+							continue;	//Some of the patrols are broken, possibly due to safety flags.
 						}
 
 						//The sources' defpaths to each exit.																				//A matching dreturn for every defpath is a safe assumption.
 						//We have a problem with our defpath extending one too far. Leaving that concat out should help.
-						//calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e].concat(Memory.rooms[room_name].sources[i].dreturn[e][0])), 'defpath', i, e);
-						//calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e].concat(Memory.rooms[room_name].sources[i].defpaths[e][0]), false), 'dreturn', i, e);
 						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e]), 'defpath', i, e);
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e]), false, 'dreturn', i, e);
+						dir = Memory.rooms[room_name].sources[i].defpaths[e][0].direction;
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e], dir), 'dreturn', i, e);
 					}
 				}
 
@@ -174,7 +177,8 @@ var calculate =
 					//The room-wide patrol paths for each exit.																				//A matching preturn for every patrol is a safe assumption.
 					//console.log(room_name + ' Pat: e: ' + e);
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.patrol[e].concat(Memory.rooms[room_name].defense.preturn[e][0])), 'patrol', false, e);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.preturn[e].concat(Memory.rooms[room_name].defense.patrol[e][0]), false), 'preturn', false, e);
+					dir = Memory.rooms[room_name].defense.patrol[e][0].direction;
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.preturn[e].concat(Memory.rooms[room_name].defense.patrol[e][0]), dir), 'preturn', false, e);
 				}
 				
 				break;
@@ -184,7 +188,8 @@ var calculate =
 				for (let e in Memory.rooms[room_name].exitpaths)
 				{																															//A matching exitreturn for every exitpath is a safe assumption.
 					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitpaths[e].concat(Memory.rooms[room_name].exitreturn[e][0])), 'exitpath', false, e);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitreturn[e].concat(Memory.rooms[room_name].exitpaths[e][0]), false), 'exitreturn', false, e);
+					dir = Memory.rooms[room_name].exitpaths[e][0].direction;
+					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitreturn[e].concat(Memory.rooms[room_name].exitpaths[e][0]), dir), 'exitreturn', false, e);
 				}
 				break;
 		}
@@ -194,8 +199,9 @@ var calculate =
 
 	cleanthispath: function(path, dir = false)	//If it's not false, it's a returning path taking the outbound path's last known direction. This handles cases where the start of the return path is still the same direction.
 	{
+		//dir = false;	//dir = true is broken. It leaves crucial steps out.
 		let temp;
-		if (dir)	//dir = true is broken. It leaves crucial steps out.
+		if (dir)
 		{
 			temp = [];
 		}
@@ -415,45 +421,50 @@ var calculate =
 		{
 			arranged_extensions = calculate.getExtensions(room_name);
 		}
-
-		//Arrange the extensions and spawners so energy is taken evenly from all sources. Spawners should be last since they could be the farthest from the source.
-		let sorted_extensions = [];
-		let current_extension;
-		let s = Array(Memory.rooms[room_name].sources.length).fill(0);
-		let more_extensions = true;
-		while (more_extensions)
+		if (calculate.sortedextensions[room_name])
 		{
-			more_extensions = false;
-			for (i = 0; i < s.length; i++)
+			return calculate.sortedextensions[room_name];
+		}
+		else
+		{
+			//Arrange the extensions and spawners so energy is taken evenly from all sources. Spawners should be last since they could be the farthest from the source.
+			let sorted_extensions = [];
+			let current_extension;
+			let s = Array(Memory.rooms[room_name].sources.length).fill(0);
+			let more_extensions = true;
+			while (more_extensions)
 			{
-				if (s[i] < Memory.rooms[room_name].sources[i].buildings.extensions.length &&
-					arranged_extensions
-						[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x] &&//x
-					arranged_extensions
-						[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x]	//x
-						[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y]	//y
-					)
+				more_extensions = false;
+				for (i = 0; i < s.length; i++)
 				{
-					//Iterate one extension from the current source. Then prepare to do the next one.
-					//console.log(room_name + ", x: " + Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x + ", y: "  + Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y);
-					current_extension = Game.getObjectById
-					(
+					if (s[i] < Memory.rooms[room_name].sources[i].buildings.extensions.length &&
+						arranged_extensions
+							[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x] &&//x
 						arranged_extensions
 							[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x]	//x
 							[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y]	//y
-					);
-					if (current_extension && current_extension.structureType == STRUCTURE_EXTENSION)
+						)
 					{
-						sorted_extensions.push(current_extension);
-						more_extensions = true;
+						//Iterate one extension from the current source. Then prepare to do the next one.
+						//console.log(room_name + ", x: " + Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x + ", y: "  + Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y);
+						current_extension = Game.getObjectById
+						(
+							arranged_extensions
+								[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x]	//x
+								[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y]	//y
+						);
+						if (current_extension && current_extension.structureType == STRUCTURE_EXTENSION)
+						{
+							sorted_extensions.push(current_extension);
+							more_extensions = true;
+						}
 					}
+					s[i]++;
 				}
-				s[i]++;
 			}
+			sorted_extensions = sorted_extensions.concat(Game.rooms[room_name].find(FIND_MY_SPAWNS));
+			return sorted_extensions;
 		}
-		sorted_extensions = sorted_extensions.concat(Game.rooms[room_name].find(FIND_MY_SPAWNS));
-
-		return sorted_extensions;
 	},
 
 	//Various reducers so we can easily do single-line checks involving arrays of arbitrary length.

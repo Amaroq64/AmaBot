@@ -1,5 +1,10 @@
 var roleTransport =
 {
+	room_containers: undefined,
+	room_energy: undefined,
+	room_ruins: undefined,
+	
+
 	withdraw: function(creep)
 	{
 		//We can only pick up once per tick.
@@ -133,9 +138,9 @@ var roleTransport =
 		//Flip, but only if we're not stuck under fatigue.
 		if (creep.fatigue == 0 && creep.pos.x == Memory.creeps[creep.name].target.x && creep.pos.y == Memory.creeps[creep.name].target.y)
 		{
-			//console.log(Memory.creeps[creep.name].utrip + " " + creep.fatigue);
+			return true;	//We're probably moving this all to control.
 
-			if (Memory.creeps[creep.name].dtrip)
+			/*if (Memory.creeps[creep.name].dtrip)
 			{
 				//If we're returning from the builder, flip back.
 				if (creep.store.getUsedCapacity() == 0)
@@ -158,7 +163,7 @@ var roleTransport =
 			}
 			//We don't need a check for dbuilders because their need is decided when they're built.
 
-			return true;
+			return true;*/
 		}
 	},
 
