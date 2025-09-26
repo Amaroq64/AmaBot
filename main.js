@@ -101,7 +101,7 @@ module.exports.loop = function()
 
 		//test.cpu_usage = cpu_usage;
 
-		if(cpu_usage[Object.keys(cpu_usage)[Object.keys(cpu_usage).length - 1]] >= 20)
+		if(cpu_usage[Object.keys(cpu_usage)[Object.keys(cpu_usage).length - 1]] >= 20 || (Memory.cpu && !(Memory.cpu = undefined)))
 		{
 			for (let module in cpu_usage)
 			{
