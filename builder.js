@@ -204,7 +204,7 @@ var builder =
 				case "utransport":	//We might not have a container yet. Store the desired position.
 				{
 					//Our target is the last step in the upgrader's path, since that's where it will be waiting.
-					options.memory.direction = false;
+					options.memory.direction = Memory.rooms[room_name].sources[need].mine[1].direction;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
@@ -212,12 +212,7 @@ var builder =
 					options.memory.return = false;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source initially.
 					//This one needs temporary instructions to get to a source. Then it loops between the source and the controller upgrader on its own.
-					for(let m = 1; m < Memory.rooms[room_name].sources[need].mine.length; m++)
-					{
-						//console.log("Pushing for source " + need + ".");
-						options.memory.movenow.push(Memory.rooms[room_name].sources[need].mine[m]);
-						//console.log("Pushing " + Memory.rooms[room_name].sources[need].mine[m].dx + " " + Memory.rooms[room_name].sources[need].mine[m].dy + ".");
-					}
+					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[need].mine, Memory.rooms[room_name].sources[need].mine[1].direction);
 					break;
 				}
 				case "builder":
@@ -266,12 +261,12 @@ var builder =
 						{
 							shortestchosen = i;
 							shortest = test;
-							console.log("Shortest Found: " + shortestchosen);
+							//console.log("Shortest Found: " + shortestchosen);
 						}
 					}
 
 					//Now deploy onto that path.
-					options.memory.direction = false;
+					options.memory.direction = Memory.rooms[room_name].sources[shortestchosen].mine[1].direction;
 					options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need]);
 					options.memory.target = {};
 					options.memory.target.x = options.memory.movenow.slice(-1)[0].x;
@@ -279,7 +274,8 @@ var builder =
 					options.memory.dtarget = {};
 					options.memory.dtarget.x = options.memory.movenow.slice(-1)[0].x;
 					options.memory.dtarget.y = options.memory.movenow.slice(-1)[0].y;
-					//options.memory.movenow = [];	//Until we find out why shortestchosen is always 0.
+					//options.memory.movenow = calculate.cleanthispath(options.memory.movenow, options.memory.movenow[1].direction)
+					options.memory.movenow = [];
 					options.memory.return = false;
 					options.memory.destination = false;
 					options.memory.need = defense.need;
