@@ -37,3 +37,17 @@ Memory.rooms[room_name].path[x][y]
 	.exitreturn[room_name]
 	.flipper.exitpath[room_name]	= true
 	.flipper.exitreturn[room_name]	= true
+
+control.paths[]
+0	'mine'
+1	'mreturn'
+2	'upgrade'
+3	'ureturn'
+4	'defpath'
+5	'dreturn'
+6	'patrol'
+7	'preturn'
+8	'exitpath'
+9	'exitreturn'
+10	'mfat'
+11	'upgrader'
