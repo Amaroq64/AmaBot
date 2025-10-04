@@ -78,7 +78,7 @@ var roleTransport =
 				roleTransport.acted = true;
 				return true;	//We got our energy. Move on.
 			}
-			else if (creep.name.indexOf("Dbuilder") != -1 && ((typeof room_ruins[r].resourceType === "string" && room_ruins[r].resourceType == RESOURCE_ENERGY) ||
+			/*else if (creep.name.indexOf("Dbuilder") != -1 && creep.memory.destination && ((typeof room_ruins[r].resourceType === "string" && room_ruins[r].resourceType == RESOURCE_ENERGY) ||
 				(typeof room_ruins[r].store === "object" && room_ruins[r].store.getUsedCapacity(RESOURCE_ENERGY) > 0)) && creep.pos.getRangeTo(room_ruins[r].pos) <= 5)
 			{
 				Memory.creeps[creep.name].movenow = creep.pos.findPathTo(room_ruins[r], {range: 1,
@@ -94,7 +94,9 @@ var roleTransport =
 						}
 					}
 				}});
-			}
+				Memory.creeps[creep.name].direction = Memory.creeps[creep.name].movenow[1].direction;
+				Memory.creeps[creep.name].movenow = require('calculate').cleanpaths(Memory.creeps[creep.name].movenow);
+			}*/
 		}
 	},
 
