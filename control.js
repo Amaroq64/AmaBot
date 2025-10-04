@@ -129,6 +129,10 @@ var control =
 						{
 							flipper = flipper[source];
 						}
+						else
+						{
+							flipper = false;
+						}
 						break;
 					case 4:	//defpath[][exit]
 					case 5:	//dreturn[][exit]
@@ -152,6 +156,10 @@ var control =
 						{
 							flipper = flipper[source][creep.memory.need];
 						}
+						else
+						{
+							flipper = false;
+						}
 						break;
 					case 6:	//patrol[exit]
 					case 7:	//preturn[exit]
@@ -170,6 +178,10 @@ var control =
 						if (flipper[creep.memory.need])
 						{
 							flipper = flipper[creep.memory.need];
+						}
+						else
+						{
+							flipper = false;
 						}
 						break;
 				}
@@ -256,11 +268,11 @@ var control =
 									creep.memory.utrip = true;
 
 									//If we're switching to a completely new path, we need to override our previous direction change.
-									/*if (Memory.rooms[room_name].path[pos.x][pos.y].upgrade && Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])
+									if (Memory.rooms[room_name].path[pos.x][pos.y].upgrade && Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])
 									{
 										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source];
 									}
-									else if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
+									/*else if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
 									{
 										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source];
 									}*/

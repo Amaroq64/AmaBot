@@ -138,7 +138,7 @@ var init =
 									{
 										costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 10); //Unless absolutely necessary.
 
-										if (i ==1)
+										if (i == 1)
 										{
 											for (let n = 0; n < temp[i - 1].mreturn.length; n++)
 											{
