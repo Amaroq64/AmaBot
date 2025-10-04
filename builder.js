@@ -170,6 +170,7 @@ var builder =
 				case "harvester":	//It could be helpful to store this to make checks easier.
 				{
 					options.memory.direction = false;
+					options.memory.path = 0;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mfat.slice(0, 1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mfat.slice(0, 1)[0].y;
@@ -179,6 +180,7 @@ var builder =
 				case "mtransport":	//We might not have a container yet. Store the desired position.
 				{
 					options.memory.direction = false;
+					options.memory.path = 0;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].y;
@@ -186,7 +188,7 @@ var builder =
 					//options.memory.dtarget.x = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
 					//options.memory.dtarget.y = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
 					options.memory.utrip = false;
-					options.memory.return = false;
+					//options.memory.return = false;
 					options.memory.dtrip = false;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
 					break;
@@ -195,6 +197,7 @@ var builder =
 				case "upgrader":	//It could be helpful to store this to make checks easier.
 				{
 					options.memory.direction = false;
+					options.memory.path = 11;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
@@ -205,19 +208,21 @@ var builder =
 				{
 					//Our target is the last step in the upgrader's path, since that's where it will be waiting.
 					options.memory.direction = Memory.rooms[room_name].sources[need].mine[1].direction;
+					options.memory.path = 3;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
-
-					options.memory.return = false;
+					//options.memory.return = false;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source initially.
 					//This one needs temporary instructions to get to a source. Then it loops between the source and the controller upgrader on its own.
 					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[need].mine, Memory.rooms[room_name].sources[need].mine[1].direction);
+					options.memory.movenow.pop();
 					break;
 				}
 				case "builder":
 				{
 					options.memory.direction = false;
+					options.memory.path = 0;
 					options.memory.target = {};	//We need to flip the utrip bool every time we visit the source.
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].y;
@@ -225,10 +230,15 @@ var builder =
 					options.memory.dtarget.x = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
 					options.memory.dtarget.y = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
 					options.memory.utrip = false;	//This breaks movement if we try to be clever by starting it as true.
-					options.memory.return = false;
+					//options.memory.return = true;
 					options.memory.dtrip = false;
-					options.memory.need = 0;
+					options.memory.destination = false;
+					options.memory.need = Memory.rooms[room_name].defense.need;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
+					//This one needs temporary instructions to get to a source. Then it loops between the source, the controller upgrader, and the defense builder on its own.
+					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[need].mine.concat(Memory.rooms[room_name].sources[need].mreturn[0]), Memory.rooms[room_name].sources[need].mine[1].direction);
+					options.memory.movenow.pop();
+					options.memory.direction = Memory.rooms[room_name].sources[need].mine[1].direction
 					break;
 				}
 				case "dbuilder":
@@ -267,6 +277,7 @@ var builder =
 
 					//Now deploy onto that path.
 					options.memory.direction = Memory.rooms[room_name].sources[shortestchosen].mine[1].direction;
+					options.memory.path = 4;
 					options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need]);
 					options.memory.target = {};
 					options.memory.target.x = options.memory.movenow.slice(-1)[0].x;
@@ -274,11 +285,13 @@ var builder =
 					options.memory.dtarget = {};
 					options.memory.dtarget.x = options.memory.movenow.slice(-1)[0].x;
 					options.memory.dtarget.y = options.memory.movenow.slice(-1)[0].y;
-					//options.memory.movenow = calculate.cleanthispath(options.memory.movenow, options.memory.movenow[1].direction)
-					options.memory.movenow = [];
-					options.memory.return = false;
-					options.memory.destination = false;
+					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need][0]),
+						Memory.rooms[room_name].sources[shortestchosen].mine[1].direction)
+					//options.memory.movenow = [];
+					//options.memory.return = false;
+					options.memory.dtrip = true;
 					options.memory.need = defense.need;
+					options.memory.s = shortestchosen;
 					direction = [Memory.rooms[room_name].sources[shortestchosen].minedir];
 
 					//When we build a new dbuilder, our builders need their dtarget updated.
