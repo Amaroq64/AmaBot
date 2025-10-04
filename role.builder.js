@@ -57,7 +57,7 @@ var roleBuilder =
 		//Create roads wherever we go.
 		if (Memory.creeps[creep.name].movenow.length == 0)
 		{
-			creep.room.createConstructionSite(creep.pos, STRUCTURE_ROAD);
+			//creep.room.createConstructionSite(creep.pos, STRUCTURE_ROAD);
 		}
 		
 		//Flip, but only if we're not stuck under fatigue.
@@ -73,9 +73,9 @@ var roleBuilder =
 			roleBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
 
 			//If we're on the way but we run out, we should go back.
-			if (Memory.creeps[creep.name].dtrip && !Memory.creeps[creep.name].return)
+			if (Memory.creeps[creep.name].path == 4)
 			{
-				Memory.creeps[creep.name].return = true;
+				Memory.creeps[creep.name].path++;
 			}
 
 			return true;
