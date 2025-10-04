@@ -1,6 +1,6 @@
 global.help =
 "flags\n" +
-"attack(attack_number, x, y)\n" +
+"attack(attack_number, x, y, [room_name])\n" +
 "attackdisplay\n" +
 "attackrole(attack_number, role_type, number_of_role)\n" +
 "movenow(creep_name, x, y)\n" +
