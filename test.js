@@ -30,6 +30,12 @@ var test =
 				test.paint.defensepath(room_name, ["green", "yellow"]);
 			}
 
+			pindex++;
+			if (pindex > 11)
+			{
+				pindex = 0;
+			}
+
 			for (let room_name in Memory.rooms)
 			{
 				if (!newpath)
@@ -41,6 +47,10 @@ var test =
 				let style = {color: 'white', opacity: 0.5};
 				for (let x in Memory.rooms[room_name].path)
 				{
+					if (x != test.path[pindex])
+					{
+						break;
+					}
 					for (let y in Memory.rooms[room_name].path[x])
 					{
 						for (let path in Memory.rooms[room_name].path[x][y])
@@ -337,6 +347,74 @@ var test =
 	},
 
 	direction: ['F', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
+	pindex: -1;
+	paths = ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpath', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
+
+	pathmemtest: function()
+	{
+		if(Memory)
+		{
+			let path = [];
+
+			for (let room_name in Memory.rooms)
+			{
+				path.push(Memory.rooms[room_name].upgrade);
+				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+				{
+					path.push(Memory.rooms[room_name].sources[i].mine);
+					path.push(Memory.rooms[room_name].sources[i].mreturn);
+					path.push(Memory.rooms[room_name].sources[i].upgrade);
+					path.push(Memory.rooms[room_name].sources[i].ureturn);
+					for (let e = 0; e < Memory.rooms[room_name].sources[i].defpaths.length; e++)
+					{
+						path.push(Memory.rooms[room_name].sources[i].defpaths[e]);
+					}
+					for (let e = 0; e < Memory.rooms[room_name].sources[i].defpaths.length; e++)
+					{
+						path.push(Memory.rooms[room_name].sources[i].dreturn[e]);
+					}
+					for (let exit_name in Memory.rooms[room_name].exitpaths)
+					{
+						path.push(Memory.rooms[room_name].exitpaths[exit_name]);
+					}
+					for (let exit_name in Memory.rooms[room_name].exitreturn)
+					{
+						path.push(Memory.rooms[room_name].exitreturn[exit_name]);
+					}
+					for (let p = 0; p < Memory.rooms[room_name].defense.patrol.length; p++)
+					{
+						path.push(Memory.rooms[room_name].defense.patrol[p]);
+					}
+					for (let p = 0; p < Memory.rooms[room_name].defense.preturn.length; p++)
+					{
+						path.push(Memory.rooms[room_name].defense.preturn[p]);
+					}
+				}
+			}
+
+			console.log('Path Steps: ' + path.length);
+
+			let cpu_usage = {Begin: Game.cpu.getUsed()};
+
+			for (let p = 0; p < path.length; p++)
+			{
+				path[p] = JSON.stringify(path[p]);
+			}
+
+			cpu_usage.Serialize = Game.cpu.getUsed() - cpu_usage.Begin;
+
+			for (let p = 0; p < path.length; p++)
+			{
+				path[p] = JSON.parse(path[p]);
+			}
+
+			cpu_usage.Deserialize = Game.cpu.getUsed() - cpu_usage.Begin - cpu_usage.Serialize;
+
+			console.log('Serialize: ' + cpu_usage.Serialize);
+			console.log('Deserialize: ' + cpu_usage.Deserialize);
+			return true;
+		}
+	},
 
 	/*cpu: function()
 	{
