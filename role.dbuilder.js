@@ -163,7 +163,14 @@ var roleDBuilder =
 				if (creep.carry.energy <= towers[0].store.getFreeCapacity(RESOURCE_ENERGY))
 				{
 					//If depositing is going to empty us out, we should return.
-					Memory.creeps[creep.name].return = !Memory.creeps[creep.name].return;
+					if (Memory.creeps[creep.name].path == 6)
+					{
+						Memory.creeps[creep.name].path = 7;
+					}
+					else if (Memory.creeps[creep.name].path == 7)
+					{
+						Memory.creeps[creep.name].path = 6;
+					}
 				}
 				return true;
 			}
