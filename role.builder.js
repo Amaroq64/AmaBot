@@ -75,7 +75,7 @@ var roleBuilder =
 			//If we're on the way but we run out, we should go back.
 			if (Memory.creeps[creep.name].path == 4)
 			{
-				Memory.creeps[creep.name].path++;
+				Memory.creeps[creep.name].path = 5;
 			}
 
 			return true;
