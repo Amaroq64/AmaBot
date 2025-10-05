@@ -141,8 +141,6 @@ var control =
 							source = creep.memory.s;	//This creep doesn't actually belong to a source.
 						}
 
-						creep.memory.need = Memory.rooms[room_name].defense.need;
-
 						if (tempdir[source] && tempdir[source][creep.memory.need])
 						{
 							tempdir = tempdir[source][creep.memory.need];
@@ -317,6 +315,7 @@ var control =
 									creep.memory.path = 4;	//We've completed our return from the upgrader and are going to the dbuilder.
 									creep.memory.utrip = false;
 									creep.memory.dtrip = true;
+									creep.memory.need = Memory.rooms[room_name].defense.need;	//This should only be updated when we first choose a defpath.
 
 									//If we're switching to a completely new path, we need to override our previous direction change.
 									if (Memory.rooms[room_name].path[pos.x][pos.y].defpath && Memory.rooms[room_name].path[pos.x][pos.y].defpath[source] && Memory.rooms[room_name].path[pos.x][pos.y].defpath[source][creep.memory.need])
