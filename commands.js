@@ -4,6 +4,7 @@ global.help =
 "attackdisplay\n" +
 "attackrole(attack_number, role_type, number_of_role)\n" +
 "movenow(creep_name, x, y)\n" +
+"newpath(current_room, action_type, action_number, [x, [y], [x2], [y2], [target_room])\n" +
 "clearcreep(creep_name)\n" +
 "oversign(creep_name)";
 
@@ -72,6 +73,31 @@ global.movenow = function(creep_name, x, y)
 	if (Memory.creeps[creep_name])
 	{
 		Memory.creeps[creep_name].movenow = Game.creeps[creep_name].pos.findPathTo(x, y);
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+global.newpath = function(room_name, action_type, action_number, x = false, y = false, x2 = false, y2 = false, room_name2)
+{
+	if (typeof room_name === 'string' && typeof action_type === 'string' && typeof action_number === 'number')
+	{
+		if (typeof x !== 'number' && typeof y !== 'number' && typeof x2 !== 'number' && typeof y2 !== 'number')
+		{
+			let temproom = Memory[action_type][action_number].path[room_name];
+			x = temproom[0].x;
+			y = temproom[0].y;
+			x2 = temproom[temproom.length - 1].x;
+			y2 = temproom[temproom.length - 1].y;
+		}
+		Memory[action_type][action_number].path[room_name] = Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)));
+		if (typeof room_name2 === 'string')
+		{
+			Memory[action_type][action_number].pos.roomName = room_name2;
+		}
 		return true;
 	}
 	else
