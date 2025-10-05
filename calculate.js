@@ -161,9 +161,10 @@ var calculate =
 
 						//The sources' defpaths to each exit.																				//A matching dreturn for every defpath is a safe assumption.
 						//We have a problem with our defpath extending one too far. Leaving that concat out should help.
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].defpaths[e]), 'defpath', i, e);
+						//We have a problem with our defpaths not starting at the source junction. A concat should help.
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mine.slice(-1).concat(Memory.rooms[room_name].sources[i].defpaths[e])), 'defpath', i, e);
 						dir = Memory.rooms[room_name].sources[i].defpaths[e][0].direction;
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e], dir), 'dreturn', i, e);
+						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e].concat(Memory.rooms[room_name].sources[i].mreturn.slice(0, 1)), dir), 'dreturn', i, e);
 					}
 				}
 
