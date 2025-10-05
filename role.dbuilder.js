@@ -134,7 +134,7 @@ var roleDBuilder =
 			}
 		}
 
-		if (found > 1)	//We've found two or more exits that are being defended, therefore we shouldn't withhold energy from our walls in this room.
+		if (found <= 1)	//All towers are concentrated at this wall, therefore we can withhold energy to refill them.
 		{
 			towers = creep.room.find(FIND_MY_STRUCTURES,
 			{
