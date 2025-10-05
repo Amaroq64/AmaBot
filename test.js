@@ -347,14 +347,15 @@ var test =
 	},
 
 	direction: ['F', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
-	pindex: -1;
-	paths = ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpath', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
+	pindex: -1,
+	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpath', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
 
 	pathmemtest: function()
 	{
 		if(Memory)
 		{
 			let path = [];
+			let path2 = [];
 
 			for (let room_name in Memory.rooms)
 			{
@@ -405,13 +406,14 @@ var test =
 
 			for (let p = 0; p < path.length; p++)
 			{
-				path[p] = JSON.parse(path[p]);
+				path2[p] = JSON.parse(path[p]);
 			}
 
 			cpu_usage.Deserialize = Game.cpu.getUsed() - cpu_usage.Begin - cpu_usage.Serialize;
 
 			console.log('Serialize: ' + cpu_usage.Serialize);
 			console.log('Deserialize: ' + cpu_usage.Deserialize);
+			console.log((JSON.stringify(path).length / 1024) + " Kb");
 			return true;
 		}
 	},
