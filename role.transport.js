@@ -128,6 +128,11 @@ var roleTransport =
 				//console.log("Depositing into a creep.");
 			}
 			roleTransport.acted = true;
+			if (creep.memory.dtrip)
+			{
+				//If we deposited to our dbuilder, we go back.
+				Memory.creeps[creep.name].path = 5;
+			}
 			return true;	//Traffic clogs up if we try to wait until we're empty.
 		}
 
