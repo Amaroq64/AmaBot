@@ -109,6 +109,10 @@ module.exports.loop = function()
 			}
 		}
 	}
+	/*else
+	{
+		//We're just starting on this shard.
+	}*/
 
 	//Generate a pixel.
 	if (Game.cpu.bucket >= PIXEL_CPU_COST)
@@ -120,7 +124,7 @@ module.exports.loop = function()
 	}
 
 	//Load our console commands.
-	if (typeof global.help !== 'string')
+	if (global.help)
 	{
 		require('commands');
 	}
