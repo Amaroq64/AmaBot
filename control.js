@@ -217,6 +217,12 @@ var control =
 								creep.memory.path = 6;
 								creep.memory.dtrip = undefined;
 								creep.memory.s = undefined;
+
+								//If we're switching to a completely new path, we need to override our previous direction change.
+								if (Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]] && Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][creep.memory.need])
+								{
+									tempdir = Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][creep.memory.need];
+								}
 							}
 							else
 							{
@@ -344,9 +350,11 @@ var control =
 						{
 							creep.memory.path = 3;
 						}
-						if (Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]])
+
+						//If we're switching to a completely new path, we need to override our previous direction change.
+						if (Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]] && Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][source])
 						{
-							tempdir = Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]];
+							tempdir = Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][source];
 						}
 						break;
 				}
