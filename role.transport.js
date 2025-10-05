@@ -131,6 +131,7 @@ var roleTransport =
 			if (creep.memory.dtrip)
 			{
 				//If we deposited to our dbuilder, we go back.
+				//dbuilders use their own deposit function, so we don't have to worry about this path switch bleeding over.
 				Memory.creeps[creep.name].path = 5;
 			}
 			return true;	//Traffic clogs up if we try to wait until we're empty.
