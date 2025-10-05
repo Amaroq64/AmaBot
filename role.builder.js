@@ -73,7 +73,7 @@ var roleBuilder =
 			roleBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
 
 			//If we're on the way but we run out, we should go back.
-			if (Memory.creeps[creep.name].path == 4)
+			if (Memory.creeps[creep.name].path == 4 && creep.name.indexOf("Builder") != -1)
 			{
 				Memory.creeps[creep.name].path = 5;
 			}
