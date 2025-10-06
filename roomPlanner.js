@@ -213,18 +213,21 @@ var roomPlanner =
 				}
 				else
 				{
-					for (let w = 0; Array.isArray(Memory.rooms[room_name].defense.knownwalls) && w < Memory.rooms[room_name].defense.knownwalls.length; w++)
+					if (Array.isArray(Memory.rooms[room_name].defense.knownwalls))
 					{
-						if (!Game.getObjectById(Memory.rooms[room_name].defense.knownwalls[w]))
+						for (let w = 0; w < Memory.rooms[room_name].defense.knownwalls.length; w++)
 						{
-							Memory.rooms[room_name].defense.knownwalls.splice(w, 1);
-							require('defender').checkDefense(room_name);
-						}
-						else if (Memory.rooms[room_name].defense.checkagain)
-						{
-							require('defender').checkDefense(room_name);
-							Memory.rooms[room_name].defense.checkagain = undefined;
-							break;
+							if (!Game.getObjectById(Memory.rooms[room_name].defense.knownwalls[w]))	//If any wall is missing.
+							{
+								Memory.rooms[room_name].defense.knownwalls.splice(w, 1);
+								require('defender').checkDefense(room_name);
+							}
+							else if (Memory.rooms[room_name].defense.checkagain)	//If checkagain is set.
+							{
+								require('defender').checkDefense(room_name);
+								Memory.rooms[room_name].defense.checkagain = undefined;
+								break;
+							}
 						}
 					}
 				}
