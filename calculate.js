@@ -339,9 +339,9 @@ var calculate =
 						{
 							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = [];
 						}
-						if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source]))
+						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] !== 'object')
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] = {}
+							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] = {};
 						}
 						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source][exit] = true;
 					}
