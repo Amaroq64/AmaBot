@@ -877,7 +877,7 @@ var claim =
 						}
 						else 
 						{
-							if (creep.pos.inRangeTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, 1))
+							if (creep.pos.inRangeTo(Memory.withdraw[a].pos.x, Memory.withdraw[a].pos.y, 1))
 							{
 								//Withdraw from our target.
 								let target = creep.pos.findInRange(structs)[0];
@@ -891,7 +891,7 @@ var claim =
 							else
 							{
 								//We need to get a path.
-								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, {ignoreCreeps: true});
+								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.withdraw[a].pos.x, Memory.withdraw[a].pos.y, {ignoreCreeps: true});
 								Memory.creeps[creep.name].movenow.pop();
 							}
 						}
@@ -932,7 +932,7 @@ var claim =
 						}
 						else 
 						{
-							if (creep.pos.inRangeTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, 1))
+							if (creep.pos.inRangeTo(Memory.deposit[a].pos.x, Memory.deposit[a].pos.y, 1))
 							{
 								//Deposit to our target.
 								let target = creep.room.storage;
@@ -954,7 +954,7 @@ var claim =
 							else
 							{
 								//We need to get a path.
-								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, {ignoreCreeps: true});
+								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.deposit[a].pos.x, Memory.deposit[a].pos.y, {ignoreCreeps: true});
 								Memory.creeps[creep.name].movenow.pop();
 							}
 						}
