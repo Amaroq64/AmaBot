@@ -63,10 +63,11 @@ var roleDBuilder =
 						if (sites[c].pos.isEqualTo(farwalls[f]))
 						{
 							//If we found one nearby, go to it, then come back from it.
-							if (Memory.creeps[creep.name].movenow.length == 0)
+							if (Memory.creeps[creep.name].movenow.length === 0)
 							{
 								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(sites[c].pos, {range: 3});
 								Memory.creeps[creep.name].movenow.concat(creep.room.findPath(creep.room.getPositionAt(Memory.creeps[creep.name].movenow.slice(-1)[0].x, Memory.creeps[creep.name].movenow.slice(-1)[0].y), creep.pos));
+								Memory.creeps[creep.name].movenow = require('calculate').cleanthispath(Memory.creeps[creep.name].movenow, Memory.creeps[creep.name].movenow[1].direction);
 							}
 						}
 					}
