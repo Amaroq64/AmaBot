@@ -193,7 +193,7 @@ var builder =
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
 					break;
 				}
-				case "ubuilder":
+				//case "ubuilder":
 				case "upgrader":	//It could be helpful to store this to make checks easier.
 				{
 					options.memory.direction = false;
