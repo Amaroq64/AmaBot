@@ -10,7 +10,8 @@ var roleUpgrader =
 			}
 		}
 
-		if(creep.upgradeController(creep.room.controller) == ERR_NOT_IN_RANGE || !creep.pos.isEqualTo(Memory.rooms[creep.room.name].upgrade.slice(-1)[0].x, Memory.rooms[creep.room.name].upgrade.slice(-1)[0].y))
+		//This could potentially have undesired behavior. If we want it to move closer than maximum range, it will never get there unless it has energy. But it will never get energy unless something dies by it.
+		if(creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE || !creep.pos.isEqualTo(creep.memory.target.x, creep.memory.target.y))
 		{
 			return true;	//We need to move to the source.
 		}
