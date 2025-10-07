@@ -1,3 +1,15 @@
+The old path and new path can coexist in memory.
+The problem lies in how huge the old path is.
+As it turns out, the majority of CPU used
+to parse Memory is spent parsing the old paths.
+Therefore, the old path should be deleted.
+The following must be accounted for before doing so.
+========================================================================
+
+========================
+What creates what?
+========================
+
 init.run()
 ========================
 Memory.rooms[room_name]
@@ -26,3 +38,172 @@ empire.room.exitpaths()
 Memory.rooms[room_name]
 	.exitpaths[room_name]
 	.exitreturn[room_name]
+
+========================================================================
+
+========================
+What is used by what?
+========================
+
+Obviously we don't care what init.run() uses. Nor what saveExtensions uses either.
+However, init.run() also requires roomPlanner.run() and empire.room.exitpaths().
+
+Every tick, we call roomPlanner.check(), which calls roomPlanner.run() when we level.
+
+======
+
+Every tick, roomPlanner.check() checks the following:
+	upgrade.slice(-1)	//For replacing a missing container.
+	[]mfat			//For replacing missing containers.
+
+Potentially every tick, if a wall is missing,
+roomPlanner.check() calls defender.checkDefense()
+	Object.keys(exitpaths[])//For iteration
+	exitpaths[room_name].slice(-1)
+				//For finding if an exitpath goes through.
+	exitpaths[room_name]	//For getting an exit's walls.
+
+======
+
+Every tick, our creep roles use the following.
+Upgraders use:
+	upgrade.slice(-1)	//To see if we're is in range.
+	We have target already.
+	Although target is built from upgrade.slice(-1) as well.
+	Fixed to use creep.memory.target.
+Transport uses:
+	upgrade.slice(-1)	//To not take from the upgrader's container.
+	Since everything uses transport code, this isn't a simple override.
+	We can't just use the creep's target because targets differ from role to role.
+
+======
+
+Every level, roomPlanner.run() uses the following:
+Every path length for calculate.idealTransports.
+	[]mine.length
+	[]mreturn.length
+	[]upgrade.length
+	[]ureturn.length
+
+======
+
+At level 2, roomPlanner.run() uses the following:
+at defender.init(), to generate []defpaths[need] and []dreturn[need].
+	upgrade.slice(-1)	//To avoid the upgading fatty.
+	[]mine and []mreturn	//To prefer these paths.
+	[]mine.length		//To find the shortest route to each defense.
+	[]mfat			//To avoid the mining fatty.
+	[]mine.slice(-1)	//Defense path starts at the source junction.
+	defense.patrol[exit]	//Defense path ends at a patrol step.
+	exitpaths[room_name]	//To prefer the path leaving the room.
+
+======
+
+Whenever we build a creep in builder.run(), we use these paths to build creep memory.
+	[]mine.slice(-1)	//For target.
+	[]upgrade.slice(-1)	//For target.
+	[]mine[1]		//For direction.
+	[]mine			//Entire path is cleaned for a new style movenow.
+	[]defpaths[need].slice(-1)
+				//dtarget
+	[]mreturn[0]		//Concat onto a whole mine movenow before cleaning.
+
+	[]mine.length
+	[]defpaths[need].length
+				//These two test the shortest defpath.
+	[]defpaths[need]	//Concat onto a whole mine movenow before cleaning.
+	dbuilders use this shortest-based movenow to select their target and dtarget.
+	They then shorten it to concat []defpaths[need][0] onto mine before cleaning.
+	This essentially means:
+	[shortest]defpaths[need].slice(-1), which we are already keeping.
+	[shortest]mine, which we are already keeping.
+
+======
+
+In claim, when generating a path for empire sending actions.
+	exitpaths[room_name].slice(-1)
+				//For leaving our room.
+
+In claim, when claiming a room, we generate some temporary old style paths.
+But those will go away when the room is claimed and the room action is deleted.
+The claim code has its own copy of the old style move system, so it runs independant.
+The only problem here is they may get lost when they are transferred to the new room.
+Falsing their direction and creating a fallback for false directions could fix it.
+
+========================================================================
+
+========================
+What we need in the end.
+========================
+
+Based on this analysis, we can see the following.
+
+We always need:
+	upgrade.slice(-1)
+	[]mine.slice(-1)
+	[]mine[1]		//For initial direction.
+	[]mfat
+	Object.keys(exitpaths[room_name])
+	exitpaths[room_name].slice(-1)
+	[]defpaths[need].slice(-1)
+				//For dtarget.
+
+	[]mine.length
+	[]defpaths[need].length
+				//These two test the shortest defpath.
+	exitpaths[room_name].slice(-1)
+				//For leaving our room.
+
+We always need cleaned versions of these:
+	[]mine			//Entire path is cleaned for a new style movenow.
+	[]mreturn[0]		//Concat onto a whole mine movenow before cleaning.
+	[sh]defpaths[need]	//Concat onto a whole mine movenow before cleaning.
+	[sh]defpaths[need].slice(-1)
+				//This replaces []defpaths[need] after dtarget select.
+
+
+Every levelup, we need:
+	[]mine.length
+	[]mreturn.length
+	[]upgrade.length
+	[]ureturn.length
+				//To calculate ideal transports.
+
+When we level to 2, we need:
+	[]mine and []mreturn	//To prefer paths.
+	defense.patrol[exit]
+	exitpaths[room_name]
+
+========================
+How to proceed.
+========================
+
+The following must be kept.
+	[]mfat			//Only the x and y are needed.
+
+The following can have all path steps removed except the last step.
+	upgrade
+	[]defpaths[need]
+
+The following can have all path steps removed except the last step at level 2.
+	[]mine
+	exitpaths[room_name]
+
+The following can be deleted after level 2.
+	[]mreturn
+	defense.patrol[exit]
+
+The following must be created before we delete things.
+	[]minedir2		//From []mine[1].direction.
+	[]mlength		//From []mine.length.
+	[]mrlength		//From []mreturn.length.
+	[]ulength		//From []upgrade.length.
+	[]urlength		//From []ureturn.length.
+	[]dlength[need]		//From []defpaths[need].length.
+	[]mclean[u]		//Cleaned []mine. Used alone for upgrader.
+	[]mclean[b]		//Cleaned []mine concat []mreturn[0] for builder.
+	[]mclean[d]		//Cleaned []mine concat []defpaths[need][0].
+				//Dbuilder only needs []defpaths[need].slice(-1).
+
+That means the following can be deleted after initialization.
+	
