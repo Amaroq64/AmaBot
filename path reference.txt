@@ -151,8 +151,6 @@ We always need:
 	[]mine.length
 	[]defpaths[need].length
 				//These two test the shortest defpath.
-	exitpaths[room_name].slice(-1)
-				//For leaving our room.
 
 We always need cleaned versions of these:
 	[]mine			//Entire path is cleaned for a new style movenow.
@@ -206,4 +204,6 @@ The following must be created before we delete things.
 				//Dbuilder only needs []defpaths[need].slice(-1).
 
 That means the following can be deleted after initialization.
+	defense.preturn[exit]
+	exitreturn[room_name]	//We should possibly keep its first step just in case.
 	
