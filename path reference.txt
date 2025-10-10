@@ -206,4 +206,6 @@ The following must be created before we delete things.
 That means the following can be deleted after initialization.
 	defense.preturn[exit]
 	exitreturn[room_name]	//We should possibly keep its first step just in case.
+
+defender.checkDefense() must be removed as a check every tick.
 	
