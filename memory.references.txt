@@ -82,5 +82,5 @@ Memory.rooms[room_name]
 		.patrol[exit][].{}	//The defense builder's patrol path for each exit.
 		.preturn[exit][].{}	//The defense builder's patrol path for each exit.
 		.need	//Which exit are we currently servicing? This is incremented when a defense builder begins building.
-		.knownwalls[]	//Array of wall ids used by defender.checkdefense() during wall placing process. Probably not needed after they are built.
+		.knownwalls[]	//Array of wall ids used by defender.setDefense() during wall placing process. Probably not needed after they are built.
 		.dshort[exit]	//Which source's mine + defpath path is the shortest to the patrol route.
