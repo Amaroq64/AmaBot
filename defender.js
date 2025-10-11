@@ -1,5 +1,8 @@
 var defender =
 {
+	walls: {},
+	ramparts: {},
+
 	init: function(room_name = false)
 	{
 		if (!room_name)
@@ -45,6 +48,7 @@ var defender =
 			//topaths[i] = [];
 			Memory.rooms[room_name].sources[i].defpaths = [];
 			Memory.rooms[room_name].sources[i].dreturn = [];
+			Memory.rooms[room_name].sources[i].dlength = [];
 			for (let e = 0; e < Memory.rooms[room_name].exits.length; e++)
 			{
 				//Get our path from source to the patrol path.
@@ -163,6 +167,8 @@ var defender =
 							}
 						}
 					});
+
+				Memory.rooms[room_name].sources[i].dlength[e] =	Memory.rooms[room_name].sources[i].defpaths[e].length;
 			}
 			//console.log(JSON.stringify(topaths[i]));
 		}
@@ -204,19 +210,22 @@ var defender =
 		//Now mark the walls that are unreachable from the patrol paths.
 		defender.outofreach(room_name);
 
+		//Now build the walls.
+		setDefense(room_name);
+
 		//We have a limited amount of containers, so we can't make them a critical requirement of a defense.
 		//Maybe at a higher room level we can replace containers with links and shift containers to defenses. Or maybe we can use minimal links in-base and put links on defenses.
 
 		return true;	//We made it this far without any errors.
 	},
 
-	checkDefense: function(room_name = false, stage = 2)
+	setDefense: function(room_name = false, stage = 2)
 	{
 		if (!room_name)
 		{
 			for (let room_name in Memory.rooms)
 			{
-				defender.checkDefense(room_name);
+				defender.setDefense(room_name);
 			}
 			return true;
 		}
@@ -359,13 +368,16 @@ var defender =
 						}
 					}
 
-					//We only need one layer of rampart.
-					if (rampart && stage == 2)
+					//If it's on the path, we need a rampart here.
+					if (rampart)
 					{
 						Game.rooms[room_name].createConstructionSite(walls[e][w].x, walls[e][w].y, STRUCTURE_RAMPART);
 						Memory.rooms[room_name].defense.need = e;
 						//console.log("Ramp: " + walls[e][w].x + ", " + walls[e][w].y);
 						built = true;
+
+						//Record the location of the rampart.
+						Memory.rooms[room_name].defense.ramparts.push(walls[e][w]);
 					}
 					else if (!rampart)
 					{
@@ -395,13 +407,110 @@ var defender =
 					if (!built || finished)
 					{
 						//If we've completed this stage, go to the next stage.
-						defender.checkDefense(room_name, stage + 1);
+						defender.setDefense(room_name, stage + 1);
 					}
 
 					return true;	//We made it this far without any errors.
 				}
 			}
 		}
+	},
+
+	getWalls: function(room_name)
+	{
+		//Use wall and rampart coordinates to make an [x][y] multidimensional object. This makes addressing them faster.
+		//They are already stored in defense.walls/ramparts.
+		let existing_walls = Memory.rooms[room_name].defense.walls;
+		let existing_ramparts = Memory.rooms[room_name].defense.ramparts;
+
+		let wall_positions = {};
+		let rampart_positions = {};
+
+		let tempwall;
+
+		//Get ramparts first.
+		for (let r = 0; r < existing_ramparts.length; r++)
+		{
+			tempwall = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, existing_ramparts[r].pos.x, existing_ramparts[r].pos.y);
+			if (tempwall.length > 0)
+			{
+				if (!rampart_positions[existing_walls[r].pos.x])
+				{
+					rampart_positions[existing_walls[r].pos.x] = {};
+				}
+
+				rampart_positions[existing_ramparts[r].pos.x][existing_ramparts[r].pos.y] = tempwall[0].id;	//There should only be a rampart here.
+			}
+		}
+
+		//Get walls now.
+		for (let w = 0; w < existing_walls.length; w++)
+		{
+			tempwall = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, existing_ramparts[w].pos.x, existing_ramparts[w].pos.y);
+			if (tempwall.length > 0 && (!rampart_positions[existing_walls[w].pos.x] || !rampart_positions[existing_walls[w].pos.x][existing_walls[w].pos.y]))
+			{
+				if (!wall_positions[existing_walls[w].pos.x])
+				{
+					wall_positions[existing_walls[w].pos.x] = {};
+				}
+
+				wall_positions[existing_walls[w].pos.x][existing_walls[w].pos.y] =	tempwall[0].id;	//There should only be a wall here.
+			}
+		}
+
+		defender.walls[room_name] = wall_positions;
+		defender.ramparts[room_name] = rampart_positions;
+		return {walls: wall_positions, ramparts: rampart_positions};
+	},
+
+	checkDefense: function(room_name = false)
+	{
+		if (!room_name)
+		{
+			let tempbool = true;
+			for (let room_name in Memory.rooms)
+			{
+				if (!defender.setDefense(room_name))
+				{
+					tempbool = false;
+				}
+			}
+			return tempbool;
+		}
+
+		//First check our ramparts.
+		for (let x in defender.ramparts)
+		{
+			for (let y in defender.ramparts[x])
+			{
+				if (!Game.getObjectById(defender.ramparts[x][y]))
+				{
+					//If any are missing, we rebuild and start over.
+					defender.walls[room_name] = {};
+					defender.ramparts[room_name] = {};
+					console.log('Resetting walls and ramparts for ' + room_name + '.');
+					return false;
+				}
+			}
+		}
+
+		//Then check our walls.
+		for (let x in defender.walls)
+		{
+			for (let y in defender.walls[x])
+			{
+				if (!Game.getObjectById(defender.walls[x][y]))
+				{
+					//If any are missing, we rebuild and start over.
+					defender.walls[room_name] = {};
+					defender.ramparts[room_name] = {};
+					console.log('Resetting walls and ramparts for ' + room_name + '.');
+					return false;
+				}
+			}
+		}
+
+		return true;	//We made it this far without any errors.
 	},
 
 	structures: function(room_name)
