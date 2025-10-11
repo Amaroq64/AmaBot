@@ -177,32 +177,39 @@ How to proceed.
 ========================
 
 The following must be kept.
-	[]mfat			//Only the x and y are needed.
+	•[]mfat			//Only the x and y are needed.
 
 The following can have all path steps removed except the last step.
-	upgrade
-	[]defpaths[need]
+	•upgrade
+
+The following can have all path steps removed except the first and last step.
+	•[]upgrade
+	•[]ureturn
 
 The following can have all path steps removed except the last step at level 2.
-	[]mine
-	exitpaths[room_name]
+	•[]mine
+	•exitpaths[room_name]
+	•exitreturn[room_name]
+	•[]defpaths[need]
 
 The following can have all path steps removed except the first step at level 2.
-	[]mreturn
+	•[]mreturn
 
 The following can be deleted after level 2.
-	defense.patrol[exit]
+	•defense.patrol[exit]
+	•defense.preturn[exit]
+	•[]dreturn[need]
 
 The following must be created before we delete things.
-	[]minedir2		//From []mine[1].direction.
-	[]mlength		//From []mine.length.
-	[]mrlength		//From []mreturn.length.
-	[]ulength		//From []upgrade.length.
-	[]urlength		//From []ureturn.length.
-	[]dlength[need]		//From []defpaths[need].length.
-	[]mclean[u]		//Cleaned []mine. Used alone for upgrader.
-	[]mclean[b]		//Cleaned []mine concat []mreturn[0] for builder.
-	[]mclean[d]		//Cleaned []mine concat []defpaths[need][0].
+	•[]minedir2		//From []mine[1].direction.
+	•[]mlength		//From []mine.length.
+	•[]mrlength		//From []mreturn.length.
+	•[]ulength		//From []upgrade.length.
+	•[]urlength		//From []ureturn.length.
+	•[]dlength[need]	//From []defpaths[need].length.
+	•[]mclean[u]		//Cleaned []mine. Used alone for utransport.
+	•[]mclean[b]		//Cleaned []mine concat []mreturn[0] for builder.
+	•[]mclean[d][need]	//Cleaned []mine concat []defpaths[need][0].
 				//Dbuilder only needs []defpaths[need].slice(-1).
 
 That means the following can be deleted after initialization.
@@ -215,3 +222,5 @@ Which wall tiles are ramparts must be recorded  at this point as well.
 This allows removal of exitpaths[room_name] (except for the last step).
 Since checkDefense() will only be run once now, we'll rename it to setDefense().
 A new checkDefense() will take its place that truly rebuilds missing walls/ramparts.
+
+Everything that needs the end uses slice(-1), everything that needs the beginning uses [0]. Nothing needs anything inbetween. Therefore a safe bet is to keep the beginnings and ends of everything and delete their middle.
