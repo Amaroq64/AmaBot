@@ -187,8 +187,10 @@ The following can have all path steps removed except the last step at level 2.
 	[]mine
 	exitpaths[room_name]
 
-The following can be deleted after level 2.
+The following can have all path steps removed except the first step at level 2.
 	[]mreturn
+
+The following can be deleted after level 2.
 	defense.patrol[exit]
 
 The following must be created before we delete things.
@@ -207,5 +209,9 @@ That means the following can be deleted after initialization.
 	defense.preturn[exit]
 	exitreturn[room_name]	//We should possibly keep its first step just in case.
 
-defender.checkDefense() must be removed as a check every tick.
-	
+defender.checkDefense() must be removed as an every-tick check.
+It can run once to build our defenses.
+Which wall tiles are ramparts must be recorded  at this point as well.
+This allows removal of exitpaths[room_name] (except for the last step).
+Since checkDefense() will only be run once now, we'll rename it to setDefense().
+A new checkDefense() will take its place that truly rebuilds missing walls/ramparts.
