@@ -226,6 +226,7 @@ var body =
 
 	healer: function(energy)
 	{
+		let body = [];
 		while(energy >= 300 && body.length < 49)
 		{
 			body.push(MOVE, HEAL);
@@ -237,10 +238,35 @@ var body =
 
 	tank: function(energy)
 	{
+		let body = [];
 		while(energy >= 550 && body.length < 49)
 		{
 			body.push(MOVE, HEAL);
 			energy -= 550;
+		}
+
+		return body;
+	},
+
+	extractor: function(energy)
+	{
+		let body = [];
+		while (energy >= 100 && body.length < 50)
+		{
+			body.push(WORK);
+			energy -= 100;
+		}
+
+		return body;
+	},
+
+	custodian: function(energy)
+	{
+		let body = [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY];
+		energy -= 1050;
+		while (energy >= 100 && body.length < 50)	//The ideal custodian quickly harvests both sources, then tends to the rest of the room. It will be T3 boosted.
+		{
+			body.shift(WORK);
 		}
 
 		return body;
@@ -282,13 +308,7 @@ body.utransport = function(energy)
 	return body.transport(energy, true);
 }
 body.ubuilder = body.builder;
-body.latebuilder = function(energy)
-{
-	let temp = body.transport(energy)
-	temp.splice(-1, 1);
-	temp.push(WORK);
-	return temp;
-}
+
 body.dbuilder = function(energy)
 {
 	return body.builder(energy, true);
