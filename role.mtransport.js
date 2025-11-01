@@ -43,7 +43,9 @@ var roleMTransport =
 				for (let y = -1; y <= 1; y++)
 				{
 					//Assignment within comparison.
-					if ((tempextension = room_extensions[creep.pos.x + x]) && (tempextension = tempextension[creep.pos.y + y]) && (tempextension = Game.getObjectById(tempextension)) && tempextension.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
+					if (room_extensions && room_extensions[creep.pos.x + x] && (tempextension = room_extensions[creep.pos.x + x])
+						&& tempextension[creep.pos.y + y] && (tempextension = tempextension[creep.pos.y + y])
+						&& (tempextension = Game.getObjectById(tempextension)) && tempextension.store && tempextension.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
 					{
 						extensions.push(tempextension);
 					}
