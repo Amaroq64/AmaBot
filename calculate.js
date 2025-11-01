@@ -115,6 +115,7 @@ var calculate =
 
 	cleanpaths: function(room_name, type)	//We are renaming some of these paths slightly different, so pay attention.
 	{
+		let temppath;
 		let dir;
 		switch(type)
 		{
@@ -129,21 +130,78 @@ var calculate =
 				//We need to do the room-wide one-time upgrade path, and the sources' mine, mreturn, upgrade, and ureturn.
 
 				//Room-wide upgrade goes from source to the upgrader.
-				calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].upgrade), 'upgrader');	//Room-wide and source-based must have different names now.
+				temppath = Memory.rooms[room_name].upgrade;
+				calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'upgrader', false, false, temppath);	//Room-wide and source-based must have different names now.
 
 				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 				{
+					//Only returning paths get a dir.
+					//dir = Memory.rooms[room_name].sources[i].mreturn2;
+
+					//Store clean steps needed for utransport and builder movenow[].
+					let temp_mine = Memory.rooms[room_name].sources[i].mine.slice();
+					temp_mine[0].direction = Memory.rooms[room_name].sources[i].minedir2;
+					Memory.rooms[room_name].sources[i].mclean =
+					{
+						u: calculate.cleanthispath(temp_mine),
+						b: calculate.cleanthispath(temp_mine)
+					};
+					for (let c in Memory.rooms[room_name].sources[i].mclean)
+					{
+						Memory.rooms[room_name].sources[i].mclean[c].pop();
+
+						while (Memory.rooms[room_name].sources[i].mclean[c].length > 1
+						&& Memory.rooms[room_name].sources[i].mclean[c][0].x == Memory.rooms[room_name].sources[i].mclean[c][1].x
+						&& Memory.rooms[room_name].sources[i].mclean[c][0].y == Memory.rooms[room_name].sources[i].mclean[c][0].y)
+						{
+							Memory.rooms[room_name].sources[i].mclean[c].shift();
+						}
+					}
+
+					let tempdefpaths = [];
+					for (let e = 0; e < Memory.rooms[room_name].sources[i].defpaths.length; e++)
+					{
+						if (Memory.rooms[room_name].sources[i].defpaths[e])
+						{
+							tempdefpaths[e] = Memory.rooms[room_name].sources[i].defpaths[e];
+						}
+					}
+
 					//Mine goes from spawn to source, then mreturn comes back.
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mine.concat(Memory.rooms[room_name].sources[i].mreturn[0])), 'mine', i);
-					dir = Memory.rooms[room_name].sources[i].mine[0].direction;
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mreturn.concat(Memory.rooms[room_name].sources[i].mine[0]), dir), 'mreturn', i);
+					temppath = Memory.rooms[room_name].sources[i].mine;
+					let tempupgrade = Memory.rooms[room_name].sources[i].upgrade.slice();
+					tempupgrade[0].direction = Memory.rooms[room_name].sources[i].upgradedir2;
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mine', i, false, temppath,
+					{
+						upgrade: tempupgrade,
+						mreturn: Memory.rooms[room_name].sources[i].mreturn,
+						mfat: Memory.rooms[room_name].sources[i].mfat,
+						defpaths: tempdefpaths	//Mine can also go to defpaths[need].
+					});
+					temppath = Memory.rooms[room_name].sources[i].mreturn;
+					dir = Memory.rooms[room_name].sources[i].mreturn[0].direction;	//Try without dir.
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mreturn', i, false, temppath,
+					{
+						mine: Memory.rooms[room_name].sources[i].mine
+					});
 					//Mfat is the direction from the end of mine to the mining container.
-					calculate.writethispath(room_name, calculate.cleanthispath([Memory.rooms[room_name].sources[i].mine.slice(-1)[0], Memory.rooms[room_name].sources[i].mfat[0]], false), 'mfat', i);
+					temppath = [Memory.rooms[room_name].sources[i].mine.slice(-1)[0], Memory.rooms[room_name].sources[i].mfat[0]];
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath, false), 'mfat', i, false, temppath);
 
 					//Upgrade goes from source to the upgrader, then comes back to mine.
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].upgrade.concat(Memory.rooms[room_name].sources[i].ureturn[0])), 'upgrade', i);
+					temppath = Memory.rooms[room_name].sources[i].upgrade;
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'upgrade', i, false, temppath,
+					{
+						ureturn: Memory.rooms[room_name].sources[i].ureturn
+					});
 					dir = Memory.rooms[room_name].sources[i].ureturn[0].direction;
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].ureturn.concat(Memory.rooms[room_name].sources[i].mine[0]), dir), 'ureturn', i);
+					temppath = Memory.rooms[room_name].sources[i].ureturn;		//Try without dir.
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'ureturn', i, false, temppath,
+					{
+						upgrade: tempupgrade,
+						mreturn: Memory.rooms[room_name].sources[i].mreturn,
+						defpaths: tempdefpaths	//Ureturn can also go to defpaths[need].
+					});
 				}
 
 				break;
@@ -152,36 +210,180 @@ var calculate =
 				//We need to do the roomwide defense path to each exit, and the sources' defpaths and dreturn to each exit.
 				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 				{
+					//Only returning paths get a dir.
+					//dir = Memory.rooms[room_name].sources[i].mreturn2;
+
+					let tempdefpaths = [];
 					for (let e = 0; e < Memory.rooms[room_name].sources[i].defpaths.length; e++)
 					{
-						if (Memory.rooms[room_name].sources[i].defpaths[e].length == 0 || Memory.rooms[room_name].sources[i].defpaths[e].length == 0)
+						if (Memory.rooms[room_name].sources[i].defpaths[e])
 						{
-							continue;	//Some of the patrols are broken, possibly due to safety flags.
+							tempdefpaths[e] = Memory.rooms[room_name].sources[i].defpaths[e];
+						}
+					}
+
+					//Mine can also go to defpaths[need].
+					/*temppath = Memory.rooms[room_name].sources[i].mine;
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mine', i, false, temppath,
+					{
+						defpaths: tempdefpaths
+					});
+
+					//Ureturn can also go to defpaths[need].
+					temppath = Memory.rooms[room_name].sources[i].ureturn;
+					dir = Memory.rooms[room_name].sources[i].ureturn[0].direction;	//Try without dir.
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'ureturn', i, false, temppath,
+					{
+						defpaths: tempdefpaths
+					});*/
+
+					//Store clean steps needed for utransport and builder movenow[].
+					let temp_mine = Memory.rooms[room_name].sources[i].mine.slice();
+					temp_mine[0].direction = Memory.rooms[room_name].sources[i].minedir2;
+					Memory.rooms[room_name].sources[i].mclean.d = {};
+
+					for (let e = 0; e < Memory.rooms[room_name].sources[i].defpaths.length; e++)
+					{
+						if (!Memory.rooms[room_name].sources[i].defpaths[e] || !Memory.rooms[room_name].sources[i].dreturn[e])
+						{
+							continue;	//Some of the defpaths are empty.
+						}
+
+						//Store clean steps needed for builder movenow[].
+						Memory.rooms[room_name].sources[i].mclean.d[e] = calculate.cleanthispath(temp_mine.concat(Memory.rooms[room_name].sources[i].defpaths[e][0]));
+
+						while (Memory.rooms[room_name].sources[i].mclean.d[e].length > 1
+						&& Memory.rooms[room_name].sources[i].mclean.d[e][0].x == Memory.rooms[room_name].sources[i].mclean.d[e][1].x
+						&& Memory.rooms[room_name].sources[i].mclean.d[e][0].y == Memory.rooms[room_name].sources[i].mclean.d[e][1].y)
+						{
+							Memory.rooms[room_name].sources[i].mclean.d[e].shift();
+						}
+
+						temppath = Memory.rooms[room_name].sources[i].defpaths[e];
+						//The flipper from defpaths to the patrol paths can cross at any point.
+						//Therefore this flipper must be constructed dynamically.
+						let temp = {patrol: Memory.rooms[room_name].defense.patrol[e].slice(), preturn:Memory.rooms[room_name].defense.preturn[e].slice()};
+						for (let temp_patrol in temp)
+						{
+							
+							for (let p = 0; p < temp[temp_patrol].length; p++)
+							{
+								//Match a step of the patrol path to the last step of defpaths.
+								if (temp[temp_patrol][p].x === temppath[temppath.length - 1].x && temp[temp_patrol][p].y === temppath[temppath.length - 1].y)
+								{
+									//If we found a match, we need to manipulate the flipper into pointing the way it should go.
+									let temp_new_obj = {};	//We need a new object because slice doesn't work. It slices the array of object references, which still manipulates the original object.
+									if (p < temp[temp_patrol].length - 1)
+									{
+										for (let newobj in temp[temp_patrol][0])
+										{
+											if (newobj === 'direction')
+											{
+												temp_new_obj[newobj] = temp[temp_patrol][p + 1][newobj];
+											}
+											else
+											{
+												temp_new_obj[newobj] = temp[temp_patrol][0][newobj];
+											}
+										}
+									}
+									else
+									{
+										//If we're at the end of this path, we need to loop around.
+										//These work because the first step was already going in the direction of the second step.
+										//Alternatively, you could use the second step.
+										for (let newobj in temp[temp_patrol][0])
+										{
+											switch (temp_patrol)
+											{
+												case 'patrol':													
+													if (newobj === 'direction' && p < temp.preturn.length - 1)
+													{
+														temp_new_obj[newobj] = temp.preturn[p + 1][newobj];
+													}
+													else
+													{
+														temp_new_obj[newobj] = temp.preturn[0][newobj];
+													}
+													break;
+												case 'preturn':
+													if (newobj === 'direction' && p < temp.patrol.length - 1)
+													{
+														temp_new_obj[newobj] = temp.patrol[p + 1][newobj];
+													}
+													else
+													{
+														temp_new_obj[newobj] = temp.patrol[0][newobj];
+													}
+													break;
+											}
+										}
+									}
+									temp[temp_patrol][0] = temp_new_obj;
+								}
+							}
 						}
 
 						//The sources' defpaths to each exit.																				//A matching dreturn for every defpath is a safe assumption.
-						//We have a problem with our defpath extending one too far. Leaving that concat out should help.
-						//We have a problem with our defpaths not starting at the source junction. A concat should help.
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].mine.slice(-1)
-						.concat(Memory.rooms[room_name].sources[i].defpaths[e])
-						.concat(Memory.rooms[room_name].sources[i].dreturn[e].slice(-1))), 'defpath', i, e);
+						calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'defpaths', i, e, temppath,
+						{
+							dreturn: Memory.rooms[room_name].sources[i].dreturn[e],
+							patrol: temp.patrol,
+							preturn: temp.preturn
+						});
 						dir = Memory.rooms[room_name].sources[i].defpaths[e][0].direction;
-						calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].sources[i].dreturn[e].concat(Memory.rooms[room_name].sources[i].mreturn.slice(0, 1)), dir), 'dreturn', i, e);
+						//tempdefpaths = [];
+						//tempdefpaths[e] = Memory.rooms[room_name].sources[i].defpaths[e];
+						temppath = Memory.rooms[room_name].sources[i].dreturn[e];		//Try without dir.
+						calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'dreturn', i, e, temppath,
+						{
+							upgrade: Memory.rooms[room_name].sources[i].upgrade,
+							mreturn: Memory.rooms[room_name].sources[i].mreturn,
+							defpaths: tempdefpaths
+						});
+						/*else
+						{
+							temppath = Memory.rooms[room_name].sources[i].defpaths[e];
+							calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'defpath', i, e, temppath,
+							{
+								dreturn: Memory.rooms[room_name].sources[i].dreturn[e],
+								//patrol: Memory.rooms[room_name].defense.patrol[e],
+								//preturn: Memory.rooms[room_name].defense.preturn[e]
+							});
+							dir = Memory.rooms[room_name].sources[i].defpaths[e][0].direction;
+							tempdefpaths = [];
+							tempdefpaths[e] = Memory.rooms[room_name].sources[i].defpaths[e];
+							temppath = Memory.rooms[room_name].sources[i].dreturn[e];		//Try without dir.
+							calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'dreturn', i, e, temppath,
+							{
+								upgrade: Memory.rooms[room_name].sources[i].upgrade,
+								mreturn: Memory.rooms[room_name].sources[i].mreturn,
+								defpaths: tempdefpaths
+							});
+						}*/
 					}
 				}
 
 				for (let e = 0; e < Memory.rooms[room_name].defense.patrol.length; e++)
 				{
-					if (Memory.rooms[room_name].defense.patrol[e].length == 0 || Memory.rooms[room_name].defense.preturn[e].length == 0)
+					if (!Memory.rooms[room_name].defense.patrol[e] || !Memory.rooms[room_name].defense.preturn[e])
 					{
-						continue;	//Some of my patrols are broken, possibly due to safety flags.
+						continue;	//Some of the patrols are empty.
 					}
 
 					//The room-wide patrol paths for each exit.																				//A matching preturn for every patrol is a safe assumption.
 					//console.log(room_name + ' Pat: e: ' + e);
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.patrol[e].concat(Memory.rooms[room_name].defense.preturn[e][0])), 'patrol', false, e);
-					dir = Memory.rooms[room_name].defense.patrol[e][0].direction;
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].defense.preturn[e].concat(Memory.rooms[room_name].defense.patrol[e][0]), dir), 'preturn', false, e);
+					temppath = Memory.rooms[room_name].defense.patrol[e];
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'patrol', false, e, temppath,
+					{
+						preturn: Memory.rooms[room_name].defense.preturn[e]
+					});
+					temppath = Memory.rooms[room_name].defense.preturn[e];
+					dir = Memory.rooms[room_name].defense.patrol[e][0].direction;		//Without dir?
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'preturn', false, e, temppath,
+					{
+						patrol: Memory.rooms[room_name].defense.patrol[e]
+					});
 				}
 				
 				break;
@@ -190,9 +392,17 @@ var calculate =
 				//We need to do the roomwide exitpaths and exitreturn to each adjacent accessible room.
 				for (let e in Memory.rooms[room_name].exitpaths)
 				{																															//A matching exitreturn for every exitpath is a safe assumption.
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitpaths[e].concat(Memory.rooms[room_name].exitreturn[e][0])), 'exitpath', false, e);
-					dir = Memory.rooms[room_name].exitpaths[e][0].direction;
-					calculate.writethispath(room_name, calculate.cleanthispath(Memory.rooms[room_name].exitreturn[e].concat(Memory.rooms[room_name].exitpaths[e][0]), dir), 'exitreturn', false, e);
+					temppath = Memory.rooms[room_name].exitpaths[e];
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'exitpath', false, e, temppath,
+					{
+						exitpaths: Memory.rooms[room_name].exitreturn[e]
+					});
+					temppath = Memory.rooms[room_name].exitreturn[e];
+					dir = Memory.rooms[room_name].exitpaths[e][0].direction;		//Without dir?
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'exitreturn', false, e, temppath,
+					{
+						exitreturn: Memory.rooms[room_name].exitpaths[e]
+					});
 				}
 				break;
 		}
@@ -215,6 +425,11 @@ var calculate =
 				console.log(JSON.stringify(path[0]));
 			}*/
 			temp = [{x: path[0].x, y: path[0].y, direction: path[0].direction}];
+			if (path[0].roomName)
+			{
+				temp[0].roomName = path[0].roomName;
+			}
+
 			dir = temp.direction;
 		}
 
@@ -226,17 +441,28 @@ var calculate =
 			{
 				dir = path[p + 1].direction;
 				temp.push({x: path[p].x, y: path[p].y, direction: dir});
+				if (path[p].roomName)
+				{
+					temp[temp.length - 1].roomName = path[p].roomName;
+				}
 			}
 		}
 
 		return temp;
 	},
 
-	writethispath: function(room_name, tiles, memory_name, source = false, exit = false)	//If source is not false, it's an index. If exit is not false, it's an index or a key.
+	//If source is not false, it's an index. If exit is not false, it's an index or a key. raw is the uncleaned path for flipper placement. nextpaths is the raw paths we could be going towards.
+	writethispath: function(room_name, tiles, memory_name, source = false, exit = false, raw = false, nextpaths = {})
 	{
 		if (typeof Memory.rooms[room_name].path !== 'object')
 		{
 			Memory.rooms[room_name].path = {};	//Make sure the path object exists.
+		}
+
+		//We need to place the flipper on the last step of the current path.
+		if (raw)
+		{
+			raw = raw[raw.length - 1];
 		}
 
 		for (let t = 0; t < tiles.length; t++)
@@ -258,20 +484,46 @@ var calculate =
 					//Write our flipper.
 					if (t == tiles.length - 1)
 					{
-						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						//Make sure the tile for our flipper exists.
+						if (!Memory.rooms[room_name].path[raw.x])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+							Memory.rooms[room_name].path[raw.x] = {};
 						}
-						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = true;
+						if (!Memory.rooms[room_name].path[raw.x][raw.y])
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y] = {};
+						}
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper)
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper = {};
+						}
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name])
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name] = {};
+						}
+
+						//Since the flipper can serve as a junction between paths, it should contain the direction to the next path.
+						for (let next in nextpaths)
+						{
+							//No source and no exit.
+							//When it's not a junction to more than one path, we don't need to store complex data.
+
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][next] = nextpaths[next][0].direction;
+
+							/*else	//In case of only 1 step.
+							{
+								Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][next] = nextpaths[next][0].direction;
+							}*/
+						}
 					}
 				}
-				else
+				else	//No source but an indexed exit.
 				{
-					if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name]) && (typeof exit === 'number' || typeof exit === 'string'))	//Room-wide with an indexed or string exit.
+					if (typeof (Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name]) !== 'object')	//Room-wide with an indexed or string exit.
 					{
 						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name] = {};	//If it's an exit based path, make sure path[x][y][name][exit] exists.
 					}
-					else
+					if (typeof exit !== 'number' && typeof exit !== 'string')
 					{
 						return false;
 					}
@@ -280,40 +532,131 @@ var calculate =
 					//Write our flipper.
 					if (t == tiles.length - 1)
 					{
-						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						//Make sure the tile for our flipper exists.
+						if (!Memory.rooms[room_name].path[raw.x])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+							Memory.rooms[room_name].path[raw.x] = {};
 						}
-						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] !== 'object')
+						if (!Memory.rooms[room_name].path[raw.x][raw.y])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = {};
+							Memory.rooms[room_name].path[raw.x][raw.y] = {};
 						}
-						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][exit] = true;
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper)
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper = {};
+						}
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name])
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name] = {};
+						}
+						//Since the flipper can serve as a junction between paths, it should contain the direction to the next path.
+						for (let next in nextpaths)
+						{
+							//No source and an exit.
+							if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][next])
+							{
+								Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][next] = {};
+							}
+							//When it's not a junction to more than one path, we don't need to store complex data.
+
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][next][exit] = nextpaths[next][0].direction;
+
+							/*else	//In case of only 1 step.
+							{
+								Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][next][exit] = nextpaths[next][0].direction;
+							}*/
+						}
 					}
 				}
 			}
-			else
+			else	//A source.
 			{
 				if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name]))
 				{
 					Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name] = [];	//If it's a source based path, make sure path[x][y][name][source] exists.
 				}
 
-				if (exit === false)	//Source-based.
+				if (exit === false)	//Source-based with no exit.
 				{
 					Memory.rooms[room_name].path[tiles[t].x][tiles[t].y][memory_name][source] = tiles[t].direction;	//Assign our direction to the [x][y][name][source] of this tile.
 					//Write our flipper.
 					if (t == tiles.length - 1)
 					{
-						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						//Make sure the tile for our flipper exists.
+						if (!Memory.rooms[room_name].path[raw.x])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+							Memory.rooms[room_name].path[raw.x] = {};
 						}
-						if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name]))
+						if (!Memory.rooms[room_name].path[raw.x][raw.y])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = [];
+							Memory.rooms[room_name].path[raw.x][raw.y] = {};
 						}
-						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] = true;
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper)
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper = {[memory_name]: []};
+						}
+						if (!Array.isArray(Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name]))
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name] = [];
+						}
+						//Since the flipper can serve as a junction between paths, it should contain the direction to the next path.
+						for (let next in nextpaths)
+						{
+							//Is this array containing a path or containing a defpath?
+							if (Array.isArray(nextpaths[next][0]))
+							{
+								//Defpath.
+								//console.log('Defpath.');
+								if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source])
+								{
+									Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source] = {};
+								}
+								Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next] = new Array(nextpaths[next].length)
+								for (let np = 0; np < nextpaths[next].length; np++)
+								{
+									if (nextpaths[next][np])
+									{
+										//If the flipper contains an array. (This is probably an array of room exits.)
+										Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next][np] = nextpaths[next][np][0].direction;
+
+										/*else	//In case of only 1 step.
+										{
+											Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next][np] = nextpaths[next][np][0].direction;
+										}*/
+									}
+								}
+							}
+							else
+							{
+								//Normal source-based path.
+								if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source])
+								{
+									Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source] = {};
+								}
+								//If the flipper just contains a flat direction.
+								if (nextpaths[next][0] && nextpaths[next][0].direction)
+								{
+									Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next] = nextpaths[next][0].direction;
+								}
+								else	//It's a defpaths.
+								{
+									//Make sure the sub array exists.
+									if (!Array.isArray(Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next]))
+									{
+										Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next] = new Array(nextpaths[next].length);
+									}
+
+									for (let a = 0; a < nextpaths[next].length; a++)
+									{
+										//Only assign if it exists.
+										if (nextpaths[next][a])
+										{
+											Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next][a] = nextpaths[next][a][0].direction;
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 				else if (typeof exit === 'number')	//Source-based with an indexed exit.
@@ -331,25 +674,187 @@ var calculate =
 					//Write our flipper.
 					if (t == tiles.length - 1)
 					{
-						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper !== 'object')
+						//Make sure the tile for our flipper exists.
+						if (!Memory.rooms[room_name].path[raw.x])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper = {};
+							Memory.rooms[room_name].path[raw.x] = {};
 						}
-						if (!Array.isArray(Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name]))
+						if (!Memory.rooms[room_name].path[raw.x][raw.y])
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name] = [];
+							Memory.rooms[room_name].path[raw.x][raw.y] = {};
 						}
-						if (typeof Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] !== 'object')
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper)
 						{
-							Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source] = {};
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper = {[memory_name]: []};
 						}
-						Memory.rooms[room_name].path[tiles[t].x][tiles[t].y].flipper[memory_name][source][exit] = true;
+						if (!Array.isArray(Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name]))
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name] = [];
+						}
+						if (!Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source])
+						{
+							Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source] = {};
+						}
+
+						//Since the flipper can serve as a junction between paths, it should contain the direction to the next path.
+						for (let next in nextpaths)
+						{
+							//A source and an exit.
+							//When it's not a junction to more than one path, we don't need to store complex data.
+							//Though our destination paths of this type can have different formats, we are ultimately passing them in here the same way, so we don't need to know the difference here.
+							//Though some of our destination paths are on a source and some are not, we are ending a source-based path that doesn't cross from one source to another.
+							//Therefore the source we're currently on is enough to know where we're going.
+
+							//If the flipper just contains a flat direction.
+							if (nextpaths[next][0] && nextpaths[next][0].direction)
+							{
+								Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next] = nextpaths[next][0].direction;
+							}
+							else	//It's a defpaths.
+							{
+								//Make sure the sub array exists.
+								if (!Array.isArray(Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next]))
+								{
+									Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next] = new Array(nextpaths[next].length);
+								}
+
+								for (let a = 0; a < nextpaths[next].length; a++)
+								{
+									//Only assign if it exists.
+									if (nextpaths[next][a])
+									{
+										Memory.rooms[room_name].path[raw.x][raw.y].flipper[memory_name][source][next][a] = nextpaths[next][a][0].direction;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
 		}
 
 		return true;
+	},
+
+	deleteoldpaths: function(room_name, type)
+	{
+		switch(type)
+		{
+			case 'init':
+				Memory.rooms[room_name].upgrade = [Memory.rooms[room_name].upgrade[0], Memory.rooms[room_name].upgrade.slice(-1)[0]];
+				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+				{
+					Memory.rooms[room_name].sources[i].mine =		[Memory.rooms[room_name].sources[i]   .mine[0],	Memory.rooms[room_name].sources[i]   .mine.slice(-1)[0]];
+					Memory.rooms[room_name].sources[i].mreturn =	[Memory.rooms[room_name].sources[i].mreturn[0],	Memory.rooms[room_name].sources[i].mreturn.slice(-1)[0]];
+					Memory.rooms[room_name].sources[i].upgrade =	[Memory.rooms[room_name].sources[i].upgrade[0],	Memory.rooms[room_name].sources[i].upgrade.slice(-1)[0]];
+					Memory.rooms[room_name].sources[i].ureturn =	[Memory.rooms[room_name].sources[i].ureturn[0],	Memory.rooms[room_name].sources[i].ureturn.slice(-1)[0]];
+				}
+				break;
+			case 'defender':
+				for (let e in Memory.rooms[room_name].exitpaths)
+				{
+					//We can assume that every exit path has an exitreturn.
+					Memory.rooms[room_name].exitpaths[e] = [Memory.rooms[room_name].exitpaths[e][0], Memory.rooms[room_name].exitpaths[e].slice(-1)[0]];
+					Memory.rooms[room_name].exitreturn[e] = [Memory.rooms[room_name].exitreturn[e][0], Memory.rooms[room_name].exitreturn[e].slice(-1)[0]];
+				}
+				for (let p = 0; p < Memory.rooms[room_name].defense.patrol.length; p++)
+				{
+					//We can assume that every patrol has a preturn.
+					if (Memory.rooms[room_name].defense.patrol[p])	//Some of these are empty.
+					{
+						Memory.rooms[room_name].defense.patrol[p] = [Memory.rooms[room_name].defense.patrol[p][0], Memory.rooms[room_name].defense.patrol[p].slice(-1)[0]];
+						Memory.rooms[room_name].defense.preturn[p] = [Memory.rooms[room_name].defense.preturn[p][0], Memory.rooms[room_name].defense.preturn[p].slice(-1)[0]];
+					}
+				}
+				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+				{
+					for (let d = 0; d < Memory.rooms[room_name].sources[i].defpaths.length; d++)
+					{
+						//We can assume that every defpath has a dreturn.
+						if (Memory.rooms[room_name].sources[i].defpaths[d])	//Some of these are empty.
+						{
+							Memory.rooms[room_name].sources[i].defpaths[d] = [Memory.rooms[room_name].sources[i].defpaths[d][0], Memory.rooms[room_name].sources[i].defpaths[d].slice(-1)[0]];
+							Memory.rooms[room_name].sources[i].dreturn[d] = [Memory.rooms[room_name].sources[i].dreturn[d][0], Memory.rooms[room_name].sources[i].dreturn[d].slice(-1)[0]];
+						}
+					}
+				}
+		}
+		return true;
+	},
+
+	backuppaths: function(room_name = false)
+	{
+		if (!room_name)
+		{
+			for (let room_name in Memory.rooms)
+			{
+				calculate.backuppaths(room_name);
+			}
+			return true;
+		}
+
+		if (!Memory.rooms.backup)
+		{
+			Memory.rooms.backup = {};
+		}
+		let tempsources = [];
+
+		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+		{
+			tempsources[i] = {};
+
+			tempsources[i].mine = Memory.rooms[room_name].sources[i].mine;
+			tempsources[i].mreturn = Memory.rooms[room_name].sources[i].mreturn;
+			tempsources[i].mfat = Memory.rooms[room_name].sources[i].mfat;
+			tempsources[i].upgrade = Memory.rooms[room_name].sources[i].upgrade;
+			tempsources[i].ureturn = Memory.rooms[room_name].sources[i].ureturn;
+			tempsources[i].defpaths = Memory.rooms[room_name].sources[i].defpaths;
+			tempsources[i].dreturn = Memory.rooms[room_name].sources[i].dreturn;
+		}
+
+		Memory.rooms.backup[room_name] =
+		{
+			sources: tempsources,
+			upgrade: Memory.rooms[room_name].upgrade,
+			exitpaths: Memory.rooms[room_name].exitpaths,
+			exitreturn: Memory.rooms[room_name].exitreturn,
+			defense: {patrol: Memory.rooms[room_name].defense.patrol, preturn: Memory.rooms[room_name].defense.preturn}
+		}
+	},
+
+	restorebackup: function(room_name = false)
+	{
+		if (!room_name)
+		{
+			for (let room_name in Memory.rooms)
+			{
+				calculate.restorebackup(room_name);
+			}
+			return true;
+		}
+
+		for (let obj in Memory.rooms.backup[room_name])
+		{
+			if (obj === 'sources')
+			{
+				for (let i = 0; i < Memory.rooms.backup[room_name].sources.length; i++)
+				{
+					for (let sobj in Memory.rooms.backup[room_name].sources[i])
+					{
+						Memory.rooms[room_name].sources[i][sobj] = Memory.rooms.backup[room_name].sources[i][sobj];
+					}
+				}
+			}
+			else if (obj === 'defense')
+			{
+				Memory.rooms[room_name].defense.patrol = Memory.rooms.backup[room_name].defense.patrol;
+				Memory.rooms[room_name].defense.preturn = Memory.rooms.backup[room_name].defense.preturn;
+			}
+			else
+			{
+				Memory.rooms[room_name][obj] = Memory.rooms.backup[room_name][obj];
+			}
+		}
 	},
 
 	maximumEnergy: function(room)
@@ -470,6 +975,123 @@ var calculate =
 		}
 	},
 
+	countextensions: function(room_name = false)
+	{
+		let e = 0;
+
+		if (!room_name)
+		{
+			for (let room_name in Memory.rooms)
+			{
+				e += calculate.countextensions(room_name);
+				return e;
+			}
+		}
+
+		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+		{
+			e += Memory.rooms[room_name].sources[i].buildings.extensions.length;
+		}
+		return e;
+	},
+
+	findouterstone: function(room_name, x_start, y_start, existing_stone = false)	//Find contiguous outer perimiter of a natural wall formation.
+	{
+		if (existing_stone && existing_stone[x_start] && existing_stone[x_start][y_start])
+		{
+			//We've already marked this section of contiguous natural walls.
+			return existing_stone;
+		}
+
+		let terrain = Game.rooms[room_name].getTerrain();
+		let temp_search = [{x: x_start, y: y_start}];
+		let search_now;
+		let found = {};
+		//let found = {[x_start]: {[y_start]: true}};
+		if (existing_stone)
+		{
+			found = existing_stone;	//If we already have previous formations recorded, we are adding to them.
+		}
+		else
+		{
+			calculate.findouterstone.innercheck(x_start, y_start, found, temp_search, terrain);
+		}
+
+		while (temp_search.length)
+		{
+			search_now = temp_search.slice();
+			temp_search = [];
+			for (let s = 0; s < search_now.length; s++)
+			{
+				//We're only getting true adjacent tiles, not the corners or the center. This ensures the walls are truly contiguous.
+				for (let x = -1; x < 2; x++)
+				{
+					if (x === 0)	//If we're horizontally centered, check the top and bottom.
+					{
+						for (let y = -1; y < 2; y += 2)
+						{
+							//Don't touch the edge of the room.
+							if (search_now[s].x + x > 0 && search_now[s].x + x < 49 && search_now[s].y + y > 0 && search_now[s].y + y < 49)
+							{
+								//If there's an empty tile touching it, mark that tile.
+								calculate.findouterstone.innercheck(search_now[s].x + x, search_now[s].y + y, found, temp_search, terrain);
+							}
+						}
+					}
+					else	//If we're horizontally at the left or right, check the second tile down.
+					{
+						let y = 0;
+						//Don't touch the edge of the room.
+						if (search_now[s].x + x > 0 && search_now[s].x + x < 49 && search_now[s].y + y > 0 && search_now[s].y + y < 49)
+						{
+							//If there's an empty tile touching it, mark that tile.
+							calculate.findouterstone.innercheck(search_now[s].x + x, search_now[s].y + y, found, temp_search, terrain);
+						}
+					}
+				}
+			}
+			//console.log(temp_search.length);
+		}
+
+		return found;
+	},
+
+	hugwalls: function(room_name, walls)
+	{
+		let empty_tiles = {};
+		let terrain = Game.rooms[room_name].getTerrain();
+
+		for (let x in walls)
+		{
+			for (let y in walls[x])
+			{
+				for (let x2 = -1; x2 < 2; x2++)
+				{
+					for (let y2 = -1; y2 < 2; y2++)
+					{
+						if (terrain.get(Number(x) + x2, Number(y) + y2) !== TERRAIN_MASK_WALL)
+						{
+							calculate.mark_found(Number(x) + x2, Number(y) + y2, empty_tiles);
+						}
+					}
+				}
+			}
+		}
+
+		return empty_tiles;
+	},
+
+	mark_found: function(x, y, obj, value = true)
+	{
+		if (!obj[x])
+		{
+			obj[x] = {};
+		}
+
+		obj[x][y] = value;
+		return true;
+	},
+
 	//Various reducers so we can easily do single-line checks involving arrays of arbitrary length.
 	reduceManyWork: function(n, part)
 	{
@@ -522,7 +1144,45 @@ var calculate =
 	arrayreducer: function(total, a)
 	{
 		return total + a.length;
+	},
+
+	//Count the number of tiles in an [x][y] object.
+	xy_length: function(obj)
+	{
+		let i = 0;
+		for (let x in obj)
+		{
+			for (let y in obj[x])
+			{
+				i++;
+			}
+		}
+		return i;
 	}
+};
+
+calculate.findouterstone.innercheck = function(x, y, found, temp_search, terrain)
+{
+	//First we need to make sure we have a wall tile. We also need to make sure we didn't already mark it.
+	if (terrain.get(x, y) === TERRAIN_MASK_WALL && (!found[x] || !found[x][y]))
+	{
+		//Now see if it has at least one empty tile touching it.
+		for (let x2 = -1; x2 < 2; x2++)
+		{
+			for (let y2 = -1; y2 < 2; y2++)
+			{
+				if (terrain.get(x + x2, y + y2) !== TERRAIN_MASK_WALL)
+				{
+					//The tile is touching a non-wall tile.
+					calculate.mark_found(x, y, found);
+					temp_search.push({x: x, y: y});
+					//console.log('Pushed ' + x + ' ' + y + '.');
+					return true;	//Successfully marked.
+				}
+			}
+		}
+	}
+	return false;	//Nothing found.
 };
 
 module.exports = calculate;
