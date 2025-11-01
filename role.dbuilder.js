@@ -1,3 +1,5 @@
+var defender = require('defender');
+
 var roleDBuilder =
 {
 	transport: require('role.transport'),
@@ -38,7 +40,12 @@ var roleDBuilder =
 			if (creep.pos.inRangeTo(sites[c], 3) && creep.build(sites[c]) == OK)	//If we're near a site, build on one.
 			{
 				test = true;
-				//console.log("Range 3.");
+				//If we built a rampart, we need to update it immediately so it can receive repairs.
+				if (sites[c].structureType === STRUCTURE_RAMPART)
+				{
+					defender.ramparts[creep.room.name] = undefined;
+					Memory.rooms[creep.room.name].defense.update = 2;
+				}
 				break;
 			}
 			else
@@ -56,18 +63,26 @@ var roleDBuilder =
 				}
 
 				//Test to see if we're dealing with a far wall.
-				if (creep.pos.getRangeTo(sites[c]) == 4)
+				if (creep.pos.getRangeTo(sites[c]) > 3 && creep.pos.getRangeTo(sites[c]) < 6)
 				{
 					for (let f = 0; f < farwalls.length; f++)
 					{
 						if (sites[c].pos.isEqualTo(farwalls[f]))
 						{
 							//If we found one nearby, go to it, then come back from it.
-							if (Memory.creeps[creep.name].movenow.length === 0)
+							if (Memory.creeps[creep.name].movenow.length === 0 && Memory.creeps[creep.name].path != 4)
 							{
-								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(sites[c].pos, {range: 3});
-								Memory.creeps[creep.name].movenow.concat(creep.room.findPath(creep.room.getPositionAt(Memory.creeps[creep.name].movenow.slice(-1)[0].x, Memory.creeps[creep.name].movenow.slice(-1)[0].y), creep.pos));
-								Memory.creeps[creep.name].movenow = require('calculate').cleanthispath(Memory.creeps[creep.name].movenow, Memory.creeps[creep.name].movenow[1].direction);
+								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(sites[c].pos, {range: 3})
+								Memory.creeps[creep.name].movenow = Memory.creeps[creep.name].movenow
+									.concat(creep.room.findPath(creep.room.getPositionAt(Memory.creeps[creep.name].movenow.slice(-1)[0].x, Memory.creeps[creep.name].movenow.slice(-1)[0].y), creep.pos));
+								//console.log(JSON.stringify(Memory.creeps[creep.name].movenow));
+								let tdirection = Memory.creeps[creep.name].movenow[0].direction;
+								Memory.creeps[creep.name].movenow = require('calculate').cleanthispath(Memory.creeps[creep.name].movenow, Memory.creeps[creep.name].movenow[0].direction);
+								//	.concat({x: creep.pos.x, y: creep.pos.y, direction: creep.memory.direction}), Memory.creeps[creep.name].movenow[0]);
+								//Memory.creeps[creep.name].movenow.push({x: creep.pos.x, y: creep.pos.y, direction: creep.memory.direction});
+								//console.log(JSON.stringify(Memory.creeps[creep.name].movenow));
+								Memory.creeps[creep.name].direction = tdirection;
+								break;
 							}
 						}
 					}
@@ -82,7 +97,7 @@ var roleDBuilder =
 	{
 		//console.log("Repairing.");
 		//Get our structures that need to be repaired.
-		let rstructures = creep.room.find(FIND_STRUCTURES,
+		/*let rstructures = creep.room.find(FIND_STRUCTURES,
 		{
 			filter: function(structure)
 			{
@@ -94,16 +109,33 @@ var roleDBuilder =
 			{
 				return ((structure.structureType == STRUCTURE_TOWER || structure.structureType == STRUCTURE_WALL) && structure.hits < structure.hitsMax);
 			}
-		}));
+		}));*/
+
+		//Get repairable structures in range of the repairer.
+		let rstructures = [];
+		for (let x = -3; x < 4; x++)
+		{
+			for (let y = -3; y < 4; y++)
+			{
+				//Assign within comparison.
+				if (defender.walls[creep.room.name] && defender.walls[creep.room.name][creep.pos.x + x] && defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y] )
+				{
+					rstructures.push(Game.getObjectById(defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y]));
+				}
+				else if(defender.ramparts[creep.room.name] && defender.ramparts[creep.room.name][creep.pos.x + x] && defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y])
+				{
+					rstructures.push(Game.getObjectById(defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y]));
+				}
+			}
+		}
 
 		//Now prioritize them.
 		let chosen;
-		//let command;
 		let lowesthp = Infinity;
 		let farwalls;
 		for (let r = 0; r < rstructures.length; r++)
 		{
-			if (rstructures[r].hits < lowesthp && creep.pos.inRangeTo(rstructures[r], 3))
+			if (rstructures[r] && rstructures[r].hits < lowesthp && creep.pos.inRangeTo(rstructures[r], 3))
 			{
 				lowesthp = rstructures[r].hits;
 				chosen = rstructures[r];
@@ -143,8 +175,15 @@ var roleDBuilder =
 				{
 					return (tower.structureType == STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) >= 500);	//If a tower is more than half empty, we should fill it.
 				}
-			});
-			tlength = towers.length;	//This is the number of towers in the room that absolutely need energy.
+			})
+				.concat(creep.room.find(FIND_CONSTRUCTION_SITES,
+			{
+				filter: function(tower)
+				{
+					return (tower.structureType == STRUCTURE_WALL || tower.structureType == STRUCTURE_RAMPART || tower.structureType == STRUCTURE_TOWER);	//If a wall, rampart, or tower needs to be built, we should build it.
+				}
+			}));
+			tlength = towers.length;	//This is the number of structures in the room that absolutely need to be serviced.
 		}
 
 		towers = creep.room.find(FIND_MY_STRUCTURES,
