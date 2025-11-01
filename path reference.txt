@@ -224,3 +224,6 @@ Since checkDefense() will only be run once now, we'll rename it to setDefense().
 A new checkDefense() will take its place that truly rebuilds missing walls/ramparts.
 
 Everything that needs the end uses slice(-1), everything that needs the beginning uses [0]. Nothing needs anything inbetween. Therefore a safe bet is to keep the beginnings and ends of everything and delete their middle.
+
+The calculate.cleanpaths() must be run before the matching
+calculate.deleteoldpaths() because it creates the mcleans.
