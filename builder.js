@@ -207,7 +207,7 @@ var builder =
 				case "utransport":	//We might not have a container yet. Store the desired position.
 				{
 					//Our target is the last step in the upgrader's path, since that's where it will be waiting.
-					options.memory.direction = Memory.rooms[room_name].sources[need].mine[1].direction;
+					options.memory.direction = Memory.rooms[room_name].sources[need].minedir2;
 					options.memory.path = 3;
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
@@ -215,13 +215,13 @@ var builder =
 					//options.memory.return = false;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source initially.
 					//This one needs temporary instructions to get to a source. Then it loops between the source and the controller upgrader on its own.
-					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[need].mine, Memory.rooms[room_name].sources[need].mine[1].direction);
-					options.memory.movenow.pop();
+					options.memory.movenow = Memory.rooms[room_name].sources[need].mclean.u;
+					//options.memory.movenow.pop();
 					break;
 				}
 				case "builder":
 				{
-					options.memory.direction = false;
+					options.memory.direction = Memory.rooms[room_name].sources[need].minedir2;
 					options.memory.path = 0;
 					options.memory.target = {};	//We need to flip the utrip bool every time we visit the source.
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mine.slice(-1)[0].x;
@@ -239,9 +239,8 @@ var builder =
 					options.memory.need = Memory.rooms[room_name].defense.need;
 					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
 					//This one needs temporary instructions to get to a source. Then it loops between the source, the controller upgrader, and the defense builder on its own.
-					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[need].mine.concat(Memory.rooms[room_name].sources[need].mreturn[0]), Memory.rooms[room_name].sources[need].mine[1].direction);
-					options.memory.movenow.pop();
-					options.memory.direction = Memory.rooms[room_name].sources[need].mine[1].direction
+					options.memory.movenow = Memory.rooms[room_name].sources[need].mclean.b;
+					//options.memory.movenow.pop();
 					break;
 				}
 				case "dbuilder":
@@ -269,7 +268,7 @@ var builder =
 					let shortestchosen = 0;
 					for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 					{
-						let test = Memory.rooms[room_name].sources[i].mine.length + Memory.rooms[room_name].sources[i].defpaths[Memory.rooms[room_name].defense.need].length;
+						let test = Memory.rooms[room_name].sources[i].mlength + Memory.rooms[room_name].sources[i].dlength[Memory.rooms[room_name].defense.need];
 						if (test < shortest)
 						{
 							shortestchosen = i;
@@ -279,17 +278,19 @@ var builder =
 					}
 
 					//Now deploy onto that path.
-					options.memory.direction = Memory.rooms[room_name].sources[shortestchosen].mine[1].direction;
+					options.memory.direction = Memory.rooms[room_name].sources[shortestchosen].minedir2;
 					options.memory.path = 4;
-					options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need]);
+					//options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need]);
 					options.memory.target = {};
-					options.memory.target.x = Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
-					options.memory.target.y = Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
 					options.memory.dtarget = {};
-					options.memory.dtarget.x = options.memory.movenow.slice(-1)[0].x;
-					options.memory.dtarget.y = options.memory.movenow.slice(-1)[0].y;
-					options.memory.movenow = calculate.cleanthispath(Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need][0]),
-						Memory.rooms[room_name].sources[shortestchosen].mine[1].direction)
+					if (Memory.rooms[room_name].sources[shortestchosen].defpaths && Memory.rooms[room_name].sources[shortestchosen].defpaths[defense.need])
+					{
+						options.memory.target.x = Memory.rooms[room_name].sources[shortestchosen].defpaths[defense.need].slice(-1)[0].x;
+						options.memory.target.y = Memory.rooms[room_name].sources[shortestchosen].defpaths[defense.need].slice(-1)[0].y;
+						options.memory.dtarget.x = options.memory.target.x;
+						options.memory.dtarget.y = options.memory.target.y;
+					}
+					options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mclean.d[defense.need];
 					//options.memory.movenow = [];
 					//options.memory.return = false;
 					options.memory.dtrip = true;
@@ -302,8 +303,8 @@ var builder =
 					{
 						for (let b = 0; b < Memory.rooms[room_name].sources[i].creeps.builder.length; b++)
 						{
-							Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtarget.x = Memory.rooms[room_name].sources[i].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
-							Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtarget.y = Memory.rooms[room_name].sources[i].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
+							Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtarget.x = Memory.rooms[room_name].sources[i].defpaths[defense.need].slice(-1)[0].x;
+							Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtarget.y = Memory.rooms[room_name].sources[i].defpaths[defense.need].slice(-1)[0].y;
 						}
 					}
 				}
@@ -313,14 +314,18 @@ var builder =
 			options.directions = direction;
 			//console.log(JSON.stringify(direction));
 
-			//Sort the extensions and spawners for efficient energy usage.
-			options.energyStructures = calculate.sortExtensions(room_name);
+			//Sort the extensions and spawners for efficient energy usage. Don't do this if there are extension construction sites.
+			if (myextensions.length === Memory.rooms[room_name].sources.reduce(calculate.sourcereducer.idealextensions, 0))
+			{
+				options.energyStructures = calculate.sortExtensions(room_name);
+			}
 
 			//Build what's needed.
 			console.log("Building " + name + ".");
 
 			//Options are defined before the direction switch so we can assign our transport targets too.
 			//If there are no construction sites, our builder should be a minbuilder, but still considered a builder in all other ways.
+			//console.log(JSON.stringify(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable)));
 			switch (spawn.spawnCreep(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable), name, options))
 			{
 				case OK:
