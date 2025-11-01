@@ -1,12 +1,13 @@
 global.help =
-"flags\n" +
 "attack(attack_number, x, y, [room_name])\n" +
 "attackdisplay\n" +
 "attackrole(attack_number, role_type, number_of_role)\n" +
 "movenow(creep_name, x, y)\n" +
-"newpath(current_room, action_type, action_number, [x, [y], [x2], [y2], [target_room])\n" +
+"newpath(current_room, action_type, action_number, [x], [y], [x2], [y2], [target_room])\n" +
 "clearcreep(creep_name)\n" +
-"oversign(creep_name)";
+"countextensions\n" +
+"oversign(creep_name)\n" +
+"flags";
 
 global.flags = "Attack\nClaims\nReserves\nSigns\nTransfer\nSafe\nJoin\nRoad";
 
@@ -117,6 +118,25 @@ global.clearcreep = function(creep_name)
 		return false;
 	}
 }
+
+Object.defineProperty(global, 'countextensions',
+{
+	get: function()
+	{
+		let all = true;
+		let counted;
+		for (let room_name in Memory.rooms)
+		{
+			counted = require('calculate').countextensions(room_name);
+			if (counted < 60)
+			{
+				all = false;
+			}
+			console.log(counted);
+		}
+		return all;
+	}
+});
 
 global.oversign = function(creep_name)
 {
