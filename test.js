@@ -30,12 +30,6 @@ var test =
 				test.paint.defensepath(room_name, ["green", "yellow"]);
 			}
 
-			pindex++;
-			if (pindex > 11)
-			{
-				pindex = 0;
-			}
-
 			for (let room_name in Memory.rooms)
 			{
 				if (!newpath)
@@ -47,21 +41,25 @@ var test =
 				let style = {color: 'white', opacity: 0.5};
 				for (let x in Memory.rooms[room_name].path)
 				{
-					if (x != test.path[pindex])
-					{
-						break;
-					}
+					let x2 = +x;
 					for (let y in Memory.rooms[room_name].path[x])
 					{
+						let y2 = +y;
 						for (let path in Memory.rooms[room_name].path[x][y])
 						{
-							x = +x;
-							y = +y;
+							if (!Memory.rooms[room_name].path[x] || !Memory.rooms[room_name].path[x][y])
+							{
+								continue;
+							}
 							style.backgroundColor = false;
 							switch(path)
 							{
 								default:
-									Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path]], x, y, style);
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
+									Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path] || 0], x2, y2, style);
 									break;
 
 								case 'mine':
@@ -70,6 +68,10 @@ var test =
 									style.backgroundColor = 'blue';
 								case 'upgrade':
 								case 'ureturn':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
 									if(!style.backgroundColor)
 									{
 										style.backgroundColor = 'red';
@@ -77,56 +79,78 @@ var test =
 
 									for (i = 0; i < Memory.rooms[room_name].path[x][y][path].length; i++)
 									{
-										if (Memory.rooms[room_name].path[x][y][path][i] === null)
+										if (Memory.rooms[room_name].path[x][y][path][i])
 										{
-											continue;
+											Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i] || 0], x2, y2, style);
 										}
-
-										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i]], x, y, style);
 									}
 									break;
 
-								case 'defpath':
+								case 'defpaths':
 								case 'dreturn':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
 									style.backgroundColor = 'purple';
 
 									for (i = 0; i < Memory.rooms[room_name].path[x][y][path].length; i++)
 									{
-										if (!Array.isArray(Memory.rooms[room_name].path[x][y][path][i]))
+										if (typeof Memory.rooms[room_name].path[x][y][path][i] !== 'object')
 										{
 											/*if (room_name == 'E49S15')
 											{
-												console.log('1st test. x: ' + x + ' y: ' + y);
+												console.log('1st test. x: ' + x2 + ' y: ' + y2);
 											}*/
 											continue;
 										}
 
 										for (let e in Memory.rooms[room_name].path[x][y][path][i])
 										{
-											Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i][e]], x, y, style);
+											Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i][e]], x2, y2, style);
 										}
 									}
 									break;
 
 								case 'patrol':
 								case 'preturn':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
 									style.backgroundColor = 'orange';
 
 									for (let e in Memory.rooms[room_name].path[x][y][path])
 									{
-										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][e]], x, y, style);
+										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][e] || 0], x2, y2, style);
 									}
 									break;
 
 								case 'exitpath':
 								case 'exitreturn':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
 									style.backgroundColor = 'green';
 
 									for (let e in Memory.rooms[room_name].path[x][y][path])
 									{
-										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][e]], x, y, style);
+										Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][e] || 0], x2, y2, style);
 									}
 									break;
+
+								case 'flipper':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
+									style.backgroundColor = 'white';
+
+									for (let e in Memory.rooms[room_name].path[x][y][path])
+									{
+										Game.rooms[room_name].visual.text(test.direction[0], x2, y2, style);
+									}
 							}
 						}
 					}
@@ -346,9 +370,9 @@ var test =
 		}
 	},
 
-	direction: ['F', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
+	direction: ['[]', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
 	pindex: -1,
-	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpath', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
+	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
 
 	pathmemtest: function()
 	{
