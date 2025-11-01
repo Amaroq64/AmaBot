@@ -153,7 +153,7 @@ var body =
 				}
 			}
 		}
-		if (minimumbuilder)
+		if (minimumbuilder && energy >= 400)
 		{
 			energy -= 250;
 			while (!fatbuilder && energy >= 150 && body.length < 30)
