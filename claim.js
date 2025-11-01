@@ -118,21 +118,22 @@ var claim =
 		//Get the first action in the queue. We will prioritize some action types over others.
 		if (!type)
 		{
+			//This is left over from when we weren't specifying a type to build for.
 			if (Array.isArray(Memory.attack))
 			{
-				type = "attack";
+				type = 'attack';
 			}
 			else if (Array.isArray(Memory.signs))
 			{
-				type = "signs";
+				type = 'signs';
 			}
 			else if (Array.isArray(Memory.reserves))
 			{
-				type = "reserves";
+				type = 'reserves';
 			}
 			else if (Array.isArray(Memory.claims))
 			{
-				type = "claims";
+				type = 'claims';
 			}
 			else
 			{
@@ -145,7 +146,7 @@ var claim =
 		//Now build what this action needs.
 		let complete;
 		//Iterate the room action objects.
-		for (let a = 0; a < Memory[type].length; a++)
+		for (let a = 0; Memory[type] && a < Memory[type].length; a++)
 		{
 			let complete = true;
 			//Iterate the roles in ideal.
@@ -172,7 +173,7 @@ var claim =
 							{
 								//Now build it.
 								let name = spawns[s].name.slice(0, 3) + spawns[s].name.slice(6) + role.charAt(0).toUpperCase() + role.slice(1) + a + "_" + Game.time.toString()
-								let status = spawns[s].spawnCreep(body, name, {memory: {target: {}, movenow: []}, energyStructures: require('calculate').sortExtensions(room_name), directions: [spawns[s].pos.getDirectionTo(
+								let status = spawns[s].spawnCreep(body, name, {memory: {target: {}, movenow: [], direction: false, path: 8}, energyStructures: require('calculate').sortExtensions(room_name), directions: [spawns[s].pos.getDirectionTo(
 									Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]][0].x,
 									Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]][0].y
 								)]});
@@ -233,13 +234,33 @@ var claim =
 								{
 									//console.log(JSON.stringify(Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]]));
 									//We're leaving our starting room.
-									creep.moveByPath(Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]]);
+									//creep.moveByPath(Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]]);
+
+									let tempdir;
+									//Assign within comparison.
+									if ((tempdir = Memory.rooms[creep.room.name].path[creep.pos.x])
+									&& (tempdir = tempdir[creep.pos.y])
+									&& (tempdir = tempdir.exitpath)
+									&& (tempdir = tempdir[Object.keys(Memory[type][a].path)[0]]))	//Our target is the first room in our path keys.
+									{
+										creep.memory.direction = tempdir;
+									}
+									creep.move(creep.memory.direction);
 								}
 							}
 							else if (creep.pos.roomName != Memory[type][a].pos.roomName)	//If we aren't at our target room yet, move along our inter-room path.
 							{
 								//console.log(JSON.stringify(Memory[type][a].path));
-								creep.moveByPath(Memory[type][a].path[creep.room.name]);
+								//creep.moveByPath(Memory[type][a].path[creep.room.name]);
+
+								let tempdir;
+								//Assign within comparison.
+								if ((tempdir = Memory[type][a].path[creep.room.name]) && (tempdir = tempdir[creep.pos.x]) && (tempdir = tempdir[creep.pos.y]))
+								{
+									creep.memory.direction = tempdir;
+								}
+
+								creep.move(creep.memory.direction);
 							}
 						}
 					}
@@ -290,6 +311,9 @@ var claim =
 				
 			}
 
+			//Clean the path.
+			tpath.path = require('calculate').cleanthispath(tpath.path);
+
 			//Separate the path by what room it's in.
 			for (let p = 0; p < tpath.path.length; p++)
 			{
@@ -300,6 +324,24 @@ var claim =
 
 				object.path[tpath.path[p].roomName].push(tpath.path[p]);
 			}
+
+			//Now arrange the cleaned steps into [x][y] tiles.
+			for (let room in object.path)
+			{
+				let temp_tile = {};
+				for (let tile = 0; tile < object.path[room].length; tile++)
+				{
+					if (!temp_tile[object.path[room][tile].x])
+					{
+						temp_tile[object.path[room][tile].x] = {};
+					}
+
+					temp_tile[object.path[room][tile].x][object.path[room][tile].y] = object.path[room][tile].direction;
+				}
+
+				object.path[room] = temp_tile;
+			}
+
 			object.ops = tpath.ops;
 			object.cost = tpath.cost;
 			object.incomplete = tpath.incomplete;
@@ -331,6 +373,12 @@ var claim =
 							if (role == 'attacker' || role == 'rattacker')
 							{
 								enemies = creep.pos.findInRange(FIND_HOSTILE_CREEPS, range, {filter: claim.checkallies})
+								if (!enemies.length)
+								{
+									enemies = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, range, {filter: function(structure) {return structure.structureType != STRUCTURE_CONTROLLER && claim.checkallies(structure)} })
+										.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_CONTAINER}}))
+										.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_POWER_BANK}}));
+								}
 							}
 							else if (role == 'dattacker')
 							{
@@ -391,9 +439,27 @@ var claim =
 								}*/
 
 								let tempenemy = creep.pos.findClosestByPath(enemies);
-								if (tempenemy)
+								if (!Memory.attack[a].guard && tempenemy)
 								{
 									Memory.attack[a].pos = tempenemy.pos;
+								}
+								else if (creep.memory.movenow.length != 0)
+								{
+									status = creep.moveByPath(creep.memory.movenow)
+									if(status == OK || status == ERR_TIRED)
+									{
+										//console.log(creep.name + ": Using stored move.");
+										if (creep.pos.x == creep.memory.movenow[creep.memory.movenow.length - 1].x && creep.pos.y == creep.memory.movenow[creep.memory.movenow.length - 1].y)
+										{
+											Memory.creeps[creep.name].movenow = [];
+										}
+									}
+									else if (status == ERR_NOT_FOUND)	//We've presumably completed our move orders. Switch back to normal movement.
+									{
+										Memory.creeps[creep.name].movenow = [];
+										console.log(creep.name + ": Switching to normal pathing.");
+										//return require('control').move(creep, role, source);
+									}
 								}
 							}
 							else
@@ -428,6 +494,10 @@ var claim =
 							if(status == OK || status == ERR_TIRED)
 							{
 								//console.log(creep.name + ": Using stored move.");
+								if (creep.pos.x == creep.memory.movenow[creep.memory.movenow.length - 1].x && creep.pos.y == creep.memory.movenow[creep.memory.movenow.length - 1].y)
+								{
+									Memory.creeps[creep.name].movenow = [];
+								}
 							}
 							else if (status == ERR_NOT_FOUND)	//We've presumably completed our move orders. Switch back to normal movement.
 							{
@@ -440,7 +510,10 @@ var claim =
 						{
 							//We need to get a path.
 							Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y);
-							Memory.creeps[creep.name].movenow.splice((0 - range), range);
+							if (!Memory.attack[a].guard)
+							{
+								Memory.creeps[creep.name].movenow.splice((0 - range), range);
+							}
 						}
 					}
 				}
@@ -535,10 +608,10 @@ var claim =
 					{
 						//If our spawn is completed, turn over control of the room.
 						let spawn = Game.rooms[creep.room.name].find(FIND_MY_SPAWNS);
-						if (spawn.length != 0 && Game.cpu.bucket >= 500)	//Initializing a room is CPU intensive.
+						if (spawn.length != 0 && Game.cpu.bucket >= 1800)	//Initializing a room is CPU intensive.
 						{
 							let init = require('init');
-							if (init.run())
+							if (init.run() && Memory.rooms[creep.room.name] && Memory.rooms[creep.room.name].init === 2)
 							{
 								//If we get this far without errors, turn our creeps over.
 								//Re-run our creep iterating code.
@@ -548,38 +621,92 @@ var claim =
 									//Iterate each creep in this role.
 									for (let c = 0; c < Memory.claims[a].creeps[role].length; c++)
 									{
+										creep = Game.creeps[Memory.claims[a].creeps[role][c]];
 										switch (role)
 										{
 											case "harvester":
 											case "builder":
 											{
+												//Prepare the creep to be transferred.
+												if (role === 'harvester')
+												{
+													creep.memory.direction = false;
+													creep.memory.path = 10;
+													creep.memory.target = {x: Memory.rooms[creep.room.name].sources[c].mfat.slice(-1)[0].x, y: Memory.rooms[creep.room.name].sources[c].mfat.slice(-1)[0].y};
+												}
+												else
+												{
+													creep.memory.direction = false;
+													creep.memory.path = 0;
+													creep.memory.target = {};
+													creep.memory.target.x = Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].x;
+													creep.memory.target.y = Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].y;
+													creep.memory.dtarget = {};
+													creep.memory.utrip = false;
+													creep.memory.dtrip = false;
+													creep.memory.destination = false;
+													creep.memory.need = 0;
+												}
+
 												Memory.rooms[creep.room.name].sources[c].creeps[role].push(Memory.claims[a].creeps[role][c]);
 												break;
 											}
 											case "claimer":
 											{
+												//Prepare the creep to be transferred.
+												creep.memory.direction = false;
+												creep.memory.path = 11;
+												creep.memory.target = {x: Memory.rooms[creep.room.name].upgrade.slice(-1)[0].x, y: Memory.rooms[creep.room.name].upgrade.slice(-1)[0].y};
+
 												Memory.rooms[creep.room.name].creeps.upgrader.push(Memory.claims[a].creeps[role][c]);
 												break;
 											}
+										}
+
+										//Now move the creep to its destination if it isn't already there. (Using our new pathing system.)
+										if (creep.pos.x != creep.memory.target.x || creep.pos.y != creep.memory.target.y)
+										{
+											//console.log(c + ' ' + JSON.stringify(Memory.rooms[creep.room.name].sources[c].pos) + ' ' + JSON.stringify(creep.memory));
+											creep.memory.movenow = creep.pos.findPathTo(creep.memory.target.x, creep.memory.target.y, {maxRooms: 1});
+											creep.memory.direction = creep.memory.movenow[0].direction;
+											creep.memory.movenow = require('calculate').cleanthispath(creep.memory.movenow);
+											creep.memory.movenow.shift();
+											creep.move(creep.memory.direction);
+										}
+										else
+										{
+											creep.memory.movenow = [];
 										}
 									}
 								}
 
 								//Creeps should be handed over now. Delete the action.
-								Memory.claims.splice(a, 1);
-								if (Memory.claims.length == 0)
+								if (Memory.rooms[creep.room.name].init)
 								{
-									delete Memory.claims;
-								}
+									Memory.claims.splice(a, 1);
+									if (Memory.claims.length == 0)
+									{
+										delete Memory.claims;
+									}
 
-								return true;
+									Memory.rooms[creep.room.name].init = undefined;
+									return true;
+								}
+								else
+								{
+									return false;
+								}
 							}
 							else
 							{
+								//Memory.rooms[creep.room.name] = undefined;
 								return false;
 							}
 						}
-						else if (Game.rooms[creep.room.name].controller.my && Game.rooms[creep.room.name].find(FIND_MY_CONSTRUCTION_SITES).length == 0)
+						else if (role === 'claimer'
+							&& Game.rooms[creep.room.name].controller.my
+							&& Game.rooms[creep.room.name].find(FIND_MY_CONSTRUCTION_SITES).length === 0
+							&& Game.rooms[creep.room.name].find(FIND_MY_SPAWNS).length === 0)
 						{
 							//Create our spawn.
 							Game.rooms[creep.room.name].createConstructionSite(Memory.claims[a].pos.x, Memory.claims[a].pos.y, STRUCTURE_SPAWN, require('builder').newSpawn(false, a));
@@ -607,10 +734,10 @@ var claim =
 							for (let i = 0; i < Memory.claims[a].claimpaths.sources.length; i++)
 							{
 								//We can be a bit sloppy with these. Who cares about the finer points when the init will handle it?
-								Memory.claims[a].claimpaths.sources[i].mine = home.findPathTo(Memory.claims[a].claimpaths.sources[i].pos.x, Memory.claims[a].claimpaths.sources[i].pos.y, {range: 1});
+								Memory.claims[a].claimpaths.sources[i].mine = home.findPathTo(Memory.claims[a].claimpaths.sources[i].pos.x, Memory.claims[a].claimpaths.sources[i].pos.y, {range: 1, maxRooms: 1});
 								Memory.claims[a].claimpaths.sources[i].mfat.push(Memory.claims[a].claimpaths.sources[i].mine.pop());
 								Memory.claims[a].claimpaths.sources[i].mreturn = Game.rooms[creep.room.name].getPositionAt(Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].x, Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].y)
-									.findPathTo(home, {range: 1});
+									.findPathTo(home, {range: 1, maxRooms: 1});
 							}
 
 							if (role == "builder")
@@ -628,7 +755,7 @@ var claim =
 								creep.memory.target.y = Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].y;
 							}
 
-							Memory.claims[a].claimpaths.upgrade = home.findPathTo(Game.rooms[creep.room.name].controller, {range: 1});
+							Memory.claims[a].claimpaths.upgrade = home.findPathTo(Game.rooms[creep.room.name].controller, {range: 1, maxRooms: 1});
 							let tempupgrade = Game.rooms[creep.room.name].getPositionAt(Memory.claims[a].claimpaths.upgrade.slice(-1)[0].x, Memory.claims[a].claimpaths.upgrade.slice(-1)[0].y)
 							Memory.claims[a].claimpaths.ureturn = tempupgrade.findPathTo(tempupgrade.findClosestByPath
 							([
@@ -636,14 +763,14 @@ var claim =
 								Game.rooms[creep.room.name].getPositionAt(
 									Memory.claims[a].claimpaths.sources[Memory.claims[a].claimpaths.sources.length - 1].mine.slice(-1)[0].x,
 									Memory.claims[a].claimpaths.sources[Memory.claims[a].claimpaths.sources.length - 1].mine.slice(-1)[0].y)
-							]));
+							]), {maxRooms: 1});
 							//We're altering the upgrade path.
 							Memory.claims[a].claimpaths.upgrade = Game.rooms[creep.room.name].getPositionAt(Memory.claims[a].claimpaths.ureturn.slice(-1)[0].x, Memory.claims[a].claimpaths.ureturn.slice(-1)[0].y)
-								.findPathTo(tempupgrade);
+								.findPathTo(tempupgrade, {maxRooms: 1});
 						}
 
 						//Now that we're here, we need to do our duties.
-						if (creep.memory.movenow.length == 0)
+						if (!creep.memory.movenow.length)
 						{
 							switch (role)
 							{
@@ -662,16 +789,39 @@ var claim =
 									if (creep.pos.isEqualTo(Game.rooms[creep.room.name].getPositionAt(Memory.claims[a].claimpaths.sources[i].mfat[0].x, Memory.claims[a].claimpaths.sources[i].mfat[0].y)))
 									{
 										//If we're at our source, mine it.
+										let status;	//Assign within comparison.
 										creep.harvest(creep.pos.findInRange(FIND_SOURCES, 1)[0]);
+										/*if ((status = creep.harvest(creep.pos.findInRange(FIND_SOURCES, 1)[0])) !== OK)
+										{
+											switch (status)
+											{
+												case ERR_NOT_OWNER:
+													status = 'ERR_NOT_OWNER';
+													break;
+												case ERR_NOT_ENOUGH_RESOURCES:
+													status = 'ERR_NOT_ENOUGH_RESOURCES';
+													break;
+											}
+											console.log(creep.name + ' ' + status);
+										}*/
 									}
-									else
+									else if(!creep.memory.movenow.length)
 									{
 										//If we're not at our source, go to it.
 										for (let i = 0; i < Memory.claims[a].claimpaths.sources.length; i++)
 										{
 											if (creep.name == Memory.claims[a].creeps.harvester[i])
 											{
-												creep.memory.movenow = creep.pos.findPathTo(Memory.claims[a].claimpaths.sources[i].mfat[0].x, Memory.claims[a].claimpaths.sources[i].mfat[0].y);
+												creep.memory.movenow = creep.pos.findPathTo(Memory.claims[a].claimpaths.sources[i].mfat[0].x, Memory.claims[a].claimpaths.sources[i].mfat[0].y, {maxRooms: 1,
+													costCallback: function(roomName, costMatrix)
+													{
+														//We need to avoid our other harvester.
+														if (i > 0 && Memory.creeps[Memory.claims[a].creeps.harvester[i - 1]].movenow.length)
+														{
+															costMatrix.set(Memory.creeps[Memory.claims[a].creeps.harvester[i - 1]].movenow.slice(-1)[0].x, Memory.creeps[Memory.claims[a].creeps.harvester[i - 1]].movenow.slice(-1)[0].y, 255);
+														}
+													}
+												});
 												break;
 											}
 										}
@@ -712,11 +862,11 @@ var claim =
 									//If we're not on our path, we need to go to it.
 									if (creep.memory.return && creep.moveByPath(Memory.claims[a].claimpaths.sources[i].mreturn) == ERR_NOT_FOUND)	//We're going to build the spawn
 									{
-										creep.moveByPath(creep.pos.findPathTo(Memory.claims[a].claimpaths.sources[i].mreturn.slice(-1)[0].x, Memory.claims[a].claimpaths.sources[i].mreturn.slice(-1)[0].y));
+										creep.moveTo(Memory.claims[a].claimpaths.sources[i].mreturn.slice(-1)[0].x, Memory.claims[a].claimpaths.sources[i].mreturn.slice(-1)[0].y, {maxRooms: 1, reusePath: 20});
 									}
 									else if (!creep.memory.return && creep.moveByPath(Memory.claims[a].claimpaths.sources[i].mine) == ERR_NOT_FOUND)	//We're returning to the source.
 									{
-										creep.moveByPath(creep.pos.findPathTo(Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].x, Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].y));
+										creep.moveTo(Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].x, Memory.claims[a].claimpaths.sources[i].mine.slice(-1)[0].y, {maxRooms: 1, reusePath: 20});
 									}
 									break;
 								}
@@ -732,13 +882,19 @@ var claim =
 										if (creep.pos.inRangeTo(controller, 1))
 										{
 											//If we're in range, take the room.
-											creep.signController(creep.room.controller, claim.signature);
-											creep.claimController(creep.room.controller);
+											if (creep.claimController(creep.room.controller) === OK)
+											{
+												creep.signController(creep.room.controller, claim.signature);
+											}
+											else if (creep.claimController(creep.room.controller) === ERR_INVALID_TARGET)
+											{
+												creep.attackController(creep.room.controller);
+											}
 										}
 										else
 										{
 											//If we're not in range, get in range.
-											creep.memory.movenow = creep.pos.findPathTo(Memory.claims[a].claimpaths.upgrade.slice(-1)[0].x, Memory.claims[a].claimpaths.upgrade.slice(-1)[0].y);
+											creep.memory.movenow = creep.pos.findPathTo(Memory.claims[a].claimpaths.upgrade.slice(-1)[0].x, Memory.claims[a].claimpaths.upgrade.slice(-1)[0].y, {maxRooms: 1});
 										}
 									}
 									break;
