@@ -19,6 +19,11 @@ var roleBuilder =
 			if (creep.pos.inRangeTo(sites[c], 3) && creep.build(sites[c]) == OK)	//If we're near a site, build on one.
 			{
 				test = true;
+				//If it was an extension or a spawn, we need to repopulate our extensions list.
+				if (sites[c].structureType == STRUCTURE_EXTENSION || sites[c].structureType == STRUCTURE_SPAWN)
+				{
+					require('calculate').extensions[creep.room.name] = undefined;
+				}
 				break;
 			}
 		}
@@ -57,7 +62,7 @@ var roleBuilder =
 		//Create roads wherever we go.
 		if (Memory.creeps[creep.name].movenow.length == 0)
 		{
-			//creep.room.createConstructionSite(creep.pos, STRUCTURE_ROAD);
+			creep.room.createConstructionSite(creep.pos, STRUCTURE_ROAD);
 		}
 		
 		//Flip, but only if we're not stuck under fatigue.
