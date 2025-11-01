@@ -8,7 +8,7 @@ module.exports.loop = function()
 	}
 
 	//Don't run if we're not ready.
-	if (Memory.rooms != undefined)
+	if (Memory.rooms)
 	{
 		//Are we under attack?
 		for (let spawn in Game.spawns)
@@ -82,6 +82,9 @@ module.exports.loop = function()
 		require('roomPlanner').check();
 		cpu_usage.Planner = Game.cpu.getUsed();
 
+		require('empire').check();
+		cpu_usage.Empire = Game.cpu.getUsed();
+
 		require('control').run();
 		cpu_usage.Control = Game.cpu.getUsed();
 
@@ -89,15 +92,12 @@ module.exports.loop = function()
 		cpu_usage.Build = Game.cpu.getUsed();
 
 		//paths, extensions, defenses, newpath, [room_name, action[a]]
-		//let test = require('test');
-		//test.run(false, false, false, true, /*['E48S14', Memory.attack[0]]*/);
-		//cpu_usage.Test = Game.cpu.getUsed();
+		let test = require('test');
+		test.run(false, true, true, true, /*['E48S14', Memory.attack[0]]*/);
+		cpu_usage.Test = Game.cpu.getUsed();
 
 		require('tower').monitor();
 		cpu_usage.Tower = Game.cpu.getUsed();
-
-		require('empire').check();
-		cpu_usage.Empire = Game.cpu.getUsed();
 
 		//test.cpu_usage = cpu_usage;
 
@@ -124,7 +124,7 @@ module.exports.loop = function()
 	}
 
 	//Load our console commands.
-	if (global.help)
+	if (!global.help)
 	{
 		require('commands');
 	}

@@ -8,7 +8,7 @@ var calculate = require('calculate');
 
 var init =
 {
-	run: function()
+	run: function(specific_room = false)
 	{
 
 		//Initialize memory if we're starting anew.
@@ -25,18 +25,25 @@ var init =
 		{
 			let room_name = Game.spawns[spawn].room.name;
 
+			if (specific_room && room_name !== specific_room)
+			{
+				continue;	//If we specify a room, we only want to do that one.
+			}
+
 			if (Memory.rooms[room_name] === undefined)	//This room is new.
 			{
 				Memory.rooms[room_name] = {};
 				Memory.rooms[room_name].sources = [];
+				Memory.rooms[room_name].mineral = {};
 				Memory.rooms[room_name].creeps = {upgrader: [], dbuilder: []};	//We don't need an upgrade builder because the source builders patrol to it.
 				Memory.rooms[room_name].buildings = {upgradecontainer: []};
 				Memory.rooms[room_name].ideal = {};
-				Memory.rooms[room_name].goals = {level: 2};
+				Memory.rooms[room_name].goals = {level: 1};
 				//Memory.rooms[room_name].structures = {};
 
 				//Since this room is new, find its energy sources.
 				let sources = Game.rooms[room_name].find(FIND_SOURCES);
+				let mineral = Game.rooms[room_name].find(FIND_MINERALS)[0];
 				let len = sources.length
 
 				//Record the found sources.
@@ -46,6 +53,7 @@ var init =
 				{
 					//Current entities start at zero. Ideal entity amounts will be populated by roomPlanner.
 					Memory.rooms[room_name].sources[i] = {id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], mtransport: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
+					//Memory.rooms[room_name].sources[i].pos = {x: Memory.rooms[room_name].sources[i].pos.x, y: Memory.rooms[room_name].sources[i].pos.y};
 				}
 
 				//Move sources to end of array until the closest one is [0].
@@ -55,9 +63,14 @@ var init =
 					Memory.rooms[room_name].sources.push(Memory.rooms[room_name].sources.shift());
 				}
 
+				//Record the found mineral.
+				//Strip everything but id and position.
+				Memory.rooms[room_name].mineral = {id: mineral.id, pos: mineral.pos};
+				//Memory.rooms[room_name].mineral.pos = {x: Memory.rooms[room_name].mineral.pos.x , y: Memory.rooms[room_name].mineral.pos.y};
+
 				//Build the path from spawn to controller so a fatty can get into position.
 				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].controller.pos,
-					{plainCost: 1, swampCost: 2, range: 3, ignoreCreeps: true});
+					{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true});
 
 				//Record our upgrader container.
 				Memory.rooms[room_name].buildings.upgradecontainer =
@@ -67,7 +80,7 @@ var init =
 				};
 
 				let temp = [];
-
+				
 				//Save the direction from the spawner to the start of this path.
 				Memory.rooms[room_name].upgradedir = Game.spawns[spawn].pos.getDirectionTo(Memory.rooms[room_name].upgrade[0].x, Memory.rooms[room_name].upgrade[0].y);
 
@@ -79,7 +92,7 @@ var init =
 					let tempPos2;
 					//From spawn to source. Extra space away from source to account for fatty miner.
 					temp[i].mine = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Memory.rooms[room_name].sources[i].pos,
-						{plainCost: 1 + i, swampCost: 2 + i, range: 2, ignoreCreeps: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
+						{plainCost: 1 + i, swampCost: 2 + i, range: 2, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
 							costCallback: function(roomName, costMatrix)
 							{
 								if (i == 1)
@@ -106,59 +119,9 @@ var init =
 					tempPos = Game.rooms[room_name].getPositionAt(temp[i].mine.slice(-1)[0].x, temp[i].mine.slice(-1)[0].y);
 					tempPos2 = Game.rooms[room_name].getPositionAt(temp[i].mine[0].x, temp[i].mine[0].y);
 
-					//Here, we go back.
-					for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
-					{
-						temp[i].mreturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
-							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreCreeps: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
-								costCallback: function(roomName, costMatrix)
-								{
-									//Go down the first generated path and make space around it.
-									if (p == 1)
-									{
-										for (let n = 1; n < temp[i].mreturn.length - 1; n++)
-										{
-											for (let x = -1; x < 2; x++)
-											{
-												for (let y = -1; y < 2; y++)
-												{
-													//Don't accidentally lower the cost of walls.
-													if (Game.rooms[room_name].getTerrain().get(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y) != TERRAIN_MASK_WALL)
-													{
-														costMatrix.set(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y, 10)	//Make room for extensions.
-													}
-												}
-											}
-										}
-									}
-
-									//Avoid backtracking on the way back.
-									let templen = temp[i].mine.length;
-									for (let n = 0; n < templen; n++)
-									{
-										costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 10); //Unless absolutely necessary.
-
-										if (i == 1)
-										{
-											for (let n = 0; n < temp[i - 1].mreturn.length; n++)
-											{
-												costMatrix.set(Memory.rooms[room_name].sources[i - 1].mreturn[n].x, Memory.rooms[room_name].sources[i - 1].mreturn[n].y, 1); //Here we prefer returning over the first return path.
-											}
-											costMatrix.set(Memory.rooms[room_name].sources[i - 1].mfat[0].x, Memory.rooms[room_name].sources[i - 1].mfat[0].y, 255); //Make sure to go around the previous mining fatty.
-										}
-
-										costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
-										costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
-									}
-
-									return costMatrix;
-								}
-							});
-					}
-
 					//Get the path from end of path to source, for generics and fatties.
 					temp[i].mfat = Game.rooms[room_name].findPath(tempPos, Memory.rooms[room_name].sources[i].pos,
-						{plainCost: 1, swampCost: 2, range: 1, ignoreCreeps: true});
+						{plainCost: 1, swampCost: 2, range: 1, ignoreRoads: true, ignoreCreeps: true});
 
 					//It's possible for the mine path to stop one short while avoiding swamps, or other rare circumstances.
 					//However, mfat (accidentally) picks up the slack when this happens.
@@ -178,6 +141,78 @@ var init =
 						y: temp[i].mfat[0].y
 					};
 
+					//Here, we go back.
+					for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
+					{
+						temp[i].mreturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
+							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+								costCallback: function(roomName, costMatrix)
+								{
+									if (p == 1)	//Go down our return path and give it a wider berth.
+									{
+										//Go down the first generated path and make space around it.
+										/*for (let n = 1; n < temp[i].mine.length - 1; n++)
+										{
+											for (let x = -1; x < 2; x++)
+											{
+												for (let y = -1; y < 2; y++)
+												{
+													//Don't accidentally lower the cost of walls.
+													if (Game.rooms[room_name].getTerrain().get(temp[i].mine[n].x + x, temp[i].mine[n].y + y) != TERRAIN_MASK_WALL)
+													{
+														costMatrix.set(temp[i].mine[n].x + x, temp[i].mine[n].y + y, 10)	//Make room for extensions.
+													}
+												}
+											}
+										}*/
+										for (let n = 1; n < temp[i].mreturn.length - 1; n++)
+										{
+											for (let x = -1; x < 2; x++)
+											{
+												for (let y = -1; y < 2; y++)
+												{
+													//Don't accidentally lower the cost of walls.
+													if (Game.rooms[room_name].getTerrain().get(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y) != TERRAIN_MASK_WALL)
+													{
+														costMatrix.set(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y, 10)	//Make room for extensions.
+													}
+												}
+											}
+										}
+
+										//costMatrix.set(temp[i].mine.slice(-1)[0].x, temp[i].mine.slice(-1)[0].y, 255); //Make sure to go around the mining fatty.
+									}
+
+									//Avoid backtracking on the way back.
+									let templen = temp[i].mine.length;
+									for (let n = 0; n < templen; n++)
+									{
+										costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 10); //Unless absolutely necessary.
+									}
+
+									if (i > 0)
+									{
+										for (let n = 0; n < temp[i - 1].mreturn.length; n++)
+										{
+											costMatrix.set(Memory.rooms[room_name].sources[i - 1].mreturn[n].x, Memory.rooms[room_name].sources[i - 1].mreturn[n].y, 1); //Here we prefer returning over the first return path.
+										}
+										costMatrix.set(temp[i - 1].mfat[0].x, temp[i - 1].mfat[0].y, 255); //Make sure to go around the previous mining fatty.
+									}
+									costMatrix.set(temp[i].mfat[0].x, temp[i].mfat[0].y, 255); //Make sure to go around the current mining fatty too.
+
+									costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
+									costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
+
+									return costMatrix;
+								}
+							});
+					}
+
+					//Save some more values for our new path system.
+					temp[i].minedir2 = temp[i].mine[1].direction;
+					temp[i].mlength = temp[i].mine.length;
+					temp[i].mrlength = temp[i].mreturn.length;
+
 					//Alter the first step in each mining path so it completes the loop.
 					temp[i].mreturn[0].direction = tempPos.getDirectionTo(Game.rooms[room_name].getPositionAt(temp[i].mreturn.slice(0, 1)[0].x, temp[i].mreturn.slice(0, 1)[0].y));
 					temp[i].mreturn[0].dx = temp[i].mreturn.slice(0, 1)[0].x - tempPos.x;
@@ -190,7 +225,7 @@ var init =
 					//Build the path from source to controller's fatty.
 					temp[i].upgrade = Game.rooms[room_name].findPath(tempPos,
 						Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-2)[0].x, Memory.rooms[room_name].upgrade.slice(-2)[0].y),
-						{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreCreeps: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
+						{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
 							costCallback: function(roomName, costMatrix)
 							{
 								let templen;
@@ -207,9 +242,9 @@ var init =
 									templen = temp[i + s].mine.length;
 									for (let n = 0; n <  templen; n++)
 									{
-										costMatrix.set(temp[i + s].mine[n].x, temp[i + s].mine[n].y, 10);	//Here we avoid going against the traffic of both sources.
-										costMatrix.set(temp[i + s].mfat[0].x, temp[i + s].mfat[0].y, 255);	//Make sure to go around both mining fatties.
+										costMatrix.set(temp[i + s].mine[n].x, temp[i + s].mine[n].y, 1);	//Here we don't mind going against the traffic of both sources.
 									}
+									costMatrix.set(temp[i + s].mfat[0].x, temp[i + s].mfat[0].y, 255);	//Make sure to go around both mining fatties.
 									s++;
 								}
 								costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around the spawner.
@@ -233,7 +268,7 @@ var init =
 								}
 
 								//Also prefer the previous upgrader path.
-								if (i == 1)
+								if (i > 0)
 								{
 									let templen = temp[i - 1].upgrade.length;
 									for (let n = 0; n < templen; n++)
@@ -257,12 +292,26 @@ var init =
 					for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
 					{
 						temp[i].ureturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
-							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreCreeps: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
 								costCallback: function(roomName, costMatrix)
 								{
-									//Go down the first generated path and make space around it.
-									if (p == 1)
+									if (p == 1)	//Go down our return path and give it a wider berth.
 									{
+										//Go down the first generated path and make space around it.
+										/*for (let n = 1; n < temp[i].upgrade.length - 1; n++)
+										{
+											for (let x = -1; x < 2; x++)
+											{
+												for (let y = -1; y < 2; y++)
+												{
+													//Don't accidentally lower the cost of walls.
+													if (Game.rooms[room_name].getTerrain().get(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y) != TERRAIN_MASK_WALL)
+													{
+														costMatrix.set(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y, 10)	//Make room for extensions.
+													}
+												}
+											}
+										}*/
 										for (let n = 1; n < temp[i].ureturn.length - 1; n++)
 										{
 											for (let x = -1; x < 2; x++)
@@ -294,11 +343,22 @@ var init =
 									{
 										costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 1);
 									}
+									//We don't mind preferring the mreturn path too since there will be roads.
+									templen = temp[i].mreturn.length;
+									for(let n = 0; n < templen; n++)
+									{
+										costMatrix.set(temp[i].mreturn[n].x, temp[i].mreturn[n].y, 1);
+									}
 
 									return costMatrix;
 								}
 							});
 					}
+
+					//Save some more values for our new path system.
+					temp[i].upgradedir2 = temp[i].upgrade[1].direction;
+					temp[i].ulength = temp[i].upgrade.length;
+					temp[i].urlength = temp[i].ureturn.length;
 
 					//Alter the first step in each upgrade path so it completes the loop.
 					temp[i].ureturn[0].direction = tempPos.getDirectionTo(Game.rooms[room_name].getPositionAt(temp[i].ureturn.slice(0, 1)[0].x, temp[i].ureturn.slice(0, 1)[0].y));
@@ -317,9 +377,143 @@ var init =
 					}
 				}
 
+				//Rebuild the path from spawn to controller to take our previous paths into account.
+				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y),
+					{plainCost: 10, swampCost: 10, ignoreRoads: true, ignoreCreeps: true,
+						costCallback: function(roomName, costMatrix)
+						{
+							let all_paths = ['mine', 'mreturn', 'upgrade', 'ureturn'];
+
+							costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
+
+							for (let i = 0; i < len; i++)
+							{
+								costMatrix.set(temp[i].mfat[0].x, temp[i].mfat[0].y, 255); //Make sure to go around the mining fatties.
+								for (let ap = 0; ap < all_paths.length; ap++)
+								{
+									for (let n = 0; n < temp[i][all_paths[ap]].length; n++)
+									{
+										costMatrix.set(temp[i][all_paths[ap]][n].x, temp[i][all_paths[ap]][n].y, 1);	//Prefer our existing paths.
+									}
+								}
+							}
+
+							return costMatrix;
+						}
+					});
+
+				//Save the direction from the spawner to the start of this path.
+				Memory.rooms[room_name].upgradedir = Game.spawns[spawn].pos.getDirectionTo(Memory.rooms[room_name].upgrade[0].x, Memory.rooms[room_name].upgrade[0].y);
+
+				//Now that our basic paths have been saved, we can generate our exit paths out of the room.
+				//Doing this here allows us to prefer the paths we've generated while also making the extensions avoid exit paths.
+				require('empire').room.exitpaths(room_name);
+				require('roomPlanner').setupDefense(room_name);	//If we do this here, we know which exits are safe too.
+
+				//Create a temporary exitpath path to any unsafe exits that aren't covered by an empire exitpath.
+				//This will exist solely to make a gap in the extensions.
+				let temp_exitpaths = new Array(Memory.rooms[room_name].exits.length).fill(true);
+				for (let te = 0; te < Memory.rooms[room_name].exits.length; te++)
+				{
+					if (Memory.rooms[room_name].defense.safe[te])
+					{
+						//If the exit is safe, ignore it.
+						temp_exitpaths[te] = false;
+					}
+					else
+					{
+						//If the exit is unsafe, check to see if we have already gotten a path to one of its tiles.
+						for (let exit_name in Memory.rooms[room_name].exitpaths)
+						{
+							let last = Memory.rooms[room_name].exitpaths[exit_name][Memory.rooms[room_name].exitpaths[exit_name].length - 1];
+
+							//Now that we have the last tile in this exitpath, check to see if it's on any of our exit tiles.
+							for (let et = 0; et < Memory.rooms[room_name].exits[te].length; et++)
+							{
+								if (Memory.rooms[room_name].exits[te][et].x == last.x && Memory.rooms[room_name].exits[te][et].y == last.y)
+								{
+									//If we found a match, ignore this exit.
+									temp_exitpaths[te] = false;
+									break;
+								}
+							}
+						}
+					}
+				}
+
+				//Now generate our temporary exit paths.
+				let describe = Game.map.describeExits(room_name);
+				for (let te = 0; te < temp_exitpaths.length; te++)
+				{
+					if (temp_exitpaths[te])	//An unsafe exit with no path to it.
+					{
+						//Which direction does the exit lead?
+						let described_exit;
+						if (Memory.rooms[room_name].exits[te][0].y == 0)		//Is it northern?
+						{
+							described_exit = describe[1];
+						}
+						else if (Memory.rooms[room_name].exits[te][0].x == 49)	//Is it eastern?
+						{
+							described_exit = describe[3];
+						}
+						else if (Memory.rooms[room_name].exits[te][0].y == 49)	//Is it southern?
+						{
+							described_exit = describe[5];
+						}
+						else if (Memory.rooms[room_name].exits[te][0].x == 0)	//Is it western?
+						{
+							described_exit = describe[7];
+						}
+
+						//console.log('Temppath to unsafe exit: ' + te + '.');
+
+						//Now record the temporary exit path.
+						temp_exitpaths[te] = Game.spawns[spawn].pos.findPathTo(new RoomPosition(25, 25, described_exit),
+						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreCreeps: true, range: 24,
+							costCallback: function(roomName, costMatrix)
+							{
+								if (room_name === roomName)
+								{
+									for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+									{
+										//Prefer slightly to go over our existing paths, since there will be roads on them.
+										let allpaths = Memory.rooms[room_name].sources[i].mine.concat(Memory.rooms[room_name].sources[i].mreturn,
+											Memory.rooms[room_name].sources[i].upgrade, Memory.rooms[room_name].sources[i].ureturn);
+										for (let n = 0; n < allpaths.length; n++)
+										{
+											costMatrix.set(allpaths[n].x, allpaths[n].y, 1);
+										}
+
+										//Make sure to go around the mining fatties.
+										costMatrix.set(Memory.rooms[room_name].sources[i].mfat[0].x, Memory.rooms[room_name].sources[i].mfat[0].y, 255);
+									}
+
+									costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
+
+									//Now block off any exit that we're purposefully excluding.
+									for (let be = 0; be < Memory.rooms[room_name].exits.length; be++)
+									{
+										if (!temp_exitpaths[be])	//This exit is safe, or it already has a path.
+										{
+											for (let bt = 0; bt < Memory.rooms[room_name].exits[be].length; bt++)
+											{
+												//Block undesired exit tiles.
+												costMatrix.set(Memory.rooms[room_name].exits[be][bt].x, Memory.rooms[room_name].exits[be][bt].y, 255);
+											}
+										}
+									}
+								}
+
+								return costMatrix;
+							}
+						});
+					}
+				}
+
 				//Now place our initial construction sites.
 				Game.spawns[spawn].room.createConstructionSite(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, STRUCTURE_CONTAINER);	//Upgrader container.
-				let keys = ["mine", "mreturn", "upgrade", "ureturn"];
+				let keys = ['exitpaths', 'mine', 'mreturn', 'upgrade', 'ureturn'];
 				let matches = [];
 				temp = [];
 				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
@@ -331,6 +525,11 @@ var init =
 					matches[i] = 0;
 					for (let k = 0; k < keys.length && matches[i] < 30; k++)
 					{
+						if (keys[k] === 'exitpaths')
+						{
+							continue;
+						}
+
 						//Iterate over all of our paths.
 						for (let n = 0; n < Memory.rooms[room_name].sources[i][keys[k]].length && matches[i] < 30; n++)
 						{
@@ -339,6 +538,7 @@ var init =
 							{
 								for (let y = -1; y < 2; y++)
 								{
+									//The position we're comparing.
 									let tempx = Memory.rooms[room_name].sources[i][keys[k]][n].x + x;
 									let tempy = Memory.rooms[room_name].sources[i][keys[k]][n].y + y;
 
@@ -366,36 +566,115 @@ var init =
 										//Now check this position against existing paths.
 										for (let p = 0; p < keys.length; p++)
 										{
-											for (let m = 0; m < Memory.rooms[room_name].sources[i][keys[p]].length; m++)
+											if (keys[p] === 'exitpaths')
 											{
-												if (Memory.rooms[room_name].sources[i][keys[p]][m].x == tempx && Memory.rooms[room_name].sources[i][keys[p]][m].y == tempy	//Did we match the position to any path steps?
-													||	Game.spawns[spawn].pos.inRangeTo(tempx, tempy, 1)	//Are we within 1 range of the (starting) spawn or the upgrader?
-													||	Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y).inRangeTo(tempx, tempy, 1))
+												for (let e in Memory.rooms[room_name].exitpaths)
 												{
-													temp[i].textensions[tempx][tempy] = false;
-													tempcont = true;
-													break;	//We won't be using this position.
-												}
-												else
-												{
-													//Are we within 1 range of either fatty miner?
-													for (let j = 0; j < Memory.rooms[room_name].sources.length; j++)
+													for (let m = 0; m < Memory.rooms[room_name].exitpaths[e].length; m++)
 													{
-														if (Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[j].mfat[0].x, Memory.rooms[room_name].sources[j].mfat[0].y).inRangeTo(tempx, tempy, 1))
+														//Are we on any path steps?
+														if (Math.max(Math.abs(Memory.rooms[room_name].exitpaths[e][m].x - tempx), Math.abs(Memory.rooms[room_name].exitpaths[e][m].y - tempy)) === 0
+															||	Game.spawns[spawn].pos.inRangeTo(tempx, tempy, 1)	//Are we within 1 range of the (starting) spawn or the upgrader?
+															||	Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y).inRangeTo(tempx, tempy, 1))
 														{
+															temp[i].textensions[tempx][tempy] = false;	//Only block this if we aren't already placing it from another path.
 															tempcont = true;
+															break;	//We won't be using this position.
+														}
+														else
+														{
+															//Are we within 1 range of either fatty miner?
+															for (let j = 0; j < Memory.rooms[room_name].sources.length; j++)
+															{
+																if (Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[j].mfat[0].x, Memory.rooms[room_name].sources[j].mfat[0].y).inRangeTo(tempx, tempy, 1))
+																{
+																	tempcont = true;
+																}
+															}
+															if (tempcont)
+															{
+																//console.log("tempcont " + tempcont)
+																temp[i].textensions[tempx][tempy] = false;
+																break;	//We won't be using this position.
+															}
 														}
 													}
-													if (tempcont)
+												}
+
+												for (let te = 0; te < temp_exitpaths.length; te++)
+												{
+													if (temp_exitpaths[te])	//A temporary exit path.
 													{
-														//console.log("tempcont " + tempcont)
+														for (let m = 0; m < temp_exitpaths[te].length; m++)
+														{
+															//Are we within 1 range of any path steps?
+															if (Math.max(Math.abs(temp_exitpaths[te][m].x - tempx), Math.abs(temp_exitpaths[te][m].y - tempy)) === 0
+																||	Game.spawns[spawn].pos.inRangeTo(tempx, tempy, 1)	//Are we within 1 range of the (starting) spawn or the upgrader?
+																||	Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y).inRangeTo(tempx, tempy, 1))
+															{
+																temp[i].textensions[tempx][tempy] = false;	//Only block this if we aren't already placing it from another path.;
+																tempcont = true;
+																break;	//We won't be using this position.
+															}
+															else
+															{
+																//Are we within 1 range of either fatty miner?
+																for (let j = 0; j < Memory.rooms[room_name].sources.length; j++)
+																{
+																	if (Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[j].mfat[0].x, Memory.rooms[room_name].sources[j].mfat[0].y).inRangeTo(tempx, tempy, 1))
+																	{
+																		tempcont = true;
+																	}
+																}
+																if (tempcont)
+																{
+																	//console.log("tempcont " + tempcont)
+																	temp[i].textensions[tempx][tempy] = false;
+																	break;	//We won't be using this position.
+																}
+															}
+														}
+													}
+												}
+
+												if (temp[i].textensions[tempx][tempy] !== false)
+												{
+													temp[i].textensions[tempx][tempy] = true;
+												}
+											}
+											else
+											{
+												for (let m = 0; m < Memory.rooms[room_name].sources[i][keys[p]].length; m++)
+												{
+													if (Memory.rooms[room_name].sources[i][keys[p]][m].x == tempx && Memory.rooms[room_name].sources[i][keys[p]][m].y == tempy	//Did we match the position to any path steps?
+														||	Game.spawns[spawn].pos.inRangeTo(tempx, tempy, 1)	//Are we within 1 range of the (starting) spawn or the upgrader?
+														||	Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y).inRangeTo(tempx, tempy, 1))
+													{
 														temp[i].textensions[tempx][tempy] = false;
+														tempcont = true;
 														break;	//We won't be using this position.
 													}
-
-													if (temp[i].textensions[tempx][tempy] !== false)
+													else
 													{
-														temp[i].textensions[tempx][tempy] = true;
+														//Are we within 1 range of either fatty miner?
+														for (let j = 0; j < Memory.rooms[room_name].sources.length; j++)
+														{
+															if (Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[j].mfat[0].x, Memory.rooms[room_name].sources[j].mfat[0].y).inRangeTo(tempx, tempy, 1))
+															{
+																tempcont = true;
+															}
+														}
+														if (tempcont)
+														{
+															//console.log("tempcont " + tempcont)
+															temp[i].textensions[tempx][tempy] = false;
+															break;	//We won't be using this position.
+														}
+
+														if (temp[i].textensions[tempx][tempy] !== false)
+														{
+															temp[i].textensions[tempx][tempy] = true;
+														}
 													}
 												}
 											}
@@ -461,9 +740,10 @@ var init =
 					delete Memory.rooms[room_name].ideal.textensions;	//If this succeeds, we don't need to save the room-wide list of extensions anymore.
 				}
 
-				require('roomPlanner').run();
-				require('empire').room.exitpaths(room_name);
-				require('roomPlanner').setupDefense(room_name);
+				//Finish the room up.
+				//Finish this next tick in the RCL1 roomPlanner check.
+				Memory.rooms[room_name].init = 1;
+				console.log('Init ' + Game.cpu.getUsed());
 			}
 		}
 
@@ -550,17 +830,90 @@ var init =
 	{
 		if (!room_name)
 		{
-			return false;
+			for (let room_name in Memory.rooms)
+			{
+				init.clean(room_name);
+			}
+			return true;
+		}	
+		else
+		{
+			if (Game.rooms[room_name])
+			{
+				let construction =
+							Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_CONTAINER}})
+					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_WALL}}))
+					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_RAMPART}}))
+					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_EXTENSION}}))
+					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_TOWER}}));
+
+				if (construction.length > 0)
+				{
+					for (let c = 0; c < construction.length; c++)
+					{
+						construction[c].remove();
+					}
+				}
+
+				construction = Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_EXTENSION}})
+					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_TOWER}}))
+					   .concat(Game.rooms[room_name].find(FIND_STRUCTURES,		{filter: {structureType: STRUCTURE_CONTAINER}}))
+					   .concat(Game.rooms[room_name].find(FIND_STRUCTURES,		{filter: {structureType: STRUCTURE_ROAD}}));
+
+				if (construction.length > 0)
+				{
+					for (let c = 0; c < construction.length; c++)
+					{
+						construction[c].destroy();
+					}
+				}
+			}
 		}
+
 		for (let creep in Memory.creeps)
 		{
-			if (Game.creeps[creep].room.name == room_name)
+			if (Game.creeps[creep])
 			{
 				Game.creeps[creep].suicide();
 			}
 		}
-		//RawMemory._parsed = {};
-		Memory.rooms[room_name] = {};
+
+		if (!room_name)
+		{
+			RawMemory._parsed = {};
+			Memory = undefined;
+		}
+		else
+		{
+			Memory.rooms[room_name] = undefined;
+		}
+
+		return true;
+	},
+
+	respawn: function(room_name = false)
+	{
+		if (!room_name)
+		{
+			for (let room_name in Memory.rooms)
+			{
+				init.respawn(room_name);
+			}
+			return true;
+		}
+
+		let structures = Game.rooms[room_name].find(FIND_STRUCTURES);
+		for (let s = 0; s < structures.length; s++)
+		{
+			structures[s].destroy();
+		}
+		structures = Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES);
+		for (let s = 0; s < structures.length; s++)
+		{
+			structures[s].remove();
+		}
+		init.clean(room_name);
+
 		return true;
 	},
 
@@ -580,5 +933,7 @@ var init =
 		}
 	}
 };
+
+init.run2 = require('roomPlanner').init_complete;
 
 module.exports = init;
