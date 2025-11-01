@@ -140,10 +140,17 @@ var body =
 		let body = [];
 		if (fatbuilder)
 		{
-			while (energy >= 350 && body.length < 46)	//Since a container can hold 2000, we should hold 1000. A T1 boost would make it match.
+			if (energy < 350)
 			{
-				body.push(MOVE, WORK, WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty and traveling to its patrol route.
-				energy -= 350;
+				return [MOVE, WORK, WORK, CARRY];	//At level 2 we might not have our extensions yet.
+			}
+			else
+			{
+				while (energy >= 350 && body.length < 46)	//Since a container can hold 2000, we should hold 1000. A T1 boost would make it match.
+				{
+					body.push(MOVE, WORK, WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty and traveling to its patrol route.
+					energy -= 350;
+				}
 			}
 		}
 		if (minimumbuilder)
@@ -189,9 +196,20 @@ var body =
 		return [MOVE];
 	},
 
-	claimer: function()
+	claimer: function(energy)
 	{
-		return [MOVE, MOVE, WORK, CARRY, CLAIM];
+		let body = [MOVE, MOVE, WORK, CLAIM];
+		energy -= 800;
+		if (energy >= 100)
+		{
+			body.splice(-2, 0, CARRY, CARRY);
+		}
+		else if (energy >= 50)
+		{
+			body.splice(-2, 0, CARRY);
+		}
+
+		return body;
 	},
 
 	reserver: function(energy)
@@ -266,7 +284,7 @@ var body =
 		energy -= 1050;
 		while (energy >= 100 && body.length < 50)	//The ideal custodian quickly harvests both sources, then tends to the rest of the room. It will be T3 boosted.
 		{
-			body.shift(WORK);
+			body.unshift(WORK);
 		}
 
 		return body;
@@ -275,7 +293,7 @@ var body =
 	paver: function(energy)
 	{
 		let body = [];
-		while (energy && body.length < 49) //The ideal paver moves slow and steady. It carries a multiple of 300 and doesn't take too long to build.
+		while (energy && body.length < 49) //The ideal paver moves slow and steady. It carries a multiple of 300 and doesn't take too long to pave the roads.
 		{
 			body.push();
 			energy -= 0;
