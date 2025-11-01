@@ -23,7 +23,7 @@ var control =
 			//We're going to be operating on our extensions every tick, so let's make sure they're in memory.
 			if (!control.calculate.extensions[room_name])
 			{
-				console.log("Getting extensions.");
+				//console.log("Getting extensions.");
 				control.calculate.getExtensions(room_name);
 			}
 
@@ -74,7 +74,7 @@ var control =
 		let pos = creep.pos;
 		let room_name = creep.room.name;
 
-		if(creep.spawning)
+		if(creep.spawning || creep.fatigue > 0)
 		{
 			return true;
 		}
@@ -87,13 +87,12 @@ var control =
 		}
 		else if(Memory.rooms[room_name].path[pos.x] && Memory.rooms[room_name].path[pos.x][pos.y])	//Otherwise, follow its routine path.
 		{
-			let room_name = creep.room.name
 			let tempdir = Memory.rooms[room_name].path[pos.x][pos.y];
 
-			let flipper = false;
-			if (tempdir.flipper)
+			let flipper;
+			if (tempdir.flipper && tempdir.flipper[control.paths[creep.memory.path]])
 			{
-				if (tempdir.flipper[control.paths[creep.memory.path]] && role !== 'harvester')	//Have we reached our current path's flipper.
+				/*if (tempdir.flipper[control.paths[creep.memory.path]] && role !== 'harvester')	//Have we reached our current path's flipper.
 				{
 					flipper = tempdir.flipper[control.paths[creep.memory.path]];	//We'll validate the source and/or exit later.
 				}
@@ -102,13 +101,20 @@ var control =
 				{
 					flipper = tempdir.flipper.mfat[source];
 					creep.memory.path = 10;	//We already know where to go from here.
-				}
+				}*/
+
+				flipper = tempdir.flipper[control.paths[creep.memory.path]];	//We'll validate the source and/or exit later.
+			}
+			else
+			{
+				flipper = false;
 			}
 
-			if (tempdir = tempdir[control.paths[creep.memory.path]])	//Assign within the comparison.
+			if ((tempdir = tempdir[control.paths[creep.memory.path]]) || flipper)	//Assign within the comparison.
 			{
 				//upgrader and other shallow paths don't need a case.
-				//We can also finalize the flipper in these cases.
+				//flipper has been assigned path[x][y].flipper[path_name].
+				//It's up to us to finalize a deeper assignment here.
 				switch (creep.memory.path)
 				{
 					case 0:	//mine[]
@@ -116,7 +122,7 @@ var control =
 					case 2:	//upgrade[]
 					case 3:	//ureturn[]
 					case 10://mfat[]
-						if (tempdir[source])
+						if (tempdir && tempdir[source])
 						{
 							tempdir = tempdir[source];
 						}
@@ -125,6 +131,7 @@ var control =
 							tempdir = false;
 						}
 
+						//Typically we are bound to one source.
 						if (flipper && flipper[source])
 						{
 							flipper = flipper[source];
@@ -141,7 +148,7 @@ var control =
 							source = creep.memory.s;	//This creep doesn't actually belong to a source.
 						}
 
-						if (tempdir[source] && tempdir[source][creep.memory.need])
+						if (tempdir && tempdir[source] && tempdir[source][creep.memory.need])
 						{
 							tempdir = tempdir[source][creep.memory.need];
 						}
@@ -150,21 +157,36 @@ var control =
 							tempdir = false;
 						}
 
-						if (flipper && flipper[source] && flipper[source][creep.memory.need])
+						//Typically we are bound to one source.
+						if (role === 'dbuilder')	//dbuilders never return from a defpath.
 						{
-							flipper = flipper[source][creep.memory.need];
+							if (flipper && flipper[source])
+							{
+								flipper = flipper[source];
+							}
+							else
+							{
+								flipper = false;
+							}
 						}
-						else
+						else if (creep.memory.path === 5)
 						{
-							flipper = false;
+							if (flipper && flipper[source])
+							{
+								flipper = flipper[source];
+							}
+							else
+							{
+								flipper = false;
+							}
 						}
 						break;
+					//We can use creep.memory.need to track either an exit index or an exit name.
 					case 6:	//patrol[exit]
 					case 7:	//preturn[exit]
-					//We can re-use creep.memory.need if we need to track an exit name.
 					case 8:	//exitpath[exit_name]
 					case 9:	//exitreturn[exit_name]
-						if (tempdir[creep.memory.need])
+						if (tempdir && tempdir[creep.memory.need])
 						{
 							tempdir = tempdir[creep.memory.need];
 						}
@@ -173,14 +195,14 @@ var control =
 							tempdir = false;
 						}
 
-						if (flipper[creep.memory.need])
+						/*if (flipper[creep.memory.need])
 						{
 							flipper = flipper[creep.memory.need];
 						}
 						else
 						{
 							flipper = false;
-						}
+						}*/
 						break;
 				}
 			}
@@ -189,48 +211,46 @@ var control =
 				tempdir = false;
 			}
 
-			//When we hit a flipper, we need to change to another path. Luckily for us, we made all our going paths odd, and all our return paths even.
+			//When we hit a flipper, we need to change to another path.
 			if (flipper)
 			{
 				switch (role)
 				{
 					//Upgraders don't need to be flipped.
-					//If it's a harvester, we've already flipped it.
 					case 'dbuilder':
 						if (creep.memory.path === 6)
 						{
 							creep.memory.path = 7;
+							//If we're switching to a completely new path, we need to override our previous direction change.
+							tempdir = flipper[control.paths[creep.memory.path]][creep.memory.need];
 							break;
 						}
 						else if (creep.memory.path === 7)
 						{
 							creep.memory.path = 6;
+							//If we're switching to a completely new path, we need to override our previous direction change.
+							tempdir = flipper[control.paths[creep.memory.path]][creep.memory.need];
 							break;
 						}
 					case 'builder':
 						if (creep.memory.path === 4)
 						{
-							if (role === 'dbuilder')
+							if (role === 'dbuilder')	//dbuilders never return from a defpath.
 							{
+								//The endpoints are flawed.
 								creep.memory.path = 6;
 								creep.memory.dtrip = undefined;
 								creep.memory.s = undefined;
 
 								//If we're switching to a completely new path, we need to override our previous direction change.
-								if (Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]] && Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][creep.memory.need])
-								{
-									tempdir = Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][creep.memory.need];
-								}
+								tempdir = flipper[control.paths[creep.memory.path]];
 							}
 							else
 							{
 								//If we've reached the defpath flipper, come back.
 								creep.memory.path = 5;
 								//If we're switching to a completely new path, we need to override our previous direction change.
-								if (Memory.rooms[room_name].path[pos.x][pos.y].dreturn && Memory.rooms[room_name].path[pos.x][pos.y].dreturn[source] && Memory.rooms[room_name].path[pos.x][pos.y].dreturn[source][creep.memory.need])
-								{
-									tempdir = Memory.rooms[room_name].path[pos.x][pos.y].dreturn[source][creep.memory.need];
-								}
+								tempdir = flipper[control.paths[creep.memory.path]][creep.memory.need];
 							}
 							break;
 						}
@@ -238,27 +258,27 @@ var control =
 						{
 							creep.memory.dtrip = false;
 
-							//dreturn ultimately goes to mreturn, but may need to traverse mine to get there.
-							//If there's a mine flipper here with our dreturn flipper, we can skip the traversal via mine and go directly to mreturn.
-							if (Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine[source])
+							//dreturn ultimately goes to mreturn.
+							/*if (Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine[source])
 							{
 								creep.memory.path = 1;	//We've completed our return from the defender and are going to the spawn next via mreturn.
+							}*/
+							/*else
+							{
+								creep.memory.path = 0;	//We're traversing mine for a bit to get to mreturn.
+							}*/
 
-								//If we're switching to a completely new path, we need to override our previous direction change.
-								if (Memory.rooms[room_name].path[pos.x][pos.y].mreturn && Memory.rooms[room_name].path[pos.x][pos.y].mreturn[source])
-								{
-									tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mreturn[source];
-								}
+							creep.memory.path = 1;	//We've completed our return from the defender and are going to the spawn next via mreturn.
+
+							//If we're switching to a completely new path, we need to override our previous direction change.
+							if (Array.isArray(flipper[control.paths[creep.memory.path]]))
+							{
+								//We currently don't have any reason to reverse from dreturn[need] to defpaths[need], but the flipper exists.
+								tempdir = flipper[control.paths[creep.memory.path]][creep.memory.need];
 							}
 							else
 							{
-								creep.memory.path = 0;	//We're traversing mine for a bit to get to mreturn.
-
-								//If we're switching to a completely new path, we need to override our previous direction change.
-								if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
-								{
-									tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source];
-								}
+								tempdir = flipper[control.paths[creep.memory.path]];
 							}
 							break;
 						}
@@ -277,85 +297,87 @@ var control =
 									creep.memory.utrip = true;
 
 									//If we're switching to a completely new path, we need to override our previous direction change.
-									if (Memory.rooms[room_name].path[pos.x][pos.y].upgrade && Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])
+									/*if (Memory.rooms[room_name].path[pos.x][pos.y].upgrade && Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source])
 									{
 										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].upgrade[source];
-									}
+									}*/
 									/*else if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
 									{
 										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source];
 									}*/
 								}
+
+								//If we're switching to a completely new path, we need to override our previous direction change.
+								if (Array.isArray(flipper[control.paths[creep.memory.path]]))
+								{
+									//If we're going to defpaths[need].
+									tempdir = flipper[control.paths[creep.memory.path]][creep.memory.need];
+								}
+								else
+								{
+									tempdir = flipper[control.paths[creep.memory.path]];
+								}
 								break;
 							case 1:
 								creep.memory.path = 0;	//We're going back from the spawn to the source.
+								tempdir = flipper[control.paths[creep.memory.path]];
 								break;
 							case 2:
 								creep.memory.path = 3;	//We're coming back from the upgrader to the source.
+								tempdir = flipper[control.paths[creep.memory.path]];
 								break;
 							case 3:
 								//ureturn ultimately goes to mreturn, but may need to traverse mine to get there.
 								//If there's a mine flipper here with our ureturn flipper, we can skip the traversal via mine and go directly to mreturn.
-								if (Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine[source]
-								&& (role === 'mtransport' || (role === 'builder' && Memory.rooms[room_name].creeps.dbuilder.length === 0)))	//If there are no dbuilders, we shouldn't visit them.
+								//if (Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine[source]
+								if (role === 'mtransport' || (role === 'builder' && Memory.rooms[room_name].creeps.dbuilder.length === 0))	//If there are no dbuilders, we shouldn't visit them.
 								{
-									creep.memory.path = 1;	//We've completed our return from the upgrader and are going to the spawn next via mreturn.
+									creep.memory.path = 1;	//We've completed our return via ureturn and are going to the spawn next via mreturn.
 									creep.memory.utrip = false;
 
 									//If we're switching to a completely new path, we need to override our previous direction change.
-									if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
-									{
-										creep.memory.utrip = false;
-										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source];
-									}
+									creep.memory.utrip = false;
+									tempdir = flipper[control.paths[creep.memory.path]];
 								}
 								else if (role === 'builder' && Memory.rooms[room_name].creeps.dbuilder.length > 0)
 								{
 									//The builder has the same routine as the mtransport, but after visiting the upgrader it visits the dbuilder.
-									creep.memory.path = 4;	//We've completed our return from the upgrader and are going to the dbuilder.
+									creep.memory.path = 4;	//We've completed our return from the upgrader and are going to the dbuilder if it exists.
 									creep.memory.utrip = false;
 									creep.memory.dtrip = true;
 									creep.memory.need = Memory.rooms[room_name].defense.need;	//This should only be updated when we first choose a defpath.
 
 									//If we're switching to a completely new path, we need to override our previous direction change.
-									if (Memory.rooms[room_name].path[pos.x][pos.y].defpath && Memory.rooms[room_name].path[pos.x][pos.y].defpath[source] && Memory.rooms[room_name].path[pos.x][pos.y].defpath[source][creep.memory.need])
-									{
-										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].defpath[source][creep.memory.need];
-									}
-									else if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
-									{
-										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source];	//Apparently we need a step from mine first.
-									}
+									tempdir = flipper[control.paths[creep.memory.path]][creep.memory.need];
 								}
 								else
 								{
-									creep.memory.path = 0;	//We're traversing mine for a bit to get to mreturn.
+									creep.memory.path = 1;	//If nothing else, then we're going to mreturn.
 
 									//If we're switching to a completely new path, we need to override our previous direction change.
-									if (Memory.rooms[room_name].path[pos.x][pos.y].mine && Memory.rooms[room_name].path[pos.x][pos.y].mine[source])
-									{
-										tempdir = Memory.rooms[room_name].path[pos.x][pos.y].mine[source];
-									}
+									tempdir = flipper[control.paths[creep.memory.path]];
 								}
 								break;
 						}
 						break;
 					case 'utransport':
-						if (creep.memory.path === 3)
-						{
-							creep.memory.path = 2;
-						}
-						else if (creep.memory.path === 2)
+						//utransports don't need to worry about complex path jumping. They just loop to and from the upgrader.
+						if (creep.memory.path === 2)
 						{
 							creep.memory.path = 3;
 						}
+						else if (creep.memory.path === 3)
+						{
+							creep.memory.path = 2;
+						}
 
 						//If we're switching to a completely new path, we need to override our previous direction change.
-						if (Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]] && Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][source])
-						{
-							tempdir = Memory.rooms[room_name].path[pos.x][pos.y][control.paths[creep.memory.path]][source];
-						}
+						tempdir = flipper[control.paths[creep.memory.path]];
 						break;
+					case 'harvester':
+						//If we're switching to a completely new path, we need to override our previous direction change.
+						creep.memory.path = 10;
+						tempdir = flipper[control.paths[creep.memory.path]];
 				}
 			}
 
@@ -583,7 +605,7 @@ var control =
 		}
 	},
 
-	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpath', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader']
+	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader']
 };
 
 module.exports = control;
