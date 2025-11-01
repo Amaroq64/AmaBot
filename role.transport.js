@@ -19,7 +19,7 @@ var roleTransport =
 			}
 		});
 
-		let room_energy = creep.room.find(FIND_DROPPED_RESOURCES);
+		let room_energy = creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
 
 		for (let e = 0; e < room_containers.length; e++)
 		{
