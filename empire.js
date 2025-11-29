@@ -120,6 +120,19 @@ var empire =
 									costMatrix.set(Memory.rooms[room_name].defense.towers[t].x, Memory.rooms[room_name].defense.towers[t].y, 255);
 									//empire.setCostMatrix(Memory.rooms[room_name].defense.towers[t].x, Memory.rooms[room_name].defense.towers[t].y, roomName, 255);
 								}
+
+								//Make sure to go around the dbuilder's resting position.
+								for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+								{
+									for (let dp = 0; dp < Memory.rooms[room_name].sources[i].defpaths.length; dp++)
+									{
+										if (Memory.rooms[room_name].sources[i].defpaths[dp])
+										{
+											//Avoid the dbuilder's resting position, but still go through it if there's no other way.
+											costMatrix.set(Memory.rooms[room_name].sources[i].defpaths[dp].slice(-1)[0].x, Memory.rooms[room_name].sources[i].defpaths[dp].slice(-1)[0].y, 40);
+										}
+									}
+								}
 							}
 						}
 					}
@@ -228,6 +241,8 @@ var empire =
 		//If they are in our allies list, return true so we can permit them.
 		return (Memory.allies && Memory.allies.indexOf(creep.owner.username) != -1);
 	},
+
+	allies: ["kotyara", "suyu", "dodzai", "Pwk", "WoodenRobot", "Belthazor", "Screepburner", "Maxrocket"]
 };
 
 module.exports = empire;
