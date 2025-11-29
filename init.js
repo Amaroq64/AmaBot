@@ -17,7 +17,8 @@ var init =
 			//console.log('Rooms undefined.');
 			Memory.rooms = {};
 			Memory.creeps = {};
-			//Memory.totalCreeps = 0;
+			Memory.allies = require('empire').allies;
+			Memory.blocked = {};
 		}
 
 		//For every spawn, add its room to memory if it's not already there.
@@ -33,6 +34,7 @@ var init =
 			if (Memory.rooms[room_name] === undefined)	//This room is new.
 			{
 				Memory.rooms[room_name] = {};
+				Memory.rooms[room_name].need = {};
 				Memory.rooms[room_name].sources = [];
 				Memory.rooms[room_name].mineral = {};
 				Memory.rooms[room_name].creeps = {upgrader: [], dbuilder: []};	//We don't need an upgrade builder because the source builders patrol to it.
@@ -834,6 +836,10 @@ var init =
 			{
 				init.clean(room_name);
 			}
+
+			RawMemory._parsed = {};
+			Memory = undefined;
+
 			return true;
 		}	
 		else
@@ -878,12 +884,7 @@ var init =
 			}
 		}
 
-		if (!room_name)
-		{
-			RawMemory._parsed = {};
-			Memory = undefined;
-		}
-		else
+		if (room_name)
 		{
 			Memory.rooms[room_name] = undefined;
 		}
