@@ -4,6 +4,7 @@ var calculate =
 {
 	extensions: {},
 	sortedextensions: {},
+	nuke: {},
 
 	idealTransports: function(room)
 	{
@@ -111,6 +112,96 @@ var calculate =
 
 		Memory.rooms[room_name].safe = safe;	//We're juggling this a bit. It will end up in Memory.rooms[room_name].defense.safe.
 		return exits;
+	},
+
+	reversepath: function(path, trim_start = true, add_end = true)
+	{
+		let path2 = [];
+		let tstep1;
+		let tstep2
+
+		//The first step of our reversal plays out differently than the rest.
+		path2.push({x: path[path.length - 1].x, y: path[path.length - 1].y});
+
+		path2[path2.length - 1].dx = path[path.length - 1].dx === 0 ? 0 : -path[path.length - 1].dx;	//If it's not 0, negate it.
+		path2[path2.length - 1].dy = path[path.length - 1].dy === 0 ? 0 : -path[path.length - 1].dy;	//If it's not 0, negate it.
+		path2[path2.length - 1].direction = path[path.length - 1].direction + 4;
+		if (path2[path2.length - 1].direction > 8)
+		{
+			path2[path2.length - 1].direction -= 8;
+		}
+
+		//Reverse the rest of the path.
+		for (let n = path.length - 2; n >= 0; n--)
+		{
+			path2.push({x: path[n].x, y: path[n].y});
+
+			//Let's only look these up once.
+			tstep1 = path2[path2.length - 1];
+			tstep2 = path2[path2.length - 2]
+
+			tstep1.dx = tstep1.x - tstep2.x;
+			tstep1.dy = tstep1.y - tstep2.y;
+
+			tstep1.direction = calculate.dxdy_to_direction(tstep1.dx, tstep1.dy);
+		}
+
+		//A moveByPath() path normally excludes its own start point.
+		if (trim_start)
+		{
+			path2.shift();
+		}
+
+		//Since the path we're reversing would have excluded its own start point, we have to step to it ourselves.
+		if (add_end)
+		{
+			path2.push({x: null, y: null, dx: path[0].dx === 0 ? 0 : -path[0].dx, dy: path[0].dy === 0 ? 0 : -path[0].dy});
+
+			path2[path2.length - 1].x = path2[path2.length - 2].x + path2[path2.length - 1].dx;
+			path2[path2.length - 1].y = path2[path2.length - 2].y + path2[path2.length - 1].dy;
+			path2[path2.length - 1].direction = calculate.dxdy_to_direction(path2[path2.length - 1].dx, path2[path2.length - 1].dy);
+		}
+
+		return path2;
+	},
+
+	dxdy_to_direction: function(dx, dy)
+	{
+		switch(dx)
+		{
+			case -1:	//We went left,
+				switch(dy)
+				{
+					case -1:	//and up.
+						return 8;
+					case 0:		//and middle.
+						return 7;
+					case 1:		//and down.
+						return 6;
+				}
+				break;
+
+			case 0:		//We went middle.
+				switch(dy)
+				{
+					case -1:	//and up.
+						return 1;
+					case 1:		//and down.
+						return 5;
+				}
+				break;
+
+			case 1:		//We went right.
+				switch(dy)
+				{
+					case -1:	//and up.
+						return 2;
+					case 0:		//and middle.
+						return 3;
+					case 1:		//and down.
+						return 4;
+				}
+		}
 	},
 
 	cleanpaths: function(room_name, type)	//We are renaming some of these paths slightly different, so pay attention.
@@ -913,6 +1004,21 @@ var calculate =
 			extension_positions[existing_extensions[e].pos.x][existing_extensions[e].pos.y] = existing_extensions[e].id;	//In roomPlanner.check() and calculate.sortExtensions(), we will make sure to erase the cache if anything changes.
 		}
 
+		//We will get our nuker during this time as well.
+		if (calculate.nuke[room_name] === undefined)
+		{
+			calculate.nuke[room_name] = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_NUKER}});
+
+			if (calculate.nuke[room_name].length)
+			{
+				calculate.nuke[room_name] = {id: calculate.nuke[room_name][0].id, x: calculate.nuke[room_name][0].pos.x, y: calculate.nuke[room_name][0].pos.y};
+			}
+			else
+			{
+				calculate.nuke[room_name] = false;
+			}
+		}
+
 		calculate.extensions[room_name] = extension_positions;
 		return extension_positions;
 	},
@@ -929,6 +1035,7 @@ var calculate =
 		{
 			arranged_extensions = calculate.getExtensions(room_name);
 		}
+
 		if (calculate.sortedextensions[room_name])
 		{
 			return calculate.sortedextensions[room_name];
@@ -1081,7 +1188,7 @@ var calculate =
 		return empty_tiles;
 	},
 
-	mark_found: function(x, y, obj, value = true)
+	mark_found: function(x, y, obj, value = true)	//obj has to be an object.
 	{
 		if (!obj[x])
 		{
@@ -1158,7 +1265,27 @@ var calculate =
 			}
 		}
 		return i;
-	}
+	},
+
+	orientation:
+	{
+		"-1": {"-1": 8, 0: 7, 1: 6},
+		 0: {"-1": 1,       1: 5},
+		 1: {"-1": 2, 0: 3, 1: 4}
+	},
+
+	dxdy:
+	[
+		null,
+		{dx:  0, dy: -1},
+		{dx:  1, dy: -1},
+		{dx:  1, dy:  0},
+		{dx:  1, dy:  1},
+		{dx:  0, dy:  1},
+		{dx: -1, dy:  1},
+		{dx: -1, dy:  0},
+		{dx: -1, dy: -1}
+	]
 };
 
 calculate.findouterstone.innercheck = function(x, y, found, temp_search, terrain)
