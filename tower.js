@@ -99,12 +99,19 @@ var tower =
 			});
 
 			//Find the wall with the highest hp.
-			let mosthp = 0;
-			for (let w = 0; w < walls.length; w++)
+			let mosthp = Game.getObjectById(Memory.rooms[room_name].defense.lastrp);
+			if (mosthp)
 			{
-				if (walls[w].hits > mosthp)
+				mosthp = mosthp.hits;
+			}
+			else
+			{
+				for (let w = 0; w < walls.length; w++)
 				{
-					mosthp = walls[w].hits;
+					if (walls[w].hits > mosthp)
+					{
+						mosthp = walls[w].hits;
+					}
 				}
 			}
 
