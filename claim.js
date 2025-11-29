@@ -6,7 +6,16 @@ var claim =
 		//console.log("From " + start_room + " to " + target_room);
 
 		//First we have to get a high level map of which rooms to traverse.
-		let room_path = Game.map.findRoute(start_room, target_room);
+		let room_path = Game.map.findRoute(start_room, target_room,
+		{
+			routeCallback(roomName, fromRoomName)
+			{
+				if (Memory.blocked[roomName])
+				{
+					return Infinity;
+				}
+			}
+		});
 		//console.log(target_position);
 		//console.log(JSON.stringify(room_path));
 
@@ -158,8 +167,16 @@ var claim =
 				if (Memory[type][a].creeps[role].length < Memory[type][a].ideal[role] && complete)
 				{
 					complete = false;
+					let body;
+					if (Memory[type][a].heal && (role.indexOf('attacker') !== -1))	//If this action requests a self-healer, we should build that.
+					{
+						body = require('body')['h' + role](Game.rooms[room_name].energyCapacityAvailable);
+					}
+					else
+					{
+						body = require('body')[role](Game.rooms[room_name].energyCapacityAvailable);
+					}
 					//We should wait until the room has enough to build it.
-					let body = require('body')[role](Game.rooms[room_name].energyCapacityAvailable)
 					let cost = require('calculate').bodyCost(body);
 					let spawns;
 					//If we have enough to build it, then build it.
@@ -224,11 +241,21 @@ var claim =
 
 							if (creep.pos.roomName == Memory[type][a].closest)	//If we're still in our starting room, use our exit path.
 							{
+								let tempdir;
+
 								//Creeps capable of a round trip must be accounted for as well.
 								if (Memory.creeps[creep.name].return)
 								{
 									//We're returning to our starting room.
-									
+									//Assign within comparison.
+									if ((tempdir = Memory.rooms[creep.room.name].path[creep.pos.x])
+									&& (tempdir = tempdir[creep.pos.y])
+									&& (tempdir = tempdir.exitreturn)
+									&& (tempdir = tempdir[Object.keys(Memory[type][a].path)[0]]))	//Our target is the first room in our path keys.
+									{
+										creep.memory.direction = tempdir;
+									}
+									creep.move(creep.memory.direction);
 								}
 								else
 								{
@@ -236,7 +263,6 @@ var claim =
 									//We're leaving our starting room.
 									//creep.moveByPath(Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]]);
 
-									let tempdir;
 									//Assign within comparison.
 									if ((tempdir = Memory.rooms[creep.room.name].path[creep.pos.x])
 									&& (tempdir = tempdir[creep.pos.y])
@@ -255,12 +281,53 @@ var claim =
 
 								let tempdir;
 								//Assign within comparison.
-								if ((tempdir = Memory[type][a].path[creep.room.name]) && (tempdir = tempdir[creep.pos.x]) && (tempdir = tempdir[creep.pos.y]))
+								if ((tempdir = Memory[type][a].path[creep.room.name]) && tempdir[creep.pos.x] && (tempdir = tempdir[creep.pos.x][creep.pos.y]))
 								{
 									creep.memory.direction = tempdir;
 								}
 
 								creep.move(creep.memory.direction);
+								tempdir = creep.memory.direction;
+
+								//If we're about to move into another room, we need to obey the path tile we're about to land on.
+								let calculate = require('calculate');
+								if ((creep.pos.x === 1 || creep.pos.x === 49) && calculate.dxdy[tempdir].dx)	//-1 and 1 are both truthy values.
+								{
+									let this_exit = Game.map.describeExits(creep.room.name)[calculate.orientation[calculate.dxdy[tempdir].dx][0]];
+
+									if (Memory[type][a].path[this_exit] && Memory[type][a].path[this_exit][creep.pos.x] && (tempdir = Memory[type][a].path[this_exit][creep.pos.x][creep.pos.y]))
+									{
+										creep.memory.direction =  tempdir;
+									}
+								}
+								else if ((creep.pos.y === 1 || creep.pos.y === 49) && calculate.dxdy[tempdir].dy)	//-1 and 1 are both truthy values.
+								{
+									let this_exit = Game.map.describeExits(creep.room.name)[calculate.orientation[0][calculate.dxdy[tempdir].dy]];
+
+									if (Memory[type][a].path[this_exit] && Memory[type][a].path[this_exit][creep.pos.x] && (tempdir = Memory[type][a].path[this_exit][creep.pos.x][creep.pos.y]))
+									{
+										creep.memory.direction =  tempdir;
+									}
+								}
+
+								//If it has heal parts and we're not attacking, we should use them.
+								if (creep.getActiveBodyparts(HEAL))
+								{
+									//If there's an injured creep on our way, let's heal it too.
+									let allies = creep.pos.findInRange(FIND_MY_CREEPS, 1);
+									let lowest_hp = Infinity;
+									let lowest_creep;
+									for (let lo = 0; lo < allies.length; lo++)
+									{
+										if (allies[lo].hits < lowest_hp)
+										{
+											lowest_hp = allies[lo].hits;
+											lowest_creep = allies[lo];
+										}
+									}
+
+									creep.heal(lowest_creep);
+								}
 							}
 						}
 					}
@@ -290,7 +357,30 @@ var claim =
 			let shortest = Infinity;
 			let tpath;
 			let closest;
+
+			//Don't re-use a room if it's already committed to this type of action.
+			let temp_rooms = {};
 			for (let room_name in Memory.rooms)
+			{
+				let free = true;
+				if (Memory[type])
+				{
+					for (let t = 0; t < Memory[type].length; t++)
+					{
+						if (Memory[type][t].closest === room_name)
+						{
+							free = false;
+						}
+					}
+				}
+
+				if (free)
+				{
+					temp_rooms[room_name] = true;
+				}
+			}
+
+			for (let room_name in temp_rooms)
 			{	//We're assigning tpath within this comparison so the findRoute only happens on valid rooms.
 				if (Game.rooms[room_name].controller.level > 2 && (tpath = Game.map.findRoute(room_name, object.pos.roomName)) && tpath.length < shortest)
 				{
@@ -361,21 +451,26 @@ var claim =
 				for (let c = 0; c < Memory.attack[a].creeps[role].length; c++)
 				{
 					let creep = Game.creeps[Memory.attack[a].creeps[role][c]];
-					let range = {attacker: 1, mattacker: 1, rattacker: 3, dattacker: 1}[role];
+					let range = {attacker: 1, mattacker: 1, rattacker: 3, dattacker: 1, healer: 1, tank: 1, paver: 1}[role];
 					//If we're in our target room, do our tasks.
 					if (Game.creeps[Memory.attack[a].creeps[role][c]].pos.roomName == Memory.attack[a].pos.roomName)
 					{
 						//Are we at the enemy yet? (This flag has to be placed on the enemy.)
-						if (creep.pos.inRangeTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, range))
+						//The healer should operate independantly of the pos targeting.
+						if (creep.pos.inRangeTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, range) || (role === 'healer' && creep.memory.movenow.length === 0
+							&& creep.pos.findInRange(FIND_MY_CREEPS, range, {filter: function(fcreep) {return fcreep.id !== creep.id && fcreep.hits < fcreep.hitsMax}}).length))
 						{
 							//Get room enemies.
-							let enemies;
+							let enemies = [];
 							if (role == 'attacker' || role == 'rattacker')
 							{
 								enemies = creep.pos.findInRange(FIND_HOSTILE_CREEPS, range, {filter: claim.checkallies})
 								if (!enemies.length)
 								{
-									enemies = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, range, {filter: function(structure) {return structure.structureType != STRUCTURE_CONTROLLER && claim.checkallies(structure)} })
+									enemies = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, range, {filter: function(structure)
+										{
+											return structure.structureType !== STRUCTURE_CONTROLLER && structure.structureType !== STRUCTURE_KEEPER_LAIR && claim.checkallies(structure);
+										} })
 										.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_CONTAINER}}))
 										.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_POWER_BANK}}));
 								}
@@ -384,17 +479,34 @@ var claim =
 							{
 								enemies = [];
 							}
-							enemies = enemies.concat(creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, range, {filter: function(structure) {return structure.structureType != STRUCTURE_CONTROLLER && claim.checkallies(structure)} }))
-								.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_CONTAINER}}))
-								.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_POWER_BANK}}));
-
-							//If there's an enemy on the target position, attack it first.
-							for (let e = 0; e < enemies.length; e++)
+							if (role !== 'healer')
 							{
-								if (enemies[e].pos.x == Memory.attack[a].pos.x && enemies[e].pos.y == Memory.attack[a].pos.y)
+								enemies = enemies.concat(creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, range, {filter: function(structure)
 								{
-									enemies.unshift(enemies.splice(e, 1)[0]);
-									break;
+									return structure.structureType != STRUCTURE_CONTROLLER && structure.structureType !== STRUCTURE_KEEPER_LAIR && claim.checkallies(structure);
+								} }))
+									.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_CONTAINER}}))
+									.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_POWER_BANK}}));
+
+								//If there's an enemy on the target position, attack it first.
+								for (let e = 0; e < enemies.length; e++)
+								{
+									if (enemies[e].pos.x == Memory.attack[a].pos.x && enemies[e].pos.y == Memory.attack[a].pos.y)
+									{
+										enemies.unshift(enemies.splice(e, 1)[0]);
+										break;
+									}
+								}
+
+								//If the target position is on a wall, we want to attack it.
+								let target_wall = creep.room.lookForAt(LOOK_STRUCTURES, Memory.attack[a].pos.x, Memory.attack[a].pos.y);
+								for (tw = 0; tw < target_wall.length; tw++)
+								{
+									if (target_wall[tw].structureType === STRUCTURE_WALL)
+									{
+										enemies.unshift(target_wall[tw]);
+										break;
+									}
 								}
 							}
 
@@ -417,9 +529,9 @@ var claim =
 									}
 								}
 							}*/
-							if (enemies.length == 0)	//If we are doing a sustained attack, then we need to kill everything in this room.
+							if (enemies.length === 0 && role !== 'healer')	//If we are doing a sustained attack, then we need to kill everything in this room.
 							{
-								if (role == 'attacker' || role == 'rattacker')
+								if (role === 'attacker' || role === 'rattacker')
 								{
 									enemies = creep.room.find(FIND_HOSTILE_CREEPS, {filter: claim.checkallies});
 								}
@@ -427,7 +539,9 @@ var claim =
 								{
 									enemies = [];
 								}
-									enemies = enemies.concat(creep.room.find(FIND_HOSTILE_STRUCTURES, {filter: function(structure) {return structure.structureType != STRUCTURE_CONTROLLER && claim.checkallies(structure)} }))
+
+								enemies = enemies.concat(creep.room.find(FIND_HOSTILE_STRUCTURES, {filter: function(structure) {return structure.structureType != STRUCTURE_CONTROLLER && structure.structureType !== STRUCTURE_KEEPER_LAIR
+										&& claim.checkallies(structure)} }))
 									.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_CONTAINER}}))
 									.concat(creep.room.find(FIND_STRUCTURES, {filter: {structureType: STRUCTURE_POWER_BANK}}));
 
@@ -461,6 +575,12 @@ var claim =
 										//return require('control').move(creep, role, source);
 									}
 								}
+
+								//If it has heal parts and we're not attacking, we should use them.
+								if (creep.getActiveBodyparts(HEAL))
+								{
+									creep.heal(creep);
+								}
 							}
 							else
 							{
@@ -468,18 +588,53 @@ var claim =
 								{
 									case 'attacker':
 									case 'mattacker':
-										creep.attack(enemies[0]);
+										if (creep.hits < creep.hitsMax && creep.getActiveBodyparts(HEAL))
+										{
+											creep.heal(creep);
+										}
+										else
+										{
+											creep.attack(enemies[0]);
+										}
 										break;
 
 									case 'rattacker':
 										creep.rangedAttack(enemies[0]);
+										//If it has heal parts and we're a ranged attacker, we should use them.
+										if (creep.getActiveBodyparts(HEAL))
+										{
+											creep.heal(creep);
+										}
 										break;
 
 									case 'dattacker':
-										creep.dismantle(enemies[0]);
+										if (creep.hits < creep.hitsMax && creep.getActiveBodyparts(HEAL))
+										{
+											creep.heal(creep);
+										}
+										else
+										{
+											creep.dismantle(enemies[0]);
+										}
 										break;
 									case 'healer':
-										creep.heal();
+										//If we're a healer, we should find an ally to heal.
+										let allies = creep.pos.findInRange(FIND_MY_CREEPS, range);
+										//Find who has the lowest hp.
+										let lowest = allies[0];
+										for (let al = 0; al < allies.length; al++)
+										{
+											if (allies[al].hits < lowest.hits)
+											{
+												lowest = allies[al];
+											}
+										}
+										creep.heal(lowest);
+										//If we healed another creep, we should probably follow it.
+										if (lowest.id !== creep.id)
+										{
+											creep.move(creep.pos.getDirectionTo(lowest));
+										}
 										break;
 									case 'tank':
 										creep.heal(creep);
@@ -488,7 +643,7 @@ var claim =
 								}
 							}
 						}
-						else if (creep.memory.movenow.length != 0)
+						else if (creep.memory.movenow.length !== 0)
 						{
 							status = creep.moveByPath(creep.memory.movenow)
 							if(status == OK || status == ERR_TIRED)
@@ -505,11 +660,107 @@ var claim =
 								console.log(creep.name + ": Switching to normal pathing.");
 								//return require('control').move(creep, role, source);
 							}
+
+							//If it has attack parts and there's something in range, we should attack it while we move.
+							//Get room enemies.
+							let enemies;
+							if (role === 'attacker' || role === 'rattacker' || role === 'dattacker')
+							{
+								if (role === 'dattacker')
+								{
+									enemies = [];
+								}
+								else
+								{
+									enemies = creep.pos.findInRange(FIND_HOSTILE_CREEPS, range, {filter: claim.checkallies})
+								}
+								if (!enemies.length)
+								{
+									enemies = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, range, {filter: function(structure) {return structure.structureType != STRUCTURE_CONTROLLER && structure.structureType !== STRUCTURE_KEEPER_LAIR
+											&& claim.checkallies(structure)} })
+										.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_CONTAINER}}))
+										.concat(creep.pos.findInRange(FIND_STRUCTURES, range, {filter: {structureType: STRUCTURE_POWER_BANK}}));
+								}
+							}
+
+							if (enemies && enemies.length)
+							{
+								switch (role)
+								{
+									case 'attacker':
+										creep.attack(enemies[0]);
+										break;
+									case 'rattacker':
+										creep.rangedAttack(enemies[0]);
+										break;
+									case 'dattacker':
+										creep.dismantle(enemies[0]);
+								}
+							}
+
+							//If it has heal parts and there's an ally in range, we should heal an ally while we move.
+							if (role === 'healer')
+							{
+								let allies = creep.pos.findInRange(FIND_MY_CREEPS, range);
+
+								//Find who has the lowest hp.
+								let lowest = allies[0];
+								for (let al = 0; al < allies.length; al++)
+								{
+									if (allies[al].hits < lowest.hits)
+									{
+										lowest = allies[al];
+									}
+								}
+
+								creep.heal(lowest);
+								//If we healed another creep, we should probably follow it.
+								if (lowest.id !== creep.id)
+								{
+									creep.move(creep.pos.getDirectionTo(lowest));
+								}
+							}
+							else
+							{
+								//If it has heal parts and we're not attacking, we should use them.
+								if (creep.getActiveBodyparts(HEAL))
+								{
+									creep.heal(creep);
+								}
+							}
+						}
+						else if (role === 'healer')
+						{
+							//Our healer needs to get a path.
+							let ally = creep.room.find(FIND_MY_CREEPS, {filter: function(fcreep) {return fcreep.id !== creep.id}});
+							//Find who has the lowest hp.
+							let lowest = ally[0];
+							for (let al = 0; al < ally.length; al++)
+							{
+								if (ally[al].hits < lowest.hits)
+								{
+									lowest = ally[al];
+								}
+							}
+							ally = lowest;
+							Memory.creeps[creep.name].movenow = creep.pos.findPathTo(ally);
+							if (Memory.creeps[creep.name].movenow.length)
+							{
+								creep.move(Memory.creeps[creep.name].movenow[0].direction);
+							}
+							if (!Memory.attack[a].guard)
+							{
+								Memory.creeps[creep.name].movenow.splice((0 - range), range);
+							}
 						}
 						else
 						{
 							//We need to get a path.
 							Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y);
+							if (Memory.creeps[creep.name].movenow.length)
+							{
+								creep.move(Memory.creeps[creep.name].movenow[0].direction);
+							}
 							if (!Memory.attack[a].guard)
 							{
 								Memory.creeps[creep.name].movenow.splice((0 - range), range);
@@ -655,10 +906,12 @@ var claim =
 											{
 												//Prepare the creep to be transferred.
 												creep.memory.direction = false;
-												creep.memory.path = 11;
-												creep.memory.target = {x: Memory.rooms[creep.room.name].upgrade.slice(-1)[0].x, y: Memory.rooms[creep.room.name].upgrade.slice(-1)[0].y};
+												creep.memory.path = 0;
+												creep.memory.target = {};
+												creep.memory.target.x = Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].x;
+												creep.memory.target.y = Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].y;
 
-												Memory.rooms[creep.room.name].creeps.upgrader.push(Memory.claims[a].creeps[role][c]);
+												Memory.rooms[creep.room.name].sources[0].creeps.mtransport.push(Memory.claims[a].creeps[role][c]);
 												break;
 											}
 										}
@@ -1120,9 +1373,40 @@ var claim =
 		}
 	},*/
 
+	//This runs every paver object.
+	pave: function()
+	{
+		//Iterate the room actions of this type.
+		for (let a = 0; a < Memory.paver.length; a++)
+		{
+			//Iterate each role in this room action.
+			for (let role in Memory.paver[a].creeps)
+			{
+				//Iterate each creep in this role.
+				for (let c = 0; c < Memory.paver[a].creeps[role].length; c++)
+				{
+					let creep = Game.creeps[Memory.paver[a].creeps[role][c]];
+					//If we're in our target room, do our tasks.
+					if (Game.creeps[Memory.paver[a].creeps[role][c]].pos.roomName == Memory.paver[a].pos.roomName)
+					{
+						
+					}
+				}
+			}
+		}
+	},
+
 	roomactions: ["attack", "reserves", "claims", "signs", "withdraw", "deposit"],
 
-	actionideal: {attack: {tank: 0, attacker: 1, rattacker: 0, dattacker: 0, healer: 0, paver: 0, tank: 0}, reserves: {reserver: 1}, claims: {harvester: 2, builder: 2, claimer: 1}, signs: {scout: 1}, withdraw: {transport: 4}, deposit: {transport: 0}},
+	actionideal:
+	{
+		attack: {tank: 0, attacker: 1, rattacker: 0, dattacker: 0, healer: 0, paver: 0, tank: 0},
+		reserves: {reserver: 1}, claims: {harvester: 2, builder: 2, claimer: 1},
+		signs: {scout: 1},
+		withdraw: {transport: 4},
+		deposit: {transport: 0},
+		pave: {paver: 1}
+	},
 
 	signature: "I am, therefore I'll think. [Bad_Named_Alliance]",
 	oversignature: "Overmind destroyed by [Bad_Named_Alliance]",
