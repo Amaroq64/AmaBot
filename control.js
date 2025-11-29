@@ -12,7 +12,7 @@ var control =
 	//ubuilder: require('role.ubuilder'),
 	dbuilder: require('role.dbuilder'),
 
-	//guard: require('role.guard'),
+	//transfer: require('role.transfer'),
 
 	calculate: require('calculate'),
 
