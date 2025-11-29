@@ -101,7 +101,7 @@ var body =
 		return body;
 	},
 
-	transport: function(energy, upgrader = false)
+	transport: function(energy, upgrader = false, pave = false)
 	{
 		let starting_energy = energy;
 		let level_seven_energy = require('calculate').maximumEnergy(7);
@@ -121,11 +121,11 @@ var body =
 			body.push(MOVE, CARRY, CARRY);	//The ideal transport has two carries for every move.
 			energy -= 150;
 		}
-		/*if (starting_energy > level_seven_energy && energy >= 100 && body.length < 49 )		//Use the leftovers to squeeze out a little more transport capacity at level 8.
+		if (pave && starting_energy > level_seven_energy && energy >= 100 && body.length < 49 )		//Use the leftovers to squeeze out a little more transport capacity for pavers.
 		{
 			body.push(CARRY, CARRY);
 			energy -= 100;
-		}*/
+		}
 		
 		return body;
 	},
@@ -143,6 +143,26 @@ var body =
 			if (energy < 350)
 			{
 				return [MOVE, WORK, WORK, CARRY];	//At level 2 we might not have our extensions yet.
+			}
+			else if (energy > require('calculate').maximumEnergy(5))	//At level 6 or higher, we might be boosting, so use less parts here.
+			{
+				let countwork = 0;
+				let flipwork = false;
+				while (energy >= [250, 200][+flipwork] && countwork < 10)	//Since a container can hold 2000, we should hold 1000. A T1 boost would make it match.
+				{
+					if (flipwork)	//We have half work now, so on odd numbers, don't add a move.
+					{
+						body.push(WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty and traveling to its patrol route.
+						energy -= 200;
+					}
+					else
+					{
+						body.push(MOVE, WORK, CARRY, CARRY);	//The ideal fatty builder only needs to move at full speed while it's empty and traveling to its patrol route.
+						energy -= 250;
+					}
+					countwork++;
+					flipwork = !flipwork;
+				}
 			}
 			else
 			{
@@ -198,13 +218,14 @@ var body =
 
 	claimer: function(energy)
 	{
-		let body = [MOVE, MOVE, WORK, CLAIM];
-		energy -= 800;
-		if (energy >= 100)
+		let body = [MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CLAIM];
+		energy -= 900;
+		while (energy >= 100 && body.length < 11)
 		{
 			body.splice(-2, 0, CARRY, CARRY);
+			energy -= 100;
 		}
-		else if (energy >= 50)
+		if (energy >= 50)
 		{
 			body.splice(-2, 0, CARRY);
 		}
@@ -230,12 +251,12 @@ var body =
 	attacker: function(energy, attack = 0)
 	{
 		let body = [];
-		let tbody = [[MOVE, ATTACK], [MOVE, RANGED_ATTACK], [MOVE, WORK]][attack];
+		let tbody = [[ATTACK, MOVE], [RANGED_ATTACK, MOVE], [WORK, MOVE]][attack];
 		let cost = [130, 200, 150][attack]
 		while (energy >= cost && body.length < 49)
 		{
 			body.push(tbody[0]);
-			body.push(tbody[1]);
+			body.unshift(tbody[1]);
 			energy -= cost;
 		}
 
@@ -252,6 +273,28 @@ var body =
 		}
 
 		return body;
+	},
+
+	hattacker: function(energy, attack = 0)
+	{
+		//A self-healing attacker can soak tower damage.
+		let body = [];
+		let move_part = [];
+		let tbody = [[MOVE, ATTACK, HEAL], [MOVE, RANGED_ATTACK, HEAL], [MOVE, WORK, HEAL]][attack];
+		let cost = [430, 500, 450][attack]
+		while (energy >= cost && (body.length + move_part.length) < 48)
+		{
+			move_part.push(tbody[0], tbody[0]);
+			body.push(tbody[1], tbody[2]);
+			energy -= cost;
+		}
+		if (energy >= 300)
+		{
+			move_part.push(tbody[0]);
+			body.push(tbody[2]);
+		}
+
+		return move_part.concat(body);;
 	},
 
 	tank: function(energy)
@@ -292,14 +335,25 @@ var body =
 
 	paver: function(energy)
 	{
+		let carry = [];
 		let body = [];
-		while (energy && body.length < 49) //The ideal paver moves slow and steady. It carries a multiple of 300 and doesn't take too long to pave the roads.
+
+		//According to my calculations, the ideal paver is 20 WORK, 10 MOVE, 18 CARRY.
+		while (energy >= 350 && (body.length + carry.length) < 46) //The ideal paver moves slow and steady. It carries a multiple of 300 and doesn't take too long to pave the roads.
 		{
-			body.push();
-			energy -= 0;
+			body.unshift(WORK, WORK);
+			body.push(MOVE);
+			carry.push(CARRY, CARRY);
+			energy -= 350;
+		}
+		if (energy >= 250)	//The previous while has already constrained it to 45.
+		{
+			body.unshift(WORK, WORK);
+			body.push(MOVE);
+			energy -= 250;
 		}
 
-		return body;
+		return body.concat(carry);
 	},
 
 	towtruck: function(energy)
@@ -312,6 +366,17 @@ var body =
 
 		return body;
 	},
+
+	transfer: function(energy)
+	{
+		let body = [];
+		while (energy >= 50 && body.length < 50) //A dumb transferer is just carry parts.
+		{
+			body.push(CARRY);
+		}
+
+		return body;
+	}
 };
 
 //We have some aliases so the calling functions don't need to care.
@@ -324,6 +389,10 @@ body.mtransport = body.transport;
 body.utransport = function(energy)
 {
 	return body.transport(energy, true);
+}
+body.ptransport = function(energy)
+{
+	return body.transport(energy, false, true);
 }
 body.ubuilder = body.builder;
 
@@ -339,10 +408,19 @@ body.mattacker = body.attacker;
 body.rattacker = function(energy, attack = 1)
 {
 	return body.attacker(energy, attack);
-}
+};
 body.dattacker = function(energy, attack = 2)
 {
 	return body.attacker(energy, attack);
-}
+};
+body.hmattacker = body.hattacker;
+body.hrattacker = function (energy, attack = 1)
+{
+	return body.hattacker(energy, attack);
+};
+body.hdattacker = function (energy, attack = 2)
+{
+	return body.hattacker(energy, attack);
+};
 
 module.exports = body;
