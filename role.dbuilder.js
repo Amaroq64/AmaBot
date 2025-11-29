@@ -29,7 +29,7 @@ var roleDBuilder =
 			})
 		);
 
-		if (sites.length == 0 && creep.room.lookForAt(LOOK_STRUCTURES, creep.pos).length == 0) //There's no sites in the room.
+		if (sites.length === 0 && creep.room.lookForAt(LOOK_STRUCTURES, creep.pos).length === 0) //There's no sites in the room.
 		{
 			return false;
 		}
@@ -113,18 +113,37 @@ var roleDBuilder =
 
 		//Get repairable structures in range of the repairer.
 		let rstructures = [];
+		let temprstructure;
 		for (let x = -3; x < 4; x++)
 		{
 			for (let y = -3; y < 4; y++)
 			{
 				//Assign within comparison.
-				if (defender.walls[creep.room.name] && defender.walls[creep.room.name][creep.pos.x + x] && defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y] )
+				if (defender.walls[creep.room.name] && defender.walls[creep.room.name][creep.pos.x + x] && defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y]
+					&& (temprstructure = Game.getObjectById(defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y])))
 				{
-					rstructures.push(Game.getObjectById(defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y]));
+					rstructures.push(temprstructure);
 				}
-				else if(defender.ramparts[creep.room.name] && defender.ramparts[creep.room.name][creep.pos.x + x] && defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y])
+				else if(defender.ramparts[creep.room.name] && defender.ramparts[creep.room.name][creep.pos.x + x] && defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y]
+					&& (temprstructure = Game.getObjectById(defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y])))
 				{
-					rstructures.push(Game.getObjectById(defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y]));
+					rstructures.push(temprstructure);
+				}
+				if (rstructures.length && rstructures[rstructures.length - 1].hits >= Memory.rooms[creep.room.name].defense.highmil * 1000000)
+				{
+					//We should only be picky if we have a single exit to defend. If we detect more than that, don't be picky.
+					let count = 0;
+					for (let dp = 0; Memory.rooms[creep.room.name].patrol && dp < Memory.rooms[creep.room.name].patrol.length; dp++)
+					{
+						if (Memory.rooms[creep.room.name].patrol)
+						{
+							count++;
+						}
+					}
+					if (count > 1)
+					{
+						rstructures.pop();	//Remove any that are above our current breakpoint to ensure balanced repairing.
+					}
 				}
 			}
 		}
@@ -135,7 +154,7 @@ var roleDBuilder =
 		let farwalls;
 		for (let r = 0; r < rstructures.length; r++)
 		{
-			if (rstructures[r] && rstructures[r].hits < lowesthp && creep.pos.inRangeTo(rstructures[r], 3))
+			if (rstructures && rstructures[r] && rstructures[r].hits < lowesthp && creep.pos.inRangeTo(rstructures[r], 3))
 			{
 				lowesthp = rstructures[r].hits;
 				chosen = rstructures[r];
@@ -144,6 +163,20 @@ var roleDBuilder =
 
 		if (creep.repair(chosen) == OK)
 		{
+			//If the repaired structure would have the highest hp, record it.
+			let new_hits = chosen.hits + (Math.min(creep.memory.repair, creep.store.getUsedCapacity(RESOURCE_ENERGY)) * (100 + (100 * [0, 0.5, 0.8, 1][creep.memory.t])));
+			let tempwall;
+			//Assign within comparison.
+			if ((tempwall = Game.getObjectById(Memory.rooms[creep.room.name].defense.lastrp)) && new_hits > tempwall.hits)
+			{
+				Memory.rooms[creep.room.name].defense.lastrp = chosen.id;
+
+				//If we reached a new highest millionth, record it.
+				if (new_hits > (Memory.rooms[creep.room.name].defense.highmil * 1000000))
+				{
+					Memory.rooms[creep.room.name].defense.highmil++;
+				}
+			}
 			return true;	//We've performed our repair action for this tick.
 		}
 		
@@ -248,10 +281,19 @@ var roleDBuilder =
 			//console.log("Withdrawing from ruins.");
 			roleDBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
 
+			//This is where we're waiting to be given energy.
 			let tpos = creep.room.getPositionAt(creep.memory.dtarget.x, creep.memory.dtarget.y);
 			if (creep.pos.isEqualTo(tpos.x, tpos.y))
 			{
-				return false;
+				//Does a creep (other than a builder) want to move towards us?
+				let nearby_creeps = creep.pos.findInRange(FIND_MY_CREEPS);
+				for (let cr = 0; cr < nearby_creeps.length; cr++)
+				{
+					if(nearby_creeps[cr].saying.toLowerCase().indexOf('move') !== -1)
+					{
+						return true;
+					}
+				}
 			}
 			else
 			{
@@ -265,11 +307,11 @@ var roleDBuilder =
 			{
 				//console.log("Repairing.");
 				roleDBuilder.repair(creep);
-				return true;
 			}
+			return true;
 		}
 
-		return true;
+		//return true;
 	}
 };
 
