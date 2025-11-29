@@ -1,9 +1,11 @@
+var calculate = require('calculate');
+
 global.help =
 "attack(attack_number, x, y, [room_name])\n" +
 "attackdisplay\n" +
 "attackrole(attack_number, role_type, number_of_role)\n" +
 "movenow(creep_name, x, y)\n" +
-"newpath(current_room, action_type, action_number, [x], [y], [x2], [y2], [target_room])\n" +
+"newpath(current_room, action_type, action_number, [x], [y], [x2], [y2], [target_room pos or true])\n" +
 "clearcreep(creep_name)\n" +
 "countextensions\n" +
 "oversign(creep_name)\n" +
@@ -82,7 +84,7 @@ global.movenow = function(creep_name, x, y)
 	}
 }
 
-global.newpath = function(room_name, action_type, action_number, x = false, y = false, x2 = false, y2 = false, room_name2)
+global.newpath = function(room_name, action_type, action_number, x = false, y = false, x2 = false, y2 = false, room_name2 = false, direction = false)
 {
 	if (typeof room_name === 'string' && typeof action_type === 'string' && typeof action_number === 'number')
 	{
@@ -94,11 +96,37 @@ global.newpath = function(room_name, action_type, action_number, x = false, y = 
 			x2 = temproom[temproom.length - 1].x;
 			y2 = temproom[temproom.length - 1].y;
 		}
-		Memory[action_type][action_number].path[room_name] = Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)));
+
+		let temppath;
 		if (typeof room_name2 === 'string')
 		{
+			temppath = calculate.cleanthispath(Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)), {plainCost: 1, swampCost: 2, maxRooms: 1}));
 			Memory[action_type][action_number].pos.roomName = room_name2;
 		}
+		else if(room_name2)
+		{
+			temppath = calculate.cleanthispath(Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)), {plainCost: 1, swampCost: 2, maxRooms: 1}));
+		}
+		else
+		{
+			temppath = calculate.cleanthispath(Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)), {plainCost: 1, swampCost: 2}));
+		}
+
+		temppath.unshift({x: x, y: y, direction: temppath[0].direction});
+
+		let temp_tile = {};
+		for (let tile = 0; tile < temppath.length; tile++)
+		{
+			if (!temp_tile[temppath[tile].x])
+			{
+				temp_tile[temppath[tile].x] = {};
+			}
+
+			temp_tile[temppath[tile].x][temppath[tile].y] = temppath[tile].direction;
+		}
+
+		Memory[action_type][action_number].path[room_name] = temp_tile;
+
 		return true;
 	}
 	else
