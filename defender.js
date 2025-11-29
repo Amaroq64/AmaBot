@@ -468,7 +468,7 @@ var defender =
 					finished = true;
 				}
 
-				if (e == lastexit && w == lastwall && stage < 4)
+				if (stage < 4 && e === lastexit && w === lastwall)
 				{
 					if (built)
 					{
@@ -484,11 +484,12 @@ var defender =
 					//defender.setRamparts(room_name);	//We have to delay this until after the exitpaths are regenerated.
 					return true;	//We made it this far without any errors.
 				}
-				else if (e == lastexit && w == lastwall && stage === 4)
+				else if (stage === 4 && e === lastexit && w === lastwall)
 				{
 					if (built)
 					{
 						Memory.rooms[room_name].defense.checkagain = true;
+						console.log('Check again.');
 					}
 					if ((!built || finished) && !built_any)
 					{
