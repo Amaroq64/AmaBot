@@ -1,6 +1,6 @@
 var test =
 {
-	run: function(paths, extensions_sources, defenses, newpath = false, actionpath = false)
+	run: function(paths, extensions_sources, defenses, newpath = false, labs = false, actionpath = false)
 	{
 		let extensions_room = false;
 		try
@@ -236,6 +236,37 @@ var test =
 			{
 				wallsTest(Memory.rooms);
 			}
+
+			if (labs && Memory.mineTest)
+			{
+				for (let room_name in Memory.rooms)
+				{
+					if (!Memory.mineTest[room_name])
+					{
+						continue;
+					}
+
+					//Display the mine path.
+					test.paint.minepath(room_name);
+
+					//Draw the labs.
+					let labs = Memory.mineTest[room_name].labs;
+					for (let la = 0; la < 10; la++)
+					{
+						let color;
+						if (la < 2)
+						{
+							color = 'darkred';
+						}
+						else
+						{
+							color = 'darkblue';
+						}
+
+						new RoomVisual(room_name).circle(labs[la].x, labs[la].y, {fill: color, radius: 0.5});
+					}
+				}
+			}
 		}
 		catch(e)
 		{
@@ -367,6 +398,11 @@ var test =
 			}
 			Game.rooms[room_name].visual.poly(tpath, {stroke: color[0], lineStyle: "dashed"});
 			Game.rooms[room_name].visual.poly(tpath2, {stroke: color[1], lineStyle: "dashed"});
+		},
+
+		minepath: function(room_name)
+		{
+			Game.rooms[room_name].visual.poly(Memory.mineTest[room_name].final_path, {stroke: 'darkblue', lineStyle: "dashed"});
 		}
 	},
 
@@ -441,6 +477,34 @@ var test =
 			return true;
 		}
 	},
+
+	newpathmemtest()
+	{
+		let all_paths = [];
+		let serialized;
+		let deserialized;
+		for (let room_name in Memory.rooms)
+		{
+			all_paths.push(Memory.rooms[room_name].path);
+		}
+
+		console.log('Testing new paths.');
+
+		let cpu_usage = {Begin: Game.cpu.getUsed()};
+
+		serialized = JSON.stringify(all_paths);
+
+		cpu_usage.Serialize = Game.cpu.getUsed() - cpu_usage.Begin;
+
+		deserialized = JSON.parse(serialized);
+
+		cpu_usage.Deserialize = Game.cpu.getUsed() - cpu_usage.Begin - cpu_usage.Serialize;
+
+		console.log('Serialize: ' + cpu_usage.Serialize);
+		console.log('Deserialize: ' + cpu_usage.Deserialize);
+		console.log((serialized.length / 1024) + " Kb");
+		return true;
+	}
 
 	/*cpu: function()
 	{
