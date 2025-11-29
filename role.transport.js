@@ -15,7 +15,7 @@ var roleTransport =
 		{
 			filter: function(structure)
 			{
-				return (structure.structureType == STRUCTURE_CONTAINER || structure.structureType == STRUCTURE_STORAGE);
+				return (structure.structureType === STRUCTURE_CONTAINER /*|| (creep.memory.useall && (structure.structureType === STRUCTURE_STORAGE || structure.structureType === STRUCTURE_TERMINAL))*/ );
 			}
 		});
 
