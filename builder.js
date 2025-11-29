@@ -278,6 +278,8 @@ var builder =
 					}
 
 					//Now deploy onto that path.
+					options.memory.repair = body[role](Game.rooms[room_name].energyAvailable).reduce(calculate.reduceManyWork, 0);
+					options.memory.t = 0;
 					options.memory.direction = Memory.rooms[room_name].sources[shortestchosen].minedir2;
 					options.memory.path = 4;
 					//options.memory.movenow = Memory.rooms[room_name].sources[shortestchosen].mine.concat(Memory.rooms[room_name].sources[shortestchosen].defpaths[Memory.rooms[room_name].defense.need]);
