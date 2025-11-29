@@ -36,6 +36,7 @@ var roleMTransport =
 
 			let extensions = [];
 			let room_extensions = roleMTransport.calculate.extensions[creep.room.name];
+			let nuke = roleMTransport.calculate.nuke[creep.room.name];
 			let tempextension;
 			//Find extensions that are near us.
 			for (let x = -1; x <= 1; x++)
@@ -50,6 +51,12 @@ var roleMTransport =
 						extensions.push(tempextension);
 					}
 				}
+			}
+
+			//Find our nuker if it's near us.
+			if (creep.room.energyAvailable === creep.room.energyCapacityAvailable && nuke && Math.max(Math.abs(creep.pos.x - nuke.x), Math.abs(creep.pos.y - nuke.y)) === 1)
+			{
+				extensions.push(Game.getObjectById(nuke.id));
 			}
 
 			for (let e = 0; e < extensions.length; e++)
