@@ -491,7 +491,9 @@ var roomPlanner =
 							{
 								//We found a wall. Record all contiguous walls connected to it.
 								console.log('A wall is touching ' + (extract[ex].x) + ' ' + (extract[ex].y));
-								found = calculate.findouterstone(room_name, extract[ex].x + x, extract[ex].y + y, found);
+
+								//Due to the flexibility of stamp checking, we don't need to stay away from walls anymore.
+								//found = calculate.findouterstone(room_name, extract[ex].x + x, extract[ex].y + y, found);
 							}
 						}
 					}
@@ -540,10 +542,10 @@ var roomPlanner =
 														costMatrix.set(Memory.rooms[room_name].sources[i].defpaths[dp][n].x, Memory.rooms[room_name].sources[i].defpaths[dp][n].y, 1);
 													}
 												}
-												else
+												/*else
 												{
 													console.log('Skipping defpaths[' + dp + '].');
-												}
+												}*/
 											}
 										}
 										else
@@ -636,7 +638,7 @@ var roomPlanner =
 			let bound = 5 * direction;
 			line = [];
 
-			for (let y = 2; y > -3; y--)	//If we're testing three offsets for it, then we can really test 5 lines and record if 3 or more are clean.
+			for (let y = -2; y < 3; y++)	//If we're testing three offsets for it, then we can really test 5 lines and record if 3 or more are clean.
 			{
 				line.push(true);
 				for (let x = 0; x !== bound; x += increment)
@@ -660,14 +662,14 @@ var roomPlanner =
 						if (line[1] && line[3])
 						{
 							//A horizontal 3x5 orients -1 or 1 along the x axis.
-							console.log('h3 Found a 3x5.');
+							//console.log('h3 Found a 3x5. ' + tempx + ' ' + tempy + '. Direction: [' + direction + '][0]. Orientation: ' + calculate.orientation[direction][0] + '. 1 & 3.');
 							tested_true.push({type: 3, n: null, o: calculate.orientation[direction][0], x: tempx, y: tempy})	//Our center three lines have matched.
 						}
 					}
 					else if (line[2 + (2 * t)] && line[2 + (1 * t)])	//Check our border lines.
 					{
 						//A horizontal 3x5 orients -1 or 1 along the x axis.
-						console.log('h3 Found a 3x5.');
+						console.log('h3 Found a 3x5. ' + tempx + ' ' + (tempy + t) + '. Direction: [' + direction + '][0]. Orientation: ' + calculate.orientation[direction][0] + '. ' + (2 + (1 * t)) + ' ' + (2 + (2 * t)));
 						tested_true.push({type: 3, n: null, o: calculate.orientation[direction][0], x: tempx, y: tempy + t})	//Our border lines have matched.
 					}
 				}
@@ -680,7 +682,7 @@ var roomPlanner =
 			let bound = 5 * direction;
 			line = [];
 
-			for (let x = 2; x > -3; x--)	//If we're testing three offsets for it, then we can really test 5 lines and record if 3 or more are clean.
+			for (let x = -2; x < 3; x++)	//If we're testing three offsets for it, then we can really test 5 lines and record if 3 or more are clean.
 			{
 				line.push(true);
 				for (let y = 0; y !== bound; y += increment)
@@ -704,14 +706,14 @@ var roomPlanner =
 						if (line[1] && line[3])
 						{
 							//A vertical 3x5 orients -1 or 1 along the y axis.
-							console.log('v3 Found a 3x5.');
+							//console.log('v3 Found a 3x5. ' + tempx + ' ' + tempy + '. Direction: [0][' + direction + ']. Orientation: ' + calculate.orientation[0][direction] + '. 1 & 3.');
 							tested_true.push({type: 3, n: null, o: calculate.orientation[0][direction], x: tempx, y: tempy});	//Our center three lines have matched.
 						}
 					}
 					else if (line[2 + (2 * t)] && line[2 + (1 * t)])	//Check our border lines.
 					{
 						//A vertical 3x5 orients -1 or 1 along the y axis.
-						console.log('v3 Found a 3x5.');
+						console.log('v3 Found a 3x5. ' + (tempx + t) + ' ' + tempy + '. Direction: [0][' + direction + ']. Orientation: ' + calculate.orientation[0][direction] + '. ' + (2 + (1 * t)) + ' ' + (2 + (2 * t)));
 						tested_true.push({type: 3, n: null, o: calculate.orientation[0][direction], x: tempx + t, y: tempy});	//Our border lines have matched.
 					}
 				}
@@ -882,7 +884,7 @@ var roomPlanner =
 				}
 
 				//If we've found a location for our stamp, then we're done here.
-				if (tested_true.length)
+				if (tested_true.length > 9)
 				{
 					break;
 				}
@@ -944,8 +946,8 @@ var roomPlanner =
 						//Get our before-side positions and after-side positions.
 						for (let x = -1; x < 2; x++)
 						{
-							console.log(td + ' Vertical: ' + (tested_true[td].x + x) + ' ' + (tested_true[td].y + bound));
-							console.log(td + ' Vertical: ' + (tested_true[td].x + x) + ' ' + tested_true[td].y);
+							//console.log(td + ' Vertical: ' + (tested_true[td].x + x) + ' ' + (tested_true[td].y + bound));
+							//console.log(td + ' Vertical: ' + (tested_true[td].x + x) + ' ' + tested_true[td].y);
 							tested_true[td].bpos.push(new RoomPosition(tested_true[td].x + x, tested_true[td].y + bound, room_name));
 							tested_true[td].apos.push(new RoomPosition(tested_true[td].x + x, tested_true[td].y, room_name));
 
@@ -989,7 +991,7 @@ var roomPlanner =
 			{
 				//Which beginning position is closest to the spawn?
 				tested_true[td].chosen_bpos = spawn.pos.findClosestByPath(tested_true[td].bpos,
-					{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+					{plainCost: 2, swampCost: 2, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
 							costMatrix = tempcostmatrix.clone();
@@ -1009,7 +1011,7 @@ var roomPlanner =
 
 				//Which ending position is closest to the mineral?
 				tested_true[td].chosen_apos = closest.findClosestByPath(tested_true[td].apos,
-					{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+					{plainCost: 2, swampCost: 2, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
 							costMatrix = tempcostmatrix.clone();
@@ -1051,7 +1053,7 @@ var roomPlanner =
 
 				//Now save a path from the spawn to the bpos and from the apos to the mineral.
 				tested_true[td].chosen_bpath = spawn.pos.findPathTo(tested_true[td].chosen_bpos,
-					{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+					{plainCost: 2, swampCost: 2, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
 							costMatrix = tempcostmatrix.clone();
@@ -1069,7 +1071,7 @@ var roomPlanner =
 						}
 					});
 				tested_true[td].chosen_apath = tested_true[td].chosen_apos.findPathTo(mineral,
-					{plainCost: 2, swampCost: 3, range: 1, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+					{plainCost: 2, swampCost: 2, range: 1, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
 							costMatrix = tempcostmatrix.clone();
@@ -1099,16 +1101,19 @@ var roomPlanner =
 				//Is it closer to the mineral? Is the path shorter in general? Or maybe both?
 				if (tested_true[td].chosen_apath.length < closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length) < shortest_count)
 				{
+					console.log('Both. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o);
 					both_chosen = [tested_true[td]];
 					closest_count = tested_true[td].chosen_apath.length;
 					shortest_count = tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length;
 				}
 				else if (tested_true[td].chosen_apath.length === closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length) === shortest_count)
 				{
+					console.log('Both. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o);
 					both_chosen.push(tested_true[td]);
 				}
-				else if (tested_true[td].chosen_apath.length < closest_count)
+				else if (tested_true[td].chosen_apath.length < closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length <= shortest_count && tested_true[td].type === 3))
 				{
+					console.log('Closest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o);
 					closest_chosen = [tested_true[td]];
 					closest_count = tested_true[td].chosen_apath.length;
 
@@ -1118,20 +1123,23 @@ var roomPlanner =
 					//If we have found a closer one, let's discard the shortest list too.
 					//shortest_chosen = [tested_true[td]];
 				}
-				else if (tested_true[td].chosen_apath.length === closest_count)
+				else if (tested_true[td].chosen_apath.length === closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length <= shortest_count && tested_true[td].type === 3))
 				{
+					console.log('Closest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o);
 					closest_chosen.push(tested_true[td]);
 				}
-				else if ((tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length) < shortest_count)
+				else if (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length < shortest_count)
 				{
+					console.log('Shortest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o);
 					shortest_chosen = [tested_true[td]];
 					shortest_count = tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length;
 
 					//We have found a shorter one than the one recorded under both.
 					both_chosen = [];
 				}
-				else if ((tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length) === shortest_count)
+				else if (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length === shortest_count)
 				{
+					console.log('Shortest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o);
 					shortest_chosen.push(tested_true[td]);
 				}
 			}
@@ -1182,7 +1190,7 @@ var roomPlanner =
 				increment = calculate.dxdy[final_choice.o];
 
 				final_choice.chosen_mpath = final_choice.chosen_bpos.findPathTo(final_choice.chosen_apos,
-					{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+					{plainCost: 2, swampCost: 2, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
 							costMatrix = tempcostmatrix.clone();
