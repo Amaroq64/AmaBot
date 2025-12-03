@@ -1276,7 +1276,7 @@ var calculate =
 
 	dxdy:
 	[
-		null,
+		{dx:  0, dy:  0},
 		{dx:  0, dy: -1},
 		{dx:  1, dy: -1},
 		{dx:  1, dy:  0},
@@ -1311,5 +1311,18 @@ calculate.findouterstone.innercheck = function(x, y, found, temp_search, terrain
 	}
 	return false;	//Nothing found.
 };
+
+calculate.dxdy_opposite =
+[
+	calculate.dxdy[0],
+	calculate.dxdy[5],
+	calculate.dxdy[6],
+	calculate.dxdy[7],
+	calculate.dxdy[8],
+	calculate.dxdy[1],
+	calculate.dxdy[2],
+	calculate.dxdy[3],
+	calculate.dxdy[4]
+];
 
 module.exports = calculate;
