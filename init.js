@@ -33,15 +33,17 @@ var init =
 
 			if (Memory.rooms[room_name] === undefined)	//This room is new.
 			{
-				Memory.rooms[room_name] = {};
-				Memory.rooms[room_name].need = {};
-				Memory.rooms[room_name].sources = [];
-				Memory.rooms[room_name].mineral = {};
-				Memory.rooms[room_name].creeps = {upgrader: [], dbuilder: []};	//We don't need an upgrade builder because the source builders patrol to it.
-				Memory.rooms[room_name].buildings = {upgradecontainer: []};
-				Memory.rooms[room_name].ideal = {};
-				Memory.rooms[room_name].goals = {level: 1};
-				//Memory.rooms[room_name].structures = {};
+				Memory.rooms[room_name] =
+				{
+					need: {},
+					sources: [],
+					mineral: null,
+					react: {},
+					creeps: {upgrader: [], dbuilder: []},	//We don't need an upgrade builder because the source builders patrol to it.
+					buildings: {upgradecontainer: []},
+					ideal: {},
+					goals: {level: 1}
+				}
 
 				//Since this room is new, find its energy sources.
 				let sources = Game.rooms[room_name].find(FIND_SOURCES);
@@ -59,7 +61,7 @@ var init =
 				}
 
 				//Move sources to end of array until the closest one is [0].
-				let closest = Game.spawns[spawn].pos.findClosestByPath(FIND_SOURCES, {ignoreCreeps: true}).id;
+				let closest = Game.spawns[spawn].pos.findClosestByPath(FIND_SOURCES, {ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1}).id;
 				while (closest != Memory.rooms[room_name].sources[0].id)
 				{
 					Memory.rooms[room_name].sources.push(Memory.rooms[room_name].sources.shift());
@@ -68,11 +70,19 @@ var init =
 				//Record the found mineral.
 				//Strip everything but id and position.
 				Memory.rooms[room_name].mineral = {id: mineral.id, pos: mineral.pos};
-				//Memory.rooms[room_name].mineral.pos = {x: Memory.rooms[room_name].mineral.pos.x , y: Memory.rooms[room_name].mineral.pos.y};
+
+				//The first path that emerges diagonally from the spawn should block the opposing diagonal.
+				//Once a different path emerges from the spawn after this diagonal, we know our second spawn location and weigh all paths after that to touch the second spawn.
+				//If no diagonals emerge, then our algorithm differs.
+				//We don't care about opposites if they're not diagonal, but detecting a perpendicular should trigger second spawn location and weighing subsequent paths to touch both.
+				//If we reach the end with no diagonals or perpendiculars, then we will have two potential spawn locations to work with. More if there is no opposite.
+				//A straight doesn't need to block touching diagonal emerges, because a perpendicular touches them both.
+				let spawndir = [];
+				let spawnblock = [];
 
 				//Build the path from spawn to controller so a fatty can get into position.
 				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].controller.pos,
-					{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true});
+					{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
 
 				//Record our upgrader container.
 				Memory.rooms[room_name].buildings.upgradecontainer =
@@ -94,7 +104,7 @@ var init =
 					let tempPos2;
 					//From spawn to source. Extra space away from source to account for fatty miner.
 					temp[i].mine = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Memory.rooms[room_name].sources[i].pos,
-						{plainCost: 1 + i, swampCost: 2 + i, range: 2, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
+						{plainCost: 1 + i, swampCost: 2 + i, range: 2, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
 							costCallback: function(roomName, costMatrix)
 							{
 								if (i == 1)
@@ -123,7 +133,7 @@ var init =
 
 					//Get the path from end of path to source, for generics and fatties.
 					temp[i].mfat = Game.rooms[room_name].findPath(tempPos, Memory.rooms[room_name].sources[i].pos,
-						{plainCost: 1, swampCost: 2, range: 1, ignoreRoads: true, ignoreCreeps: true});
+						{plainCost: 1, swampCost: 2, range: 1, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
 
 					//It's possible for the mine path to stop one short while avoiding swamps, or other rare circumstances.
 					//However, mfat (accidentally) picks up the slack when this happens.
@@ -147,7 +157,7 @@ var init =
 					for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
 					{
 						temp[i].mreturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
-							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
 								costCallback: function(roomName, costMatrix)
 								{
 									if (p == 1)	//Go down our return path and give it a wider berth.
@@ -227,7 +237,7 @@ var init =
 					//Build the path from source to controller's fatty.
 					temp[i].upgrade = Game.rooms[room_name].findPath(tempPos,
 						Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-2)[0].x, Memory.rooms[room_name].upgrade.slice(-2)[0].y),
-						{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
+						{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
 							costCallback: function(roomName, costMatrix)
 							{
 								let templen;
@@ -294,7 +304,7 @@ var init =
 					for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
 					{
 						temp[i].ureturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
-							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
 								costCallback: function(roomName, costMatrix)
 								{
 									if (p == 1)	//Go down our return path and give it a wider berth.
@@ -381,7 +391,7 @@ var init =
 
 				//Rebuild the path from spawn to controller to take our previous paths into account.
 				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y),
-					{plainCost: 10, swampCost: 10, ignoreRoads: true, ignoreCreeps: true,
+					{plainCost: 10, swampCost: 10, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
 							let all_paths = ['mine', 'mreturn', 'upgrade', 'ureturn'];
@@ -472,7 +482,7 @@ var init =
 
 						//Now record the temporary exit path.
 						temp_exitpaths[te] = Game.spawns[spawn].pos.findPathTo(new RoomPosition(25, 25, described_exit),
-						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreCreeps: true, range: 24,
+						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, range: 24,
 							costCallback: function(roomName, costMatrix)
 							{
 								if (room_name === roomName)
@@ -932,6 +942,258 @@ var init =
 		{
 			return false;
 		}
+	}
+};
+
+init.run.spawn = 
+{
+	block: function(marked, blocked, spawnpos, path, spawn2 = null)
+	{
+		let tempx = spawnpos.x + path[0].dx;
+		let tempy = spawnpos.y + path[0].dy;
+
+		//Assign within comparison for an easier else if.
+		if (tempx === path[0].x && tempy === path[0].y && !(found = init.run.spawn.marked(tempx, tempy, marked)))	//Only process an emerge position if it hasn't been marked already.
+		{
+			dir = calculate.orientation[path[0].dx][path[0].dy];
+			marked.push({x: tempx, y: tempy, direction: dir});
+
+			if (!path[0].dx || !path[0].dy)	//We found a straight emergence.
+			{
+				//console.log('We found a straight emergence.');
+
+				if (marked.length === 2)
+				{
+					if (init.run.spawn.diagonals(marked) === 1)	//One diagonal and one straight. We can use the most flexible shape.
+					{
+						//First mirror the straight.
+						let m_dxdy = calculate.dxdy_opposite[marked[1].direction];
+						marked.push({x: spawnpos.x + m_dxdy.dx, y: spawnpos.y + m_dxdy.dy, direction: calculate.orientation[m_dxdy.dx][m_dxdy.dy]});
+
+						//Now mirror the diagonal across the same axis.
+						m_dxdy = calculate.dxdy[marked[1].direction];
+						let m_dxdy2 = calculate.dxdy[marked[0].direction];
+						if (m_dxdy.dx)	//It's a horizontal straight, so we should take the diagonal and flip its x.
+						{
+							marked.push({x: spawnpos.x - m_dxdy2.dx, y: spawnpos.y + m_dxdy2.dy, direction: calculate.orientation[m_dxdy2.dx * -1][m_dxdy2.dy]});
+
+							//Theorize a vertical straight on the same side as the diagonals. Block it and its opposite.
+							blocked.push({x: spawnpos.x, y: spawnpos.y + m_dxdy2.dy, direction: calculate.orientation[0][m_dxdy2.dy]});
+							blocked.push({x: spawnpos.x, y: spawnpos.y - m_dxdy2.dy, direction: calculate.orientation[0][m_dxdy2.dy * -1]});
+
+							//We now know where the spawn goes as well.
+							spawn2.x = spawnpos.x;
+							spawn2.y = spawnpos.y + m_dxdy2.dy;
+							spawn2.direction = calculate.orientation[0][m_dxdy2.dy];
+						}
+						else if(m_dxdy.dy)	//It's a vertical straight, so we should take the diagonal and flip its y.
+						{
+							marked.push({x: spawnpos.x + m_dxdy2.dx, y: spawnpos.y - m_dxdy2.dy, direction: calculate.orientation[m_dxdy2.dx][m_dxdy2.dy * -1]});
+
+							//Theorize a horizontal straight on the same side as the diagonals. Block it and its opposite.
+							blocked.push({x: spawnpos.x + m_dxdy2.dx, y: spawnpos.y, direction: calculate.orientation[m_dxdy2.dx][0]});
+							blocked.push({x: spawnpos.x - m_dxdy2.dx, y: spawnpos.y, direction: calculate.orientation[m_dxdy2.dx * -1][0]});
+
+							//We now know where the spawn goes as well.
+							spawn2.x = spawnpos.x + m_dxdy2.dx;
+							spawn2.y = spawnpos.y;
+							spawn2.direction = calculate.orientation[m_dxdy2.dx][0];
+						}
+
+						//Now block the mirrored diagonal's opposite.
+						m_dxdy = calculate.dxdy_opposite[marked[marked.length - 1].direction];
+						blocked.push({x: spawnpos.x + m_dxdy.dx, y: spawnpos.y + m_dxdy.dy, direction: calculate.orientation[m_dxdy.dx][m_dxdy.dy]});
+					}
+					else if (calculate.dxdy[marked[0].direction].dx && calculate.dxdy[marked[1].direction].dx)	//Two opposing straights. They are opposite x's along y.
+					{
+						//Block both perpendiculars. They will be opposite y's along x. We now know that the spawn will go on one and nothing should emerge on the other.
+						for (y2 = -1; y2 < 2; y2 += 2)
+						{
+							blocked.push({x: spawnpos.x, y: spawnpos.y + y2, direction: calculate.orientation[0][y2]});
+						}
+					}
+					else if (calculate.dxdy[marked[0].direction].dy && calculate.dxdy[marked[1].direction].dy)	//Two opposing straights. They are opposite y's along x.
+					{
+						//Block both perpendiculars. They will be opposite x's along y. We now know that the spawn will go on one and nothing should emerge on the other.
+						for (x2 = -1; x2 < 2; x2 += 2)
+						{
+							blocked.push({x: spawnpos.x + x2, y: spawnpos.y, direction: calculate.orientation[x2][0]});
+						}
+					}
+					else	//Perpendicular straights.
+					{
+						//We now know that the spawn should go on the diagonal between them.
+						let dx = calculate.dxdy[marked[0].direction].dx ? calculate.dxdy[marked[0].direction].dx : calculate.dxdy[marked[1].direction].dx;
+						let dy = calculate.dxdy[marked[0].direction].dy ? calculate.dxdy[marked[0].direction].dy : calculate.dxdy[marked[1].direction].dy;
+
+						spawn2.x = spawnpos.x + dx;
+						spawn2.y = spawnpos.y + dy;
+						spawn2.direction = calculate.orientation[dx][dy];
+
+						//Block everything other than these two straights.
+						//These straights should not have blocked anything yet, so we are still working with an empty blocked array.
+						for (let x2 = -1; x2 < 2; x2++)
+						{
+							for (let y2 = -1; y2 < 2; y2++)
+							{
+								if (!init.run.spawn.marked(spawnpos.x + x2, spawnpos.y + y2, marked) && !(x2 === 0 && y2 === 0))	//If it's not marked and it's not the center tile, block it.
+								{
+									blocked.push({x: spawnpos.x + x2, y: spawnpos.y + y2, direction: calculate.orientation[x2][y2]});
+								}
+							}
+						}
+					}
+				}
+			}
+			else	//We found a diagonal emergence.
+			{
+				//console.log('We found a diagonal emergence.');
+
+				//A diagonal should always block its opposing direction.
+				blocked.push({x: spawnpos.x + calculate.dxdy_opposite[dir].dx, y: spawnpos.y + calculate.dxdy_opposite[dir].dy, direction: dir});
+
+				if (marked.length === 2)	//We now have two marked positions.
+				{
+					if (init.run.spawn.diagonals(marked) === 1)	//One diagonal and one straight. We can use the most flexible shape.
+					{
+						//First mirror the straight.
+						let m_dxdy = calculate.dxdy_opposite[marked[0].direction];
+						marked.push({x: spawnpos.x + m_dxdy.dx, y: spawnpos.y + m_dxdy.dy, direction: calculate.orientation[m_dxdy.dx][m_dxdy.dy]});
+
+						//Now mirror the diagonal across the same axis.
+						m_dxdy = calculate.dxdy[marked[0].direction];
+						let m_dxdy2 = calculate.dxdy[marked[1].direction];
+						if (m_dxdy.dx)	//It's a horizontal straight, so we should take the diagonal and flip its x.
+						{
+							marked.push({x: spawnpos.x - m_dxdy2.dx, y: spawnpos.y + m_dxdy2.dy, direction: calculate.orientation[m_dxdy2.dx * -1][m_dxdy2.dy]});
+
+							//Theorize a vertical straight on the same side as the diagonals. Block it and its opposite.
+							blocked.push({x: spawnpos.x, y: spawnpos.y + m_dxdy2.dy, direction: calculate.orientation[0][m_dxdy2.dy]});
+							blocked.push({x: spawnpos.x, y: spawnpos.y - m_dxdy2.dy, direction: calculate.orientation[0][m_dxdy2.dy * -1]});
+
+							//We now know where the spawn goes as well.
+							spawn2.x = spawnpos.x;
+							spawn2.y = spawnpos.y + m_dxdy2.dy;
+							spawn2.direction = calculate.orientation[0][m_dxdy2.dy];
+						}
+						else if(m_dxdy.dy)	//It's a vertical straight, so we should take the diagonal and flip its y.
+						{
+							marked.push({x: spawnpos.x + m_dxdy2.dx, y: spawnpos.y - m_dxdy2.dy, direction: calculate.orientation[m_dxdy2.dx][m_dxdy2.dy * -1]});
+
+							//Theorize a horizontal straight on the same side as the diagonals. Block it and its opposite.
+							blocked.push({x: spawnpos.x + m_dxdy2.dx, y: spawnpos.y, direction: calculate.orientation[m_dxdy2.dx][0]});
+							blocked.push({x: spawnpos.x - m_dxdy2.dx, y: spawnpos.y, direction: calculate.orientation[m_dxdy2.dx * -1][0]});
+
+							//We now know where the spawn goes as well.
+							spawn2.x = spawnpos.x + m_dxdy2.dx;
+							spawn2.y = spawnpos.y;
+							spawn2.direction = calculate.orientation[m_dxdy2.dx][0];
+						}
+
+						//Now block the mirrored diagonal's opposite.
+						m_dxdy = calculate.dxdy_opposite[marked[marked.length - 1].direction];
+						blocked.push({x: spawnpos.x + m_dxdy.dx, y: spawnpos.y + m_dxdy.dy, direction: calculate.orientation[m_dxdy.dx][m_dxdy.dy]});
+					}
+					else	//Two diagonals. We can use the most flexible shape.
+					{
+						//We've already marked both diagonals and blocked their opposites. Now theorize the opposing straights and mark them.
+						//Which dxdy do both diagonals share?
+						if (calculate.dxdy[marked[0].direction].dx === calculate.dxdy[marked[1].direction].dx)	//They are both leaning the same way on the x axis.
+						{
+							//Mark the top and bottom y along x.
+							for (let y2 = -1; y2 < 2; y2 += 2)
+							{
+								marked.push({x: spawnpos.x, y: spawnpos.y + y2, direction: calculate.orientation[0][y2]});
+							}
+
+							//Block the perpendicular on the same side as the diagonals, then block its opposite.
+							blocked.push({x: spawnpos.x + calculate.dxdy[marked[0].direction].dx, y: spawnpos.y, direction: calculate.orientation[calculate.dxdy[marked[0].direction].dx][0]});
+							blocked.push({x: spawnpos.x - calculate.dxdy[marked[0].direction].dx, y: spawnpos.y, direction: calculate.orientation[calculate.dxdy[marked[0].direction].dx * -1][0]});
+
+							//We now know where the spawn goes as well.
+							spawn2.x = spawnpos.x + calculate.dxdy[marked[0].direction].dx;
+							spawn2.y = spawnpos.y;
+							spawn2.direction = calculate.orientation[calculate.dxdy[marked[0].direction].dx][0];
+						}
+						else if (marked[0].dy === marked[1].dy)	//They are both leaning the same way on the y axis.
+						{
+							//Mark the left and right x along y.
+							for (let x2 = -1; x2 < 2; x2 += 2)
+							{
+								marked.push({x: spawnpos.x + x2, y: spawnpos.y, direction: calculate.orientation[x2][0]});
+							}
+
+							//Block the perpendicular on the same side as the diagonals, then block its opposite.
+							blocked.push({x: spawnpos.x, y: spawnpos.y + calculate.dxdy[marked[0].direction].dy, direction: calculate.orientation[0][calculate.dxdy[marked[0].direction].dy]});
+							blocked.push({x: spawnpos.x, y: spawnpos.y - calculate.dxdy[marked[0].direction].dy, direction: calculate.orientation[0][calculate.dxdy[marked[0].direction].dy * -1]});
+
+							//We now know where the spawn goes as well.
+							spawn2.x = spawnpos.x;
+							spawn2.y = spawnpos.y + calculate.dxdy[marked[0].direction].dy;
+							spawn2.direction = calculate.orientation[0][calculate.dxdy[marked[0].direction].dy];
+						}
+						
+					}
+				}
+				else if (marked.length === 3)
+				{
+					//The only way to get this far is two opposing straights followed by a diagonal. We can use the most efficient shape.
+					//Flip the diagonal (staying on the same side of the straights) and block its opposite.
+					let dx = !calculate.dxdy[marked[0].direction].dx ? calculate.dxdy[marked[2].direction].dx : calculate.dxdy[marked[2].direction].dx * -1;	//If the straights are opposing y's along the x, preserve the diagonal's x, else flip it.
+					let dy = !calculate.dxdy[marked[0].direction].dy ? calculate.dxdy[marked[2].direction].dy : calculate.dxdy[marked[2].direction].dy * -1;	//If the straights are opposing x's along the y, preserve the diagonal's y, else flip it.
+					
+					marked.push({x: spawnpos.x + dx, y: spawnpos.y + dy, direction: calculate.orientation[dx][dy]});
+					blocked.push({x: spawnpos.x - dx, y: spawnpos.y - dy, direction: calculate.orientation[dx * -1][dy * -1]});
+
+					//Since the opposing straights already blocked the perpendiculars, we should be done here. Put the spawn on the perpendicular between the diagonals.
+					dx = calculate.dxdy[marked[0].direction].dx ? 0 : calculate.dxdy[marked[2].direction].dx;	//If the straights are opposing x's along the y, then take the 0 x and the diagonal's y.
+					dy = calculate.dxdy[marked[0].direction].dy ? 0 : calculate.dxdy[marked[2].direction].dy;	//If the straights are opposing y's along the x, then take the 0 y and the diagonal's x.
+
+					spawn2.x = spawnpos.x + dx;
+					spawn2.y = spawnpos.y + dy;
+					spawn2.direction = calculate.orientation[dx][dy];
+				}
+			}
+
+			//console.log('Marked: ' + JSON.stringify(marked));
+			//console.log('Blocked: ' + JSON.stringify(blocked));
+			return true;	//We made it this far without any errors.
+		}
+		else if(found)
+		{
+			return false;	//It's already been marked.
+		}
+
+		return null;	//If we get here, the path probably didn't exist.
+	},
+
+	marked: function(x, y, marked)
+	{
+		for (let b = 0; b < marked.length; b++)
+		{
+			if (marked[b].x === x && marked[b].y === y)
+			{
+				return true;	//We found a marked space.
+			}
+		}
+
+		return false;	//No marked space found.
+	},
+
+	diagonals: function(marked)
+	{
+		let n = 0;
+		let dxdy;
+		for (let m = 0; m < marked.length; m++)
+		{
+			dxdy = calculate.dxdy[marked[m].direction];
+			if (dxdy.dx && dxdy.dy)	//We found a diagonal.
+			{
+				n++;
+			}
+		}
+
+		return n;
 	}
 };
 
