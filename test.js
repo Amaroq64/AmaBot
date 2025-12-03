@@ -1,6 +1,6 @@
 var test =
 {
-	run: function(paths, extensions_sources, defenses, newpath = false, labs = false, actionpath = false)
+	run: function(paths, extensions_sources, defenses, newpath = false, labs = false, spawntest = false, actionpath = false)
 	{
 		let extensions_room = false;
 		try
@@ -239,13 +239,8 @@ var test =
 
 			if (labs && Memory.mineTest)
 			{
-				for (let room_name in Memory.rooms)
+				for (let room_name in Memory.mineTest)
 				{
-					if (!Memory.mineTest[room_name])
-					{
-						continue;
-					}
-
 					//Display the mine path.
 					test.paint.minepath(room_name);
 
@@ -264,6 +259,49 @@ var test =
 						}
 
 						new RoomVisual(room_name).circle(labs[la].x, labs[la].y, {fill: color, radius: 0.5});
+					}
+				}
+			}
+
+			if ((test.spawnmark.spawntest = spawntest) && Memory.spawnTest)
+			{
+				if (!global.spawnmark)
+				{
+					//console.log('Making spawnmark available.');
+					global.spawnmark = test.spawnmark;
+				}
+
+				for (let room_name in Memory.spawnTest)
+				{
+					//Display the emerging paths.
+					for (let p = 0; p < Memory.spawnTest[room_name].paths.length; p++)
+					{
+						Game.rooms[room_name].visual.poly([{x: Memory.spawnTest[room_name].spawn[0].x, y: Memory.spawnTest[room_name].spawn[0].y,
+							dx: Memory.spawnTest[room_name].paths[p][0].dx, dy: Memory.spawnTest[room_name].paths[p][0].dy, direction: Memory.spawnTest[room_name].paths[p][0].direction},
+						Memory.spawnTest[room_name].paths[p][0],
+						{x: Memory.spawnTest[room_name].paths[p][0].x + Memory.spawnTest[room_name].paths[p][0].dx, y: Memory.spawnTest[room_name].paths[p][0].y + Memory.spawnTest[room_name].paths[p][0].dy,
+							dx: Memory.spawnTest[room_name].paths[p][0].dx, dy: Memory.spawnTest[room_name].paths[p][0].dy, direction: Memory.spawnTest[room_name].paths[p][0].direction}],
+							{stroke: 'white', lineStyle: "dashed"});
+					}
+
+					//Display the marked and blocked tiles.
+					for (let t = 0, type = ['marked', 'blocked'], color = ['darkblue', 'darkred']; t < 2; t++)
+					{
+						for (let ti = 0; ti < Memory.spawnTest[room_name][type[t]].length; ti++)
+						{
+							new RoomVisual(room_name).rect(Memory.spawnTest[room_name][type[t]][ti].x - 0.5, Memory.spawnTest[room_name][type[t]][ti].y - 0.5, 1, 1, {fill: color[t]});
+						}
+					}
+
+					//Display the spawns.
+					let spawn;
+					for (let s = 0; s < Memory.spawnTest[room_name].spawn.length; s++)
+					{
+						if ((spawn = Memory.spawnTest[room_name].spawn[s]) && spawn.x && spawn.y)
+						{
+							new RoomVisual(room_name).circle(spawn.x, spawn.y, {fill: 'black', radius: 0.5, opacity: 1});
+							new RoomVisual(room_name).circle(spawn.x, spawn.y, {fill: 'yellow', radius: 0.4, opacity: 1});
+						}
 					}
 				}
 			}
@@ -410,6 +448,56 @@ var test =
 	pindex: -1,
 	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
 
+	spawnmark: function(room_name = false, direction = false, reset = 0)	//When placing the initial 'spawn', pass an object with its x and y as direction.
+	{
+		if (!room_name || (typeof direction !== 'number' && typeof direction !== 'object'))
+		{
+			return false;
+		}
+
+		if (!Memory.spawnTest)
+		{
+			Memory.spawnTest = {};
+		}
+		else if (reset === 2)
+		{
+			Memory.spawnTest = undefined;
+
+			if (reset === 2)
+			{
+				return true;
+			}
+		}
+
+		let dx, dy;
+		if (typeof direction === 'number')
+		{
+			let calculate = require('calculate');
+			dx = calculate.dxdy[direction].dx;
+			dy = calculate.dxdy[direction].dy;
+		}
+
+		if (!Memory.spawnTest[room_name] || (reset === 1 && (direction = {x: Memory.spawnTest[room_name].spawn[0].x, y: Memory.spawnTest[room_name].spawn[0].y})))
+		{
+			Memory.spawnTest[room_name] =
+			{
+				spawn: [{x: direction.x, y: direction.y, roomName: room_name}, {}],
+				paths: [],
+				marked: [],
+				blocked: []
+			};
+			return true;
+		}
+		else
+		{
+			let path = Game.rooms[room_name].findPath(
+				new RoomPosition(Memory.spawnTest[room_name].spawn[0].x, Memory.spawnTest[room_name].spawn[0].y, room_name),
+				new RoomPosition(Memory.spawnTest[room_name].spawn[0].x + dx, Memory.spawnTest[room_name].spawn[0].y + dy, room_name));
+			Memory.spawnTest[room_name].paths.push(path);
+			return require('init').run.spawn.block(Memory.spawnTest[room_name].marked, Memory.spawnTest[room_name].blocked, Memory.spawnTest[room_name].spawn[0], path, Memory.spawnTest[room_name].spawn[1]);
+		}
+	},
+
 	pathmemtest: function()
 	{
 		if(Memory)
@@ -516,5 +604,7 @@ var test =
 
 	cpu_usage: undefined*/
 };
+
+test.spawnmark.spawntest = false;
 
 module.exports = test;
