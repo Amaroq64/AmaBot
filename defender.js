@@ -71,8 +71,8 @@ var defender =
 				//topaths[i][e] = [];
 				Memory.rooms[room_name].sources[i].defpaths[e] =
 					sourcepos[i].findPathTo(sourcepos[i].findClosestByPath(destpath[e],
-					{plainCost: 2, swampCost: 2, ignoreCreeps: true, ignoreRoads: true, maxRooms: 1, costCallback:
-						function(roomName, costMatrix)
+					{plainCost: 2, swampCost: 2, ignoreCreeps: true, ignoreRoads: true, ignoreDestructibleStructures: true, maxRooms: 1,
+					costCallback: function(roomName, costMatrix)
 						{
 							//Prefer the path leaving the room.
 							for (let path in Memory.rooms[room_name].exitpaths)
@@ -120,7 +120,7 @@ var defender =
 								}
 							}
 						}}),
-					{plainCost: 2, swampCost: 2, ignoreCreeps: true, ignoreRoads: true, maxRooms: 1, costCallback:
+					{plainCost: 2, swampCost: 2, ignoreCreeps: true, ignoreRoads: true, ignoreDestructibleStructures: true, maxRooms: 1, costCallback:
 						function(roomName, costMatrix)
 						{
 							//Prefer the path leaving the room.
@@ -173,7 +173,7 @@ var defender =
 				//Now return.
 				Memory.rooms[room_name].sources[i].dreturn[e] = Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[i].defpaths[e].slice(-1)[0].x, Memory.rooms[room_name].sources[i].defpaths[e].slice(-1)[0].y)
 					.findPathTo(sourcepos[i].x, sourcepos[i].y,
-					{plainCost: 5, swampCost: 5, ignoreCreeps: true, ignoreRoads: true, maxRooms: 1, costCallback:
+					{plainCost: 5, swampCost: 5, ignoreCreeps: true, ignoreRoads: true, ignoreDestructibleStructures: true, maxRooms: 1, costCallback:
 						function(roomName, costMatrix)
 						{
 							//Return over the same path we came from.
