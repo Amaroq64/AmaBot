@@ -16,7 +16,7 @@ var builder =
 					structureType: STRUCTURE_EXTENSION
 				}
 			});
-			let myspawns = Game.rooms[room_name].find(FIND_MY_SPAWNS);
+			//let myspawns = Game.rooms[room_name].find(FIND_MY_SPAWNS);
 
 			//If we're out of creeps, it's an emergency.
 			for (i = 0; i < Memory.rooms[room_name].sources.length; i++)
@@ -44,6 +44,7 @@ var builder =
 
 			//Find our first non-busy spawn. If they're all busy, we aren't building anything.
 			let spawn = Game.rooms[room_name].find(FIND_MY_SPAWNS); //Make sure to assign one spawn to this. Our later code is not meant to handle an array.
+			spawn = [spawn[0]];	//We're not ready to hook up multiple spawns yet.
 			let all_busy = true;
 			for (let s = 0; s < spawn.length; s++)
 			{
@@ -435,22 +436,30 @@ var builder =
 	{
 		let room_spawns;
 		let name = undefined;
-		if (room_name)
+		if (room_name)	//Adding more spawns to the room will use this.
 		{
+			//Which index room are we in?
+			let r = 0;
+			for (let which_room in Memory.rooms)
+			{
+				if (which_room === room_name)
+				{
+					break;
+				}
+				else
+				{
+					r++;
+				}
+			}
+
+			//Assign the appropriate spawn name for our room.
 			room_spawns = Game.rooms[room_name].find(FIND_MY_SPAWNS);
 
-			if (room_spawns.length = 0)
-			{
-				name = "Amaroq" + (1 + ((Object.keys(Memory.rooms).length - 1) * 3));
-			}
-			else if (room_spawns.length < 3)
-			{
-				name = "Amaroq" + (room_spawns.length + 2);
-			}
+			name = builder.newSpawn.basename + (1 + (r * 3) + room_spawns.length);
 		}
-		else
+		else	//Claim uses this.
 		{
-			name = "Amaroq" + (1 + ((Object.keys(Memory.rooms).length + a) * 3));
+			name = builder.newSpawn.basename + (1 + ((Object.keys(Memory.rooms).length + a) * 3));
 		}
 		console.log("Spawn named " + name);
 		return name;
@@ -575,5 +584,7 @@ builder.anticipate.lifeTest = function(creep, cost)
 	//console.log(creep + ": " + cost);
 	return (Game.creeps[creep] && Game.creeps[creep].ticksToLive <= cost);
 };
+
+builder.newSpawn.basename = 'Amaroq';
 
 module.exports = builder;
