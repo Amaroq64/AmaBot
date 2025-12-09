@@ -837,7 +837,7 @@ var roomPlanner =
 		//Cache pairs of x and y directions.
 		let increment;
 
-		for (let n = 0; n < extract.length; n++)
+		path_test: for (let n = 0; n < extract.length; n++)
 		{
 			for (let try_again = 0; try_again < 6; try_again++)	//If at first we don't succeed, try try again.
 			{
@@ -938,7 +938,7 @@ var roomPlanner =
 				//If we've found a location for our stamp, then we're done here.
 				if (tested_true.length > 5)
 				{
-					break;
+					break path_test;
 				}
 			}
 		}
