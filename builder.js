@@ -230,8 +230,11 @@ var builder =
 					options.memory.dtarget = {};
 					if (Memory.rooms[room_name].sources[need].defpaths)
 					{
-						options.memory.dtarget.x = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
-						options.memory.dtarget.y = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
+						if (Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need])
+						{
+							options.memory.dtarget.x = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
+							options.memory.dtarget.y = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
+						}
 					}
 					options.memory.utrip = false;	//This breaks movement if we try to be clever by starting it as true.
 					//options.memory.return = true;
