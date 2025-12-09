@@ -31,19 +31,29 @@ var init =
 				continue;	//If we specify a room, we only want to do that one.
 			}
 
-			if (Memory.rooms[room_name] === undefined)	//This room is new.
+			if (!Memory.rooms[room_name])	//This room is new.
 			{
 				Memory.rooms[room_name] =
 				{
 					need: {},
+					spawns: new Array(3).fill(null),
 					sources: [],
 					mineral: null,
+					mine: null,
 					react: {},
 					creeps: {upgrader: [], dbuilder: []},	//We don't need an upgrade builder because the source builders patrol to it.
-					buildings: {upgradecontainer: []},
+					buildings: {upgradecontainer: null},
 					ideal: {},
 					goals: {level: 1}
 				}
+
+				Memory.rooms[room_name].spawns[0] = {id: Game.spawns[spawn].id, x: Game.spawns[spawn].pos.x, y: Game.spawns[spawn].pos.y};
+				Memory.rooms[room_name].spawns[1] = {id: null};
+
+				Memory.rooms[room_name].spawns.marked = [];
+				Memory.rooms[room_name].spawns.blocked = [];
+				Memory.rooms[room_name].spawnsmarked = Memory.rooms[room_name].spawns.marked;	//This is needed for the 2nd stage room planning. It will be deleted after.
+				Memory.rooms[room_name].spawnsblocked = Memory.rooms[room_name].spawns.blocked;	//This is needed for the 2nd stage room planning. It will be deleted after.
 
 				//Since this room is new, find its energy sources.
 				let sources = Game.rooms[room_name].find(FIND_SOURCES);
@@ -69,7 +79,7 @@ var init =
 
 				//Record the found mineral.
 				//Strip everything but id and position.
-				Memory.rooms[room_name].mineral = {id: mineral.id, pos: mineral.pos};
+				Memory.rooms[room_name].mineral = {id: mineral.id, pos: {x: mineral.pos.x, y: mineral.pos.y}};
 
 				//The first path that emerges diagonally from the spawn should block the opposing diagonal.
 				//Once a different path emerges from the spawn after this diagonal, we know our second spawn location and weigh all paths after that to touch the second spawn.
@@ -87,6 +97,7 @@ var init =
 				//Record our upgrader container.
 				Memory.rooms[room_name].buildings.upgradecontainer =
 				{
+					id: null,
 					x: Memory.rooms[room_name].upgrade[Memory.rooms[room_name].upgrade.length - 1].x,
 					y: Memory.rooms[room_name].upgrade[Memory.rooms[room_name].upgrade.length - 1].y
 				};
@@ -107,7 +118,7 @@ var init =
 						{plainCost: 1 + i, swampCost: 2 + i, range: 2, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
 							costCallback: function(roomName, costMatrix)
 							{
-								if (i == 1)
+								if (i >= 1)
 								{
 									let templen = temp[i - 1].mine.length;
 									for (let n = 0; n < templen; n++)
@@ -120,9 +131,18 @@ var init =
 								costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255)	//Make sure to go around our spawn.
 								costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
 
-									return costMatrix;
+								//Hook in our blocked spawn positions.
+								for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+								{
+									costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+								}
+
+								return costMatrix;
 							}
 						});
+
+					//Run our spawn blocker based on the generated path.
+					init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp[i].mine, Memory.rooms[room_name].spawns[1]);
 
 					//Save the direction from the spawner to the start of this path.
 					temp[i].minedir = Game.spawns[spawn].pos.getDirectionTo(temp[i].mine[0].x, temp[i].mine[0].y);
@@ -215,6 +235,12 @@ var init =
 									costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
 									costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
 
+									//Hook in our blocked spawn positions.
+									for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+									{
+										costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+									}
+
 									return costMatrix;
 								}
 							});
@@ -234,137 +260,280 @@ var init =
 					temp[i].mine[0].dx = temp[i].mreturn[temp[i].mreturn.length - 2].x - tempPos2.x;
 					temp[i].mine[0].dy = temp[i].mreturn[temp[i].mreturn.length - 2].y - tempPos2.y;
 
-					//Build the path from source to controller's fatty.
-					temp[i].upgrade = Game.rooms[room_name].findPath(tempPos,
-						Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-2)[0].x, Memory.rooms[room_name].upgrade.slice(-2)[0].y),
-						{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
-							costCallback: function(roomName, costMatrix)
+					for (let last_try = false, try_again = true, upath_xy, tempx, tempy; try_again; )	//If we crossed our second spawn position, we need to recreate this path.
+					{
+						upath_xy = {};
+
+						//Do we already have a 2nd spawn placement?
+						if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+						{
+							last_try = true;
+						}
+
+						//Build the path from source to controller's fatty.
+						temp[i].upgrade = Game.rooms[room_name].findPath(tempPos,
+							Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-2)[0].x, Memory.rooms[room_name].upgrade.slice(-2)[0].y),
+							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
+								costCallback: function(roomName, costMatrix)
+								{
+									let templen;
+
+									let s = 0;
+									if (i == 1)
+									{
+										s = -1;
+									}
+
+									//Avoid going against traffic when we leave the source.
+									while (s < 1)
+									{
+										templen = temp[i + s].mine.length;
+										for (let n = 0; n <  templen; n++)
+										{
+											costMatrix.set(temp[i + s].mine[n].x, temp[i + s].mine[n].y, 1);	//Here we don't mind going against the traffic of both sources.
+										}
+										costMatrix.set(temp[i + s].mfat[0].x, temp[i + s].mfat[0].y, 255);	//Make sure to go around both mining fatties.
+										s++;
+									}
+									costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around the spawner.
+
+									s = 0;
+									if (i == 1)
+									{
+										s = -1;
+									}
+
+									//But prefer the mreturn path since there will be roads.
+									while (s < 1)
+									{
+										templen = temp[i + s].mreturn.length;
+										for(let n = 0; n < templen; n++)
+										{
+											costMatrix.set(temp[i + s].mreturn[n].x, temp[i + s].mreturn[n].y, 1);
+											
+										}
+										s++;
+									}
+
+									//Also prefer the previous upgrader path.
+									if (i > 0)
+									{
+										let templen = temp[i - 1].upgrade.length;
+										for (let n = 0; n < templen; n++)
+										{
+											costMatrix.set(temp[i - 1].upgrade[n].x, temp[i - 1].upgrade[n].y, 1); //Prefer the previous path slightly.
+										}
+									}
+
+									//Once our 2nd spawner has been selected, we must block it.
+									if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+									{
+										costMatrix.set(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, 255);
+									}
+
+									return costMatrix;
+								}
+							})
+						temp[i].upgrade.unshift({x: temp[i].mine[temp[i].mine.length - 1].x, y: temp[i].mine[temp[i].mine.length - 1].y,
+							dx: temp[i].mine[temp[i].mine.length - 1].x - temp[i].upgrade[0].x, dy: temp[i].mine[temp[i].mine.length - 1].y - temp[i].upgrade[0].y,
+							direction: Game.rooms[room_name].getPositionAt(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y).getDirectionTo(temp[i].upgrade[0].x, temp[i].upgrade[0].y)});
+
+						//A path that doesn't go to or from the spawn can theoretically cross the position of our second spawn. We should try to eliminate this possibility early.
+						if (last_try)
+						{
+							//Once we've detected a spawn placement, we are done here.
+							try_again = false;
+						}
+						else
+						{
+							//Mark any position where our path touched the first spawn.
+							for (let tu = 0; tu < temp[i].upgrade.length; tu++)
 							{
-								let templen;
-
-								let s = 0;
-								if (i == 1)
-								{
-									s = -1;
-								}
-
-								//Avoid going against traffic when we leave the source.
-								while (s < 1)
-								{
-									templen = temp[i + s].mine.length;
-									for (let n = 0; n <  templen; n++)
-									{
-										costMatrix.set(temp[i + s].mine[n].x, temp[i + s].mine[n].y, 1);	//Here we don't mind going against the traffic of both sources.
-									}
-									costMatrix.set(temp[i + s].mfat[0].x, temp[i + s].mfat[0].y, 255);	//Make sure to go around both mining fatties.
-									s++;
-								}
-								costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around the spawner.
-
-								s = 0;
-								if (i == 1)
-								{
-									s = -1;
-								}
-
-								//But prefer the mreturn path since there will be roads.
-								while (s < 1)
-								{
-									templen = temp[i + s].mreturn.length;
-									for(let n = 0; n < templen; n++)
-									{
-										costMatrix.set(temp[i + s].mreturn[n].x, temp[i + s].mreturn[n].y, 1);
-										
-									}
-									s++;
-								}
-
-								//Also prefer the previous upgrader path.
-								if (i > 0)
-								{
-									let templen = temp[i - 1].upgrade.length;
-									for (let n = 0; n < templen; n++)
-									{
-										costMatrix.set(temp[i - 1].upgrade[n].x, temp[i - 1].upgrade[n].y, 1); //Prefer the previous path slightly.
-									}
-								}
-
-								return costMatrix;
+								calculate.mark_found(temp[i].upgrade[tu].x, temp[i].upgrade[tu].y, upath_xy);
 							}
-						})
-					temp[i].upgrade.unshift({x: temp[i].mine[temp[i].mine.length - 1].x, y: temp[i].mine[temp[i].mine.length - 1].y,
-						dx: temp[i].mine[temp[i].mine.length - 1].x - temp[i].upgrade[0].x, dy: temp[i].mine[temp[i].mine.length - 1].y - temp[i].upgrade[0].y,
-						direction: Game.rooms[room_name].getPositionAt(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y).getDirectionTo(temp[i].upgrade[0].x, temp[i].upgrade[0].y)});
+
+							//Now check to see if it touched it.
+							try_again = false;	//If we don't detect any touching steps, there's no conflict.
+							for (let x = -1; !try_again && x < 2; x++)
+							{
+								tempx = Game.spawns[spawn].pos.x + x;
+
+								for (let y = 0; !try_again && y < 2; y++)
+								{
+									tempy = Game.spawns[spawn].pos.y + y;
+
+									//If a path step touches the spawn, we should run the blocking function to mark it.
+									if (calculate.check_xy(tempx, tempy, upath_xy))
+									{
+										try_again = true;
+
+										//Since the blocker expects a path step emerging from the spawn, we have to fabricate one.
+										let temp_step = [{x: tempx, y: tempy, dx: tempx - Game.spawns[spawn].pos.x, dy: tempy - Game.spawns[spawn].pos.y,
+											direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
+
+										init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
+
+										//While we're here, did the second spawn position get generated?
+										if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+										{
+											//Did it land on a path step?
+											if (calculate.check_xy(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, upath_xy))
+											{
+												last_try = true;
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 
 					//To go back to source, we really go from final upgrading position to initial upgrading position.
 					tempPos = Game.rooms[room_name].getPositionAt(temp[i].upgrade.slice(-1)[0].x, temp[i].upgrade.slice(-1)[0].y);
 					tempPos2 = Game.rooms[room_name].getPositionAt(temp[i].upgrade[0].x, temp[i].upgrade[0].y);
 
-					//Here, we go back.
-					for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
+					for (let last_try = false, try_again = true, upath_xy, tempx, tempy; try_again; )	//If we crossed our second spawn position, we need to recreate this path.
 					{
-						temp[i].ureturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
-							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
-								costCallback: function(roomName, costMatrix)
-								{
-									if (p == 1)	//Go down our return path and give it a wider berth.
+						upath_xy = {};
+
+						//Do we already have a 2nd spawn placement?
+						if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+						{
+							last_try = true;
+						}
+
+						//Here, we go back.
+						for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
+						{
+							temp[i].ureturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
+								{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+									costCallback: function(roomName, costMatrix)
 									{
-										//Go down the first generated path and make space around it.
-										/*for (let n = 1; n < temp[i].upgrade.length - 1; n++)
+										if (p == 1)	//Go down our return path and give it a wider berth.
 										{
-											for (let x = -1; x < 2; x++)
+											//Go down the first generated path and make space around it.
+											/*for (let n = 1; n < temp[i].upgrade.length - 1; n++)
 											{
-												for (let y = -1; y < 2; y++)
+												for (let x = -1; x < 2; x++)
 												{
-													//Don't accidentally lower the cost of walls.
-													if (Game.rooms[room_name].getTerrain().get(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y) != TERRAIN_MASK_WALL)
+													for (let y = -1; y < 2; y++)
 													{
-														costMatrix.set(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y, 10)	//Make room for extensions.
+														//Don't accidentally lower the cost of walls.
+														if (Game.rooms[room_name].getTerrain().get(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y) != TERRAIN_MASK_WALL)
+														{
+															costMatrix.set(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y, 10)	//Make room for extensions.
+														}
 													}
 												}
-											}
-										}*/
-										for (let n = 1; n < temp[i].ureturn.length - 1; n++)
-										{
-											for (let x = -1; x < 2; x++)
+											}*/
+											for (let n = 1; n < temp[i].ureturn.length - 1; n++)
 											{
-												for (let y = -1; y < 2; y++)
+												for (let x = -1; x < 2; x++)
 												{
-													//Don't accidentally lower the cost of walls.
-													if (Game.rooms[room_name].getTerrain().get(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y) != TERRAIN_MASK_WALL)
+													for (let y = -1; y < 2; y++)
 													{
-														costMatrix.set(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y, 10)	//Make room for extensions.
+														//Don't accidentally lower the cost of walls.
+														if (Game.rooms[room_name].getTerrain().get(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y) != TERRAIN_MASK_WALL)
+														{
+															costMatrix.set(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y, 10)	//Make room for extensions.
+														}
 													}
 												}
 											}
 										}
-									}
 
-									//Avoid backtracking on the way back.
-									let templen = temp[i].upgrade.length;
-									for (let n = 0; n < templen; n++)
-									{
-										costMatrix.set(temp[i].upgrade[n].x, temp[i].upgrade[n].y, 10); //Unless absolutely necessary.
-									}
-									costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
-									costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
-									
-									//But prefer the mine path since there will be roads.
-									templen = temp[i].mine.length;
-									for(let n = 0; n < templen; n++)
-									{
-										costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 1);
-									}
-									//We don't mind preferring the mreturn path too since there will be roads.
-									templen = temp[i].mreturn.length;
-									for(let n = 0; n < templen; n++)
-									{
-										costMatrix.set(temp[i].mreturn[n].x, temp[i].mreturn[n].y, 1);
-									}
+										//Avoid backtracking on the way back.
+										let templen = temp[i].upgrade.length;
+										for (let n = 0; n < templen; n++)
+										{
+											costMatrix.set(temp[i].upgrade[n].x, temp[i].upgrade[n].y, 10); //Unless absolutely necessary.
+										}
+										costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
+										costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
 
-									return costMatrix;
+										for (let i2 = 0; i2 < len; i2++)
+										{
+											costMatrix.set(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y, 255);	//Make sure to go around both mining fatties.
+										}
+										
+										//But prefer the mine path since there will be roads.
+										templen = temp[i].mine.length;
+										for(let n = 0; n < templen; n++)
+										{
+											costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 1);
+										}
+										//We don't mind preferring the mreturn path too since there will be roads.
+										templen = temp[i].mreturn.length;
+										for(let n = 0; n < templen; n++)
+										{
+											costMatrix.set(temp[i].mreturn[n].x, temp[i].mreturn[n].y, 1);
+										}
+
+										//Hook in our blocked spawn positions.
+										for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+										{
+											costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+										}
+
+										//Once our 2nd spawner has been selected, we must block it.
+										if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+										{
+											costMatrix.set(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, 255);
+										}
+
+										return costMatrix;
+									}
+								});
+						}
+
+						//A path that doesn't go to or from the spawn can theoretically cross the position of our second spawn. We should try to eliminate this possibility early.
+						if (last_try)
+						{
+							//Once we've detected a spawn placement, we are done here.
+							try_again = false;
+						}
+						else
+						{
+							//Mark any position where our path touched the first spawn.
+							for (let tu = 0; tu < temp[i].ureturn.length; tu++)
+							{
+								calculate.mark_found(temp[i].ureturn[tu].x, temp[i].ureturn[tu].y, upath_xy);
+							}
+
+							//Now check to see if it touched it.
+							try_again = false;	//If we don't detect any touching steps, there's no conflict.
+							for (let x = -1; !try_again && x < 2; x++)
+							{
+								tempx = Game.spawns[spawn].pos.x + x;
+
+								for (let y = 0; !try_again && y < 2; y++)
+								{
+									tempy = Game.spawns[spawn].pos.y + y;
+
+									//If a path step touches the spawn, we should run the blocking function to mark it.
+									if (calculate.check_xy(tempx, tempy, upath_xy))
+									{
+										try_again = true;
+
+										//Since the blocker expects a path step emerging from the spawn, we have to fabricate one.
+										let temp_step = [{x: tempx, y: tempy, dx: tempx - Game.spawns[spawn].pos.x, dy: tempy - Game.spawns[spawn].pos.y,
+											direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
+
+										init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
+
+										//While we're here, did the second spawn position get generated?
+										if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+										{
+											//Did it land on a path step?
+											if (calculate.check_xy(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, upath_xy))
+											{
+												last_try = true;
+											}
+										}
+									}
 								}
-							});
+							}
+						}
 					}
 
 					//Save some more values for our new path system.
@@ -410,9 +579,18 @@ var init =
 								}
 							}
 
+							//Hook in our blocked spawn positions.
+							for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+							{
+								costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+							}
+
 							return costMatrix;
 						}
 					});
+
+				//Run our spawn blocker based on the generated path.
+				init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], Memory.rooms[room_name].upgrade, Memory.rooms[room_name].spawns[1]);
 
 				//Save the direction from the spawner to the start of this path.
 				Memory.rooms[room_name].upgradedir = Game.spawns[spawn].pos.getDirectionTo(Memory.rooms[room_name].upgrade[0].x, Memory.rooms[room_name].upgrade[0].y);
@@ -517,10 +695,72 @@ var init =
 									}
 								}
 
+								//Hook in our blocked spawn positions.
+								for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+								{
+									costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+								}
+
 								return costMatrix;
 							}
 						});
 					}
+				}
+
+				//If we haven't chosen a spawn yet, we need to do that.
+				//First record every remaining position around the spawn.
+				let spawn_adjacent = [];
+				for (let x = -1, usable; x < 2; x++)
+				{
+					let tempx = Memory.rooms[room_name].spawns[0].x + x;
+
+					for (let y = -1; y < 2; y++)
+					{
+						let tempy = Memory.rooms[room_name].spawns[0].y + y;
+
+						usable = true;
+						for (let t = 0, type = ['marked', 'blocked']; usable && t < 2; t++)
+						{
+							for (let sp = 0; sp < Memory.rooms[room_name].spawns[type[t]].length; sp++)
+							{
+								if ((tempx === Memory.rooms[room_name].spawns[type[t]][sp].x && tempy === Memory.rooms[room_name].spawns[type[t]][sp].y) || (x === 0 && y === 0))
+								{
+									//We found a marked or a blocked.
+									usable = false;
+									break;
+								}
+							}
+						}
+
+						if (usable)
+						{
+							spawn_adjacent.push({x: tempx, y: tempy});
+						}
+					}
+				}
+
+				//Now fill them in until we've selected our second spawn.
+				let temp_adjacent;
+				while (!Memory.rooms[room_name].spawns[1].x || !Memory.rooms[room_name].spawns[1].y)
+				{
+					//Rather than deciding these arbitrarily, let's put them slightly closer to source[0], since it's closer to the spawn.
+					temp_adjacent = calculate.true_closest(Game.spawns[spawn].pos, spawn_adjacent,
+						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1})[0];
+
+					//Remove the one we're using.
+					for (let sa = 0; sa < spawn_adjacent.length; sa++)
+					{
+						if (temp_adjacent.x === spawn_adjacent[sa].x && temp_adjacent.y === spawn_adjacent[sa].y)
+						{
+							spawn_adjacent.splice(sa, 1);
+						}
+					}
+
+					//Make it a path.
+					temp_adjacent = temp_adjacent.findPathTo(Memory.rooms[room_name].sources[0].pos.x, Memory.rooms[room_name].sources[0].pos.y);
+
+					//Now mark it.
+					init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_adjacent, Memory.rooms[room_name].spawns[1]);
 				}
 
 				//Now place our initial construction sites.
@@ -946,8 +1186,8 @@ var init =
 };
 
 init.run.spawn = 
-{
-	block: function(marked, blocked, spawnpos, path, spawn2 = null)
+{	//marked[], blocked[], and spawn2{x, y} are changed by this function. spawnpos{x, y} just needs x and y. path[] just uses the first step of a moveByPath() compliant path.
+	block: function(marked, blocked, spawnpos, path, spawn2)
 	{
 		let tempx = spawnpos.x + path[0].dx;
 		let tempy = spawnpos.y + path[0].dy;
@@ -982,9 +1222,10 @@ init.run.spawn =
 							blocked.push({x: spawnpos.x, y: spawnpos.y - m_dxdy2.dy, direction: calculate.orientation[0][m_dxdy2.dy * -1]});
 
 							//We now know where the spawn goes as well.
+							//spawn2 = {id: null};
 							spawn2.x = spawnpos.x;
 							spawn2.y = spawnpos.y + m_dxdy2.dy;
-							spawn2.direction = calculate.orientation[0][m_dxdy2.dy];
+							//spawn2.direction = calculate.orientation[0][m_dxdy2.dy];
 						}
 						else if(m_dxdy.dy)	//It's a vertical straight, so we should take the diagonal and flip its y.
 						{
@@ -995,9 +1236,10 @@ init.run.spawn =
 							blocked.push({x: spawnpos.x - m_dxdy2.dx, y: spawnpos.y, direction: calculate.orientation[m_dxdy2.dx * -1][0]});
 
 							//We now know where the spawn goes as well.
+							//spawn2 = {id: null};
 							spawn2.x = spawnpos.x + m_dxdy2.dx;
 							spawn2.y = spawnpos.y;
-							spawn2.direction = calculate.orientation[m_dxdy2.dx][0];
+							//spawn2.direction = calculate.orientation[m_dxdy2.dx][0];
 						}
 
 						//Now block the mirrored diagonal's opposite.
@@ -1026,9 +1268,10 @@ init.run.spawn =
 						let dx = calculate.dxdy[marked[0].direction].dx ? calculate.dxdy[marked[0].direction].dx : calculate.dxdy[marked[1].direction].dx;
 						let dy = calculate.dxdy[marked[0].direction].dy ? calculate.dxdy[marked[0].direction].dy : calculate.dxdy[marked[1].direction].dy;
 
+						//spawn2 = {id: null};
 						spawn2.x = spawnpos.x + dx;
 						spawn2.y = spawnpos.y + dy;
-						spawn2.direction = calculate.orientation[dx][dy];
+						//spawn2.direction = calculate.orientation[dx][dy];
 
 						//Block everything other than these two straights.
 						//These straights should not have blocked anything yet, so we are still working with an empty blocked array.
@@ -1072,9 +1315,10 @@ init.run.spawn =
 							blocked.push({x: spawnpos.x, y: spawnpos.y - m_dxdy2.dy, direction: calculate.orientation[0][m_dxdy2.dy * -1]});
 
 							//We now know where the spawn goes as well.
+							//spawn2 = {id: null};
 							spawn2.x = spawnpos.x;
 							spawn2.y = spawnpos.y + m_dxdy2.dy;
-							spawn2.direction = calculate.orientation[0][m_dxdy2.dy];
+							//spawn2.direction = calculate.orientation[0][m_dxdy2.dy];
 						}
 						else if(m_dxdy.dy)	//It's a vertical straight, so we should take the diagonal and flip its y.
 						{
@@ -1085,9 +1329,10 @@ init.run.spawn =
 							blocked.push({x: spawnpos.x - m_dxdy2.dx, y: spawnpos.y, direction: calculate.orientation[m_dxdy2.dx * -1][0]});
 
 							//We now know where the spawn goes as well.
+							//spawn2 = {id: null};
 							spawn2.x = spawnpos.x + m_dxdy2.dx;
 							spawn2.y = spawnpos.y;
-							spawn2.direction = calculate.orientation[m_dxdy2.dx][0];
+							//spawn2.direction = calculate.orientation[m_dxdy2.dx][0];
 						}
 
 						//Now block the mirrored diagonal's opposite.
@@ -1111,9 +1356,10 @@ init.run.spawn =
 							blocked.push({x: spawnpos.x - calculate.dxdy[marked[0].direction].dx, y: spawnpos.y, direction: calculate.orientation[calculate.dxdy[marked[0].direction].dx * -1][0]});
 
 							//We now know where the spawn goes as well.
+							//spawn2 = {id: null};
 							spawn2.x = spawnpos.x + calculate.dxdy[marked[0].direction].dx;
 							spawn2.y = spawnpos.y;
-							spawn2.direction = calculate.orientation[calculate.dxdy[marked[0].direction].dx][0];
+							//spawn2.direction = calculate.orientation[calculate.dxdy[marked[0].direction].dx][0];
 						}
 						else if (marked[0].dy === marked[1].dy)	//They are both leaning the same way on the y axis.
 						{
@@ -1128,9 +1374,10 @@ init.run.spawn =
 							blocked.push({x: spawnpos.x, y: spawnpos.y - calculate.dxdy[marked[0].direction].dy, direction: calculate.orientation[0][calculate.dxdy[marked[0].direction].dy * -1]});
 
 							//We now know where the spawn goes as well.
+							//spawn2 = {id: null};
 							spawn2.x = spawnpos.x;
 							spawn2.y = spawnpos.y + calculate.dxdy[marked[0].direction].dy;
-							spawn2.direction = calculate.orientation[0][calculate.dxdy[marked[0].direction].dy];
+							//spawn2.direction = calculate.orientation[0][calculate.dxdy[marked[0].direction].dy];
 						}
 						
 					}
@@ -1149,9 +1396,10 @@ init.run.spawn =
 					dx = calculate.dxdy[marked[0].direction].dx ? 0 : calculate.dxdy[marked[2].direction].dx;	//If the straights are opposing x's along the y, then take the 0 x and the diagonal's y.
 					dy = calculate.dxdy[marked[0].direction].dy ? 0 : calculate.dxdy[marked[2].direction].dy;	//If the straights are opposing y's along the x, then take the 0 y and the diagonal's x.
 
+					//spawn2 = {id: null};
 					spawn2.x = spawnpos.x + dx;
 					spawn2.y = spawnpos.y + dy;
-					spawn2.direction = calculate.orientation[dx][dy];
+					//spawn2.direction = calculate.orientation[dx][dy];
 				}
 			}
 
