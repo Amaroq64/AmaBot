@@ -239,8 +239,20 @@ var test =
 
 			if (labs && Memory.mineTest)
 			{
+				if (!global.setupMining)
+				{
+					global.setupMining = require('roomPlanner').setupMining;
+				}
+
+				let calculate = require('calculate');
+
 				for (let room_name in Memory.mineTest)
 				{
+					if (!Memory.mineTest[room_name])
+					{
+						continue;
+					}
+
 					//Display the mine path.
 					test.paint.minepath(room_name);
 
@@ -259,6 +271,51 @@ var test =
 						}
 
 						new RoomVisual(room_name).circle(labs[la].x, labs[la].y, {fill: color, radius: 0.5});
+					}
+
+					test.paint.stamp_type = ['mine_pos', 'hand_pos', 'spawn_pos', 'store_pos', 'term_pos']
+					//Draw the other stamp coordinates.
+					for (let ty = 0; ty < test.paint.stamp_type.length; ty++)
+					{
+						if (Memory.mineTest[room_name][test.paint.stamp_type[ty]])
+						{
+							if (ty < 2)
+							{
+								new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[2], radius: 0.30, opacity: 1});
+								new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[ty], radius: 0.25, opacity: 1});
+							}
+							else
+							{
+								let stamp_color = test.paint.stamp_color;
+								switch(test.paint.stamp_type[ty])
+								{
+									case 'store_pos':
+										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.3, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.5, 0.6, 1.2, {fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.25, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.35, 0.5, 0.9, {fill: stamp_color[4], opacity: 1});
+										break;
+									case 'term_pos':
+										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.5, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.5, 1, 1, {fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.4, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.4, 0.8, 0.8, {fill: stamp_color[4], opacity: 1});
+										break;
+									case 'spawn_pos':
+										new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: stamp_color[2], radius: 0.5, opacity: 1});
+										new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: stamp_color[4], radius: 0.4, opacity: 1});
+								}
+							}
+						}
+					}
+
+					//Draw the directions out from the spawn.
+					for (let sd = 0; sd < Memory.mineTest[room_name].spawn_dir.length; sd++)
+					{
+						if (Memory.mineTest[room_name].spawn_dir[sd])
+						{
+							Game.rooms[room_name].visual.poly([{x: Memory.mineTest[room_name].spawn_pos.x, y: Memory.mineTest[room_name].spawn_pos.y,
+								dx: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, dy: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy, direction: Memory.mineTest[room_name].spawn_dir[sd]},
+							{x: Memory.mineTest[room_name].spawn_pos.x + calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, y: Memory.mineTest[room_name].spawn_pos.y + calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy,
+								dx: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, dy: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy, direction: Memory.mineTest[room_name].spawn_dir[sd]}],
+								{stroke: 'white', lineStyle: "dashed"});
+						}
 					}
 				}
 			}
@@ -299,8 +356,8 @@ var test =
 					{
 						if ((spawn = Memory.spawnTest[room_name].spawn[s]) && spawn.x && spawn.y)
 						{
-							new RoomVisual(room_name).circle(spawn.x, spawn.y, {fill: 'black', radius: 0.5, opacity: 1});
-							new RoomVisual(room_name).circle(spawn.x, spawn.y, {fill: 'yellow', radius: 0.4, opacity: 1});
+							new RoomVisual(room_name).circle(spawn.x, spawn.y, {fill: test.paint.color[2], radius: 0.5, opacity: 1});
+							new RoomVisual(room_name).circle(spawn.x, spawn.y, {fill: test.paint.color[4], radius: 0.4, opacity: 1});
 						}
 					}
 				}
@@ -441,7 +498,10 @@ var test =
 		minepath: function(room_name)
 		{
 			Game.rooms[room_name].visual.poly(Memory.mineTest[room_name].final_path, {stroke: 'darkblue', lineStyle: "dashed"});
-		}
+		},
+
+		stamp_color: ['gold', 'gray', 'black', 'white', 'gold'],
+		stamp_type: ['mine_pos', 'hand_pos', 'spawn_pos', 'store_pos', 'term_pos']
 	},
 
 	direction: ['[]', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
