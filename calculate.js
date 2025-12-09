@@ -165,6 +165,66 @@ var calculate =
 		return path2;
 	},
 
+	true_closest: function(start, positions, options)
+	{
+		if (!positions.length || !positions[0].x || !positions[0].y)
+		{
+			//If there's no positions to test, we can't get a closest position.
+			return [];
+		}
+		else if (positions.length === 1)
+		{
+			//If there's only one position, it's the closest.
+			return [new RoomPosition(positions[0].x, positions[0].y, start.roomName)];
+		}
+
+		let closest = [];
+		let closestchosen;
+		let shortest = Infinity;
+		let shortest2 = Infinity;
+		let test;
+		let width;
+		let height;
+
+		//First record every length, tracking the shortest.
+		for (let p = 0; p < positions.length; p++)
+		{
+			test = start.findPathTo(positions[p].x, positions[p].y, options).length;
+			closest.push(test);
+
+			if (test < shortest)
+			{
+				shortest = test;
+			}
+		}
+
+		//Now process the true distance, but only of the shortest ones we found before.
+		//The truly shortest we find should become a position.
+		for (c = 0; c < positions.length; c++)
+		{
+			if (closest[c] === shortest)
+			{
+				width = Math.abs(start.x - positions[c].x);
+				height = Math.abs(start.y - positions[c].y);
+				test = (width * width) + (height * height);
+
+				if (test < shortest2)
+				{
+					shortest2 = test;
+					closestchosen = [new RoomPosition(positions[c].x, positions[c].y, start.roomName)];
+				}
+				else if (test === shortest2)
+				{
+					closestchosen.push(new RoomPosition(positions[c].x, positions[c].y, start.roomName));
+				}
+			}
+		}
+
+		//We're returning the array of chosen positions.
+		//Whether there's one shortest or multiple of equal shortness, the receiving code must decide what to do with it then.
+		return closestchosen;
+	},
+
 	dxdy_to_direction: function(dx, dy)
 	{
 		switch(dx)
@@ -1197,6 +1257,19 @@ var calculate =
 
 		obj[x][y] = value;
 		return true;
+	},
+
+	check_xy: function(x, y, obj)
+	{
+		return obj[x] && obj[x][y];
+	},
+
+	get_xy: function(x, y, obj)
+	{
+		if (obj[x])
+		{
+			return obj[x][y];
+		}
 	},
 
 	//Various reducers so we can easily do single-line checks involving arrays of arbitrary length.
