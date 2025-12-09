@@ -2,40 +2,17 @@ var roleMTransport =
 {
 	transport: require('role.transport'),
 
-	flip: undefined,
-
 	calculate: require('calculate'),
 
 	run: function(creep)
 	{
-		//Flip, but only if we're not stuck under fatigue.
-		if (roleMTransport.flip(creep))
-		{
-			if (roleMTransport.transport.withdraw(creep) || roleMTransport.transport.withdrawRuins(creep))
-			{
-				//console.log(creep.name + " flipping.");
-				return true;	//If we withdrew, then move on.
-			}
-		}
 
 		//Deposit wherever we go.
 		if (creep.carry.energy > 0)
 		{
-			/*//We're taking the spawn as an extensions so the code can be agnostic of the particulars.
-			let extensions = creep.room.find(FIND_MY_STRUCTURES,
-			{
-				filter: function(structure)
-				{
-					//console.log((structure.structureType == STRUCTURE_EXTENSION || structure.structureType == STRUCTURE_SPAWN) && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
-					return ((structure.structureType == STRUCTURE_EXTENSION || structure.structureType == STRUCTURE_SPAWN) && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0);	//Find extensions that need energy.
-				}
-			});
-
-			//Only iterate the extensions that are near us.
-			extensions = creep.pos.findInRange(extensions, 1);*/
 
 			let extensions = [];
-			let room_extensions = roleMTransport.calculate.extensions[creep.room.name];
+			let room_extensions = roleMTransport.calculate.extensions[creep.room.name];	//The spawns have been included as extensions already.
 			let nuke = roleMTransport.calculate.nuke[creep.room.name];
 			let tempextension;
 			//Find extensions that are near us.
@@ -79,12 +56,10 @@ var roleMTransport =
 		}
 
 		//Run normal transport stuff if we've got no extensions to deposit to.
-		 roleMTransport.transport.withdrawRuins(creep) || roleMTransport.transport.withdraw(creep);
+		roleMTransport.transport.withdrawRuins(creep) || roleMTransport.transport.withdraw(creep);
 
 		return true;
 	}
 };
-
-roleMTransport.flip = roleMTransport.transport.flip;
 
 module.exports = roleMTransport;
