@@ -118,6 +118,15 @@ var defender =
 								{
 									costMatrix.set(Memory.rooms[room_name].sources[i2].buildings.extensions[ex].x, Memory.rooms[room_name].sources[i2].buildings.extensions[ex].y, 255);
 								}
+
+								//Avoid the spawns as well.
+								for (let sp = 0; sp <= 3; sp++)
+								{
+									if (Memory.rooms[room_name].spawns[sp])
+									{
+										costMatrix.set(Memory.rooms[room_name].spawns[sp].x, Memory.rooms[room_name].spawns[sp].y, 255);
+									}
+								}
 							}
 						}}),
 					{plainCost: 2, swampCost: 2, ignoreCreeps: true, ignoreRoads: true, ignoreDestructibleStructures: true, maxRooms: 1, costCallback:
@@ -166,6 +175,15 @@ var defender =
 								for (let ex = 0; ex < Memory.rooms[room_name].sources[i2].buildings.extensions.length; ex++)
 								{
 									costMatrix.set(Memory.rooms[room_name].sources[i2].buildings.extensions[ex].x, Memory.rooms[room_name].sources[i2].buildings.extensions[ex].y, 255);
+								}
+
+								//Avoid the spawns as well.
+								for (let sp = 0; sp <= 3; sp++)
+								{
+									if (Memory.rooms[room_name].spawns[sp])
+									{
+										costMatrix.set(Memory.rooms[room_name].spawns[sp].x, Memory.rooms[room_name].spawns[sp].y, 255);
+									}
 								}
 							}
 						}});
@@ -470,6 +488,11 @@ var defender =
 
 				if (stage < 4 && e === lastexit && w === lastwall)
 				{
+					if (!Memory.rooms[room_name].defense.need)
+					{
+						Memory.rooms[room_name].defense.need = 0;
+					}
+
 					if (built)
 					{
 						Memory.rooms[room_name].defense.checkagain = true;
@@ -489,6 +512,10 @@ var defender =
 					if (built)
 					{
 						Memory.rooms[room_name].defense.checkagain = true;
+						if (!Memory.rooms[room_name].defense.need)
+						{
+							Memory.rooms[room_name].defense.need = 0;
+						}
 						console.log('Check again.');
 					}
 					if ((!built || finished) && !built_any)
@@ -496,6 +523,10 @@ var defender =
 						//If we've completed this stage, we're done here.
 						Memory.rooms[room_name].defense.checkagain = undefined;
 						Memory.rooms[room_name].defense.knownwalls = undefined;
+						if (!Memory.rooms[room_name].defense.need)
+						{
+							Memory.rooms[room_name].defense.need = 0;
+						}
 						console.log('All walls complete.');
 					}
 
@@ -1406,7 +1437,7 @@ var defender =
 		return true;	//We made it this far without any errors.
 	},
 
-	manualpath: function(exit, positions = false)
+	/*manualpath: function(exit, positions = false)
 	{
 		if (!positions)
 		{
@@ -1422,7 +1453,7 @@ var defender =
 		}
 
 		//Now build our path.
-	},
+	},*/
 
 	clean: function(room_name)
 	{

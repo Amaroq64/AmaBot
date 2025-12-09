@@ -96,7 +96,7 @@ var empire =
 								//Make sure to go around the mining fatties.
 								costMatrix.set(Memory.rooms[room_name].sources[i].mfat[0].x, Memory.rooms[room_name].sources[i].mfat[0].y, 255);
 
-								//We're generating this before the extensions now. But we can still take them into account if needed.
+								//We're generating this before the extensions now. But we can still take them into account afterward.
 								if (again)
 								{
 									for (let e = 0; e < Memory.rooms[room_name].sources[i].buildings.extensions.length; e++)
@@ -111,7 +111,7 @@ var empire =
 							costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255);
 							//empire.setCostMatrix(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, roomName, 255);
 
-							//We're generating this before the towers now. But we can still take them into account if needed.
+							//We're generating this before the towers and lab stamp. But we can still take them into account afterward.
 							if (again && Memory.rooms[room_name].defense && Memory.rooms[room_name].defense.towers)
 							{
 								//Make sure to go around towers.
@@ -133,10 +133,37 @@ var empire =
 										}
 									}
 								}
+
+								//Make sure to go around the labs.
+								for (let la = 0; la < Memory.rooms[room_name].mine.labs.length; la++)
+								{
+									costMatrix.set(Memory.rooms[room_name].mine.labs[la].x, Memory.rooms[room_name].mine.labs[la].y, 255);
+								}
+
+								//Make sure to go around the spawns.
+								for (let sp = 0; sp < Memory.rooms[room_name].spawns.length; sp++)
+								{
+									costMatrix.set(Memory.rooms[room_name].spawns[sp].x, Memory.rooms[room_name].spawns[sp].y, 255);
+								}
+
+								//Make sure to go around the rest of our lab stamp.
+								costMatrix.set(Memory.rooms[room_name].mine.miner.x, Memory.rooms[room_name].mine.miner.y, 255);
+								costMatrix.set(Memory.rooms[room_name].mine.handler.x, Memory.rooms[room_name].mine.handler.y, 255);
+								costMatrix.set(Memory.rooms[room_name].buildings.store.x, Memory.rooms[room_name].buildings.store.y, 255);
+								costMatrix.set(Memory.rooms[room_name].buildings.terminal.x, Memory.rooms[room_name].buildings.terminal.y, 255);
+							}
+
+							//Hook in our blocked spawn positions.
+							for (sb = 0; sb < Memory.rooms[room_name].spawnsblocked.length; sb++)
+							{
+								costMatrix.set(Memory.rooms[room_name].spawnsblocked[sb].x, Memory.rooms[room_name].spawnsblocked[sb].y, 255);
 							}
 						}
 					}
 				});
+
+				//Run our spawn blocker based on the generated path.
+				require('init').run.spawn.block(Memory.rooms[room_name].spawnsmarked, Memory.rooms[room_name].spawnsblocked, Memory.rooms[room_name].spawns[0], exitpaths[neighboring[direction]], Memory.rooms[room_name].spawns[1]);
 
 				//Now return.
 				exitreturn[neighboring[direction]] = Game.rooms[room_name].getPositionAt(exitpaths[neighboring[direction]].slice(-1)[0].x, exitpaths[neighboring[direction]].slice(-1)[0].y)
@@ -148,6 +175,12 @@ var empire =
 							for (let n = 0; n < exitpaths[neighboring[direction]].length; n++)
 							{
 								costMatrix.set(exitpaths[neighboring[direction]][n].x, exitpaths[neighboring[direction]][n].y, 1);
+							}
+
+							//Hook in our blocked spawn positions.
+							for (sb = 0; sb < Memory.rooms[room_name].spawnsblocked.length; sb++)
+							{
+								costMatrix.set(Memory.rooms[room_name].spawnsblocked[sb].x, Memory.rooms[room_name].spawnsblocked[sb].y, 255);
 							}
 						}
 					});
