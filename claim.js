@@ -962,7 +962,7 @@ var claim =
 							&& Game.rooms[creep.room.name].find(FIND_MY_SPAWNS).length === 0)
 						{
 							//Create our spawn.
-							Game.rooms[creep.room.name].createConstructionSite(Memory.claims[a].pos.x, Memory.claims[a].pos.y, STRUCTURE_SPAWN, require('builder').newSpawn(false, a));
+							Game.rooms[creep.room.name].createConstructionSite(Memory.claims[a].pos.x, Memory.claims[a].pos.y, STRUCTURE_SPAWN, require('builder').newSpawn(false));
 						}
 
 						//If we've just arrived, create some paths.
@@ -993,7 +993,7 @@ var claim =
 									.findPathTo(home, {range: 1, maxRooms: 1});
 							}
 
-							if (role == "builder")
+							if (role === "builder")
 							{
 								//Assign our target positions to the builders.
 								let i;	//Which source do we belong to?
