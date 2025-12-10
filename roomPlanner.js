@@ -252,11 +252,12 @@ var roomPlanner =
 				}
 
 				//Are we missing any of our labs?
-				/*for (la = 0; la < Memory.rooms[room_name].goals.labs; la++)
+				for (la = 0; la < Memory.rooms[room_name].goals.labs; la++)
 				{
 					if (!Game.getObjectById(Memory.rooms[room_name].mine.labs[la].id))
 					{
-						let lab = Game.rooms[room_name].lookForAt(FIND_MY_STRUCTURES, Memory.rooms[room_name].mine.labs[la].x, Memory.rooms[room_name].mine.labs[la].y, {filter: {structureType: STRUCTURE_LAB}});
+						let lab = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: function(lab_obj)
+							{return lab_obj.structureType === STRUCTURE_LAB && lab_obj.pos.x === Memory.rooms[room_name].mine.labs[la].x && Memory.rooms[room_name].mine.labs[la].y}});
 
 						if (lab.length)
 						{
@@ -267,7 +268,7 @@ var roomPlanner =
 							Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mine.labs[la].x, Memory.rooms[room_name].mine.labs[la].y, STRUCTURE_LAB);
 						}
 					}
-				}*/
+				}
 
 				//Are we missing any of our spawns?
 				//for (sa = 0; sa < CONTROLLER_STRUCTURES.spawn[Game.rooms[room_name].controller.level]; sa++)
@@ -275,11 +276,11 @@ var roomPlanner =
 				{
 					if (!Game.getObjectById(Memory.rooms[room_name].spawns[sa].id))
 					{
-						let spawn = Game.rooms[room_name].find(FIND_MY_SPAWNS, {filter: function(spawn_obj) {return spawn_obj.pos.x === Memory.rooms[room_name].spawns[sa].x && spawn_obj.pos.y === Memory.rooms[room_name].spawns[sa].y}})[0];
+						let spawn = Game.rooms[room_name].find(FIND_MY_SPAWNS, {filter: function(spawn_obj) {return spawn_obj.pos.x === Memory.rooms[room_name].spawns[sa].x && spawn_obj.pos.y === Memory.rooms[room_name].spawns[sa].y}});
 
-						if (spawn)
+						if (spawn.length)
 						{
-							Memory.rooms[room_name].spawns[sa].id = spawn.id;
+							Memory.rooms[room_name].spawns[sa].id = spawn[0].id;
 						}
 						else
 						{
@@ -525,54 +526,10 @@ var roomPlanner =
 			}
 		}
 
-		//Get a path to the source twice if the first time touched a wall. The second time around, make sure it stays away from walls.
-		//Due to the flexibility of stamp checking, we don't need to stay away from walls anymore.
-		/*let found = false;
-		for (let run = 0; run < 2; run++)
-		{
-			if (run)
-			{
-				//Did we go adjacent to any walls? If so, avoid them this time.
-				for (let ex = 0; ex < extract.length - 1; ex++)
-				{
-					for (let x = -1; x < 2; x++)
-					{
-						for (let y = -1; y < 2; y++)
-						{
-							if (terrain.get(extract[ex].x + x, extract[ex].y + y) === TERRAIN_MASK_WALL)
-							{
-								//We found a wall. Record all contiguous walls connected to it.
-								console.log('A wall is touching ' + (extract[ex].x) + ' ' + (extract[ex].y));
-
-								found = calculate.findouterstone(room_name, extract[ex].x + x, extract[ex].y + y, found);
-							}
-						}
-					}
-				}
-
-				//Now mark and avoid the spaces touching those walls.
-				/*if (found)
-				{
-					found = calculate.hugwalls(room_name, found);
-					for (let sx in found)
-					{
-						for (let sy in found[sx])
-						{
-							tempcostmatrix.set(Number(sx), Number(sy), 10);
-						}
-					}
-				}
-			}
-
-			if (!run || found)
-			{*/
 		extract = spawn.pos.findPathTo(mineral,
 			{plainCost: 2, swampCost: 3, range: 1, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
 				costCallback: function(roomName, costMatrix)
 				{
-					/*if (!run)
-					{*/
-					//Slightly prefer every path that exists.
 					for (let n = 0; n < Memory.rooms[room_name].upgrade.lenth; n++)
 					{
 						costMatrix.set(Memory.rooms[room_name].upgrade[n].x, Memory.rooms[room_name].upgrade[n].y, 1);
@@ -646,25 +603,8 @@ var roomPlanner =
 
 					tempcostmatrix = costMatrix.clone();
 					return costMatrix;
-					/*}
-					else
-					{
-						return tempcostmatrix;
-					}*/
 				}
 			});
-			/*}
-
-			//Unmark the spaces around the walls so we can use them again later.
-			//This could cause bugs since we could unmark path steps.
-			for (let sx in found)
-			{
-				for (let sy in found[sx])
-				{
-					tempcostmatrix.set(Number(sx), Number(sy), 0);
-				}
-			}
-		}*/
 
 		//Now match it to one of the others.
 		for (let s = 0; s < mspaces.length; s++)
@@ -936,7 +876,7 @@ var roomPlanner =
 				}
 
 				//If we've found a location for our stamp, then we're done here.
-				if (tested_true.length > 5)
+				if (tested_true.length > 16)
 				{
 					break path_test;
 				}
@@ -1859,7 +1799,7 @@ var roomPlanner =
 						mine_pos = new RoomPosition(final_choice.final_path[last_i].x, final_choice.final_path[last_i].y, room_name);
 						hand_pos = new RoomPosition(final_choice.final_path[last_i - 1].x, final_choice.final_path[last_i - 1].y, room_name);
 
-						//Since towing is needed, the spawn and terminal can just touch apos as long as they aren't on the path.
+						//Since towing is needed, the spawn and store can just touch apos as long as they aren't on the path.
 						for (let x = -1; x < 2; x++)
 						{
 							let tempx = apos_pos.x + x;
@@ -1882,6 +1822,7 @@ var roomPlanner =
 						}
 
 						//Now select from among these positions.
+						console.log('double_positions.length ' + double_positions.length);
 						if (double_positions.length >= 2)
 						{
 							//Rather than deciding these arbitrarily, let's put the store slightly closer to the main spawn.
@@ -2172,11 +2113,140 @@ var roomPlanner =
 					console.log('tow_temp_pos.length ' + tow_temp_pos.length);
 
 					//Remember, we are here because we have one path step after apos that's touching the mineral. It just wasn't touching a lab.
+					let bpos_pos = new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y, room_name);
 					if (temp_pos.length === 1)
 					{
 						//If we only found one, let's use it.
 						mine_pos = temp_pos[0];
 						hand_pos = apos_pos;
+
+						//If we're abandoning the last step in the mine path, we can put the spawn here, since it touches both mine_pos and hand_pos.
+						spawn_pos = final_choice.final_path[last_i];
+						double_positions = [];
+
+						//Now find a place for the store (touching apos of course.)
+						for (let x = -1; x < 2; x++)
+						{
+							let tempx = apos_pos.x + x;
+
+							for (let y = -1; y < 2; y++)
+							{
+								let tempy = apos_pos.y + y;
+
+								if (!(tempx === apos_pos.x && tempy === apos_pos.y) && !(tempx === mine_pos.x && tempy === mine_pos.y)	//Don't use apos or mine_pos. (hand_pos is the same as apos.)
+									&& terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use the path, labs, or spawn. Don't touch an exit tile.
+								{
+									double_positions.push({x: tempx, y: tempy});
+								}
+							}
+						}
+
+						if (double_positions.length)	//Since true_closest early-returns a single, and we only need to place the store, we don't need separate cases for 1 or more than 1.
+						{
+							//Rather than deciding these arbitrarily, let's put the store slightly closer to the main spawn.
+							store_pos = calculate.true_closest(spawn.pos, double_positions,
+								{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+									costCallback: function(roomName, costMatrix)
+									{
+										tempcostmatrix.set(spawn_pos.x, spawn_pos.y, 255);
+
+										return tempcostmatrix;
+									}
+								})[0];
+							store_pos = {x: store_pos.x, y: store_pos.y};
+
+							//Now that we've come this far, let's place the terminal.
+							double_positions = [];
+							for (let x = -1; x < 2; x++)
+							{
+								let tempx = final_choice.final_path[bpos_i].x + x;
+								
+								for (let y = -1; y < 2; y++)
+								{
+									let tempy = final_choice.final_path[bpos_i].y + y;
+
+									if (!(tempx === bpos_pos.x && tempy === bpos_pos.y)	//Don't use bpos.
+										&& terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use the path, labs, or spawn. Don't touch an exit tile.
+									{
+										double_positions.push({x: tempx, y: tempy});
+									}
+								}
+							}
+
+							//Rather than deciding these arbitrarily, let's put the terminal slightly closer to the main spawn.
+							term_pos = calculate.true_closest(spawn.pos, double_positions,
+								{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+									costCallback: function(roomName, costMatrix)
+									{
+										tempcostmatrix.set(store_pos.x, store_pos.y, 255);
+
+										return tempcostmatrix;
+									}
+								})[0];
+							term_pos = {x: term_pos.x, y: term_pos.y};
+						}
+						else
+						{
+							console.log('There was no place to put the store touching apos.');
+
+							//Since there was nowhere for the store touching apos, we'll have to put it by bpos with the terminal.
+							double_positions = [];
+							for (i = bpos_i - 1; double_positions.length < 2 && i >= 0; i -= 2)
+							{
+								for (let x = -1; x < 2; x++)
+								{
+									let tempx = final_choice.final_path[i].x;
+
+									for (let y = -1; y < 2; y++)
+									{
+										let tempy = final_choice.final_path[i].y;
+
+										if (!(tempx === bpos_pos.x && tempy === bpos_pos.y)	//Don't use bpos.
+											&& terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use any path or labs. Don't touch an exit tile.
+										{
+											double_positions.push({x: tempx, y: tempy});
+										}
+									}
+								}
+							}
+
+							//Rather than deciding these arbitrarily, let's put them slightly closer to bpos.
+							while (double_positions.length && (!store_pos || !term_pos))
+							{
+								let temp_pos_live = calculate.true_closest(new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y), double_positions,
+									{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+										costCallback: function(roomName, costMatrix)
+										{
+											tempcostmatrix.set(store_pos.x, store_pos.y, 255);
+
+											return tempcostmatrix;
+										}
+									})[0];
+
+								if (!store_pos)
+								{
+									store_pos = {x: temp_pos_live.x, y: temp_pos_live.y};
+								}
+								else if (!term_pos)
+								{
+									term_pos = {x: temp_pos_live.x, y: temp_pos_live.y};
+								}
+								else
+								{
+									break;
+								}
+
+								//Now remove the one we used.
+								for (dp = 0; dp < double_positions.length; dp++)
+								{
+									if (temp_pos_live.x === double_positions[dp].x && temp_pos_live.y === double_positions[dp].y)
+									{
+										double_positions.splice(dp, 1);
+										break;
+									}
+								}
+							}
+						}
 					}
 					else if(temp_pos.length)
 					{
@@ -2189,11 +2259,11 @@ var roomPlanner =
 							current_valid = 0;
 							for (let x = -1; x < 2; x++)
 							{
-								let tempx = temp_pos[tp].x;
+								let tempx = temp_pos[tp].x + x;
 
 								for (let y = -1; y < 2; y++)
 								{
-									let tempy = temp_pos[tp].y;
+									let tempy = temp_pos[tp].y + y;
 
 									if (!(tempx === apos_pos.x && tempy === apos_pos.y)	//Don't use apos.
 										&& terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0)	//Don't use the path or labs.
@@ -2647,8 +2717,6 @@ var roomPlanner =
 							//Since we have a towing scenario with a pre-stamp spawn, let's point the spawn to bpos.
 							spawn_dir.push(new RoomPosition(spawn_pos.x, spawn_pos.y, room_name).getDirectionTo(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y));
 						}
-
-						
 					}
 					/*else
 					{
@@ -2831,7 +2899,7 @@ var roomPlanner =
 									})[0];
 								best_store = {x: best_store.x, y: best_store.y};
 
-								if (!(best_store.x === mine_list[ml].spawn.x && best_store.y === mine_list[ml].spawn.y))
+								if (!(best_store.x === mine_list[ml].spawn.x && best_store.y === mine_list[ml].spawn.y) && !(best_store.x === mine_list[ml].x && best_store.y === mine_list[ml].y))
 								{
 									spawn_pos = {x: mine_list[ml].spawn.x, y: mine_list[ml].spawn.y};
 									mine_pos = {x: mine_list[ml].x, y: mine_list[ml].y};

@@ -43,19 +43,19 @@ var builder =
 			}
 
 			//Find our first non-busy spawn. If they're all busy, we aren't building anything.
-			let spawn = Game.rooms[room_name].find(FIND_MY_SPAWNS); //Make sure to assign one spawn to this. Our later code is not meant to handle an array.
-			spawn = [spawn[0]];	//We're not ready to hook up multiple spawns yet.
+			let spawn;
+			let spawn_index;
 			let all_busy = true;
-			for (let s = 0; s < spawn.length; s++)
+			for (spawn_index = 0; spawn_index < 2; spawn_index++)
 			{
-				if (spawn[s].spawning === null)	//We found a spawn that's not building.
+				spawn = Game.getObjectById(Memory.rooms[room_name].spawns[spawn_index].id);
+				if (spawn && spawn.spawning === null)	//We found a spawn that's not building.
 				{
 					all_busy = false;
-					spawn = spawn[s];	//Here we are purging the array and assigning one spawn, as required by later code.
 					break;
 				}
 			}
-			//console.log("all_busy: " + all_busy);
+
 			if (all_busy)	//No free spawns. There's nothing to do with this room.
 			{
 				continue;
@@ -175,7 +175,7 @@ var builder =
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].sources[need].mfat.slice(0, 1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].sources[need].mfat.slice(0, 1)[0].y;
-					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[need]];	//It goes to a source.
 					break;
 				}
 				case "mtransport":	//We might not have a container yet. Store the desired position.
@@ -191,7 +191,7 @@ var builder =
 					options.memory.utrip = false;
 					//options.memory.return = false;
 					options.memory.dtrip = false;
-					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[need]];	//It goes to a source.
 					break;
 				}
 				//case "ubuilder":
@@ -202,7 +202,7 @@ var builder =
 					options.memory.target = {};
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
-					direction = [Memory.rooms[room_name].upgradedir];	//It goes to the controller.
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.upgradedir];	//It goes to the controller.
 					break;
 				}
 				case "utransport":	//We might not have a container yet. Store the desired position.
@@ -214,7 +214,7 @@ var builder =
 					options.memory.target.x = Memory.rooms[room_name].upgrade.slice(-1)[0].x;
 					options.memory.target.y = Memory.rooms[room_name].upgrade.slice(-1)[0].y;
 					//options.memory.return = false;
-					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source initially.
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[need]];	//It goes to a source initially.
 					//This one needs temporary instructions to get to a source. Then it loops between the source and the controller upgrader on its own.
 					options.memory.movenow = Memory.rooms[room_name].sources[need].mclean.u;
 					//options.memory.movenow.pop();
@@ -241,7 +241,7 @@ var builder =
 					options.memory.dtrip = false;
 					options.memory.destination = false;
 					options.memory.need = Memory.rooms[room_name].defense.need;
-					direction = [Memory.rooms[room_name].sources[need].minedir];	//It goes to a source.
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[need]];	//It goes to a source.
 					//This one needs temporary instructions to get to a source. Then it loops between the source, the controller upgrader, and the defense builder on its own.
 					options.memory.movenow = Memory.rooms[room_name].sources[need].mclean.b;
 					//options.memory.movenow.pop();
@@ -302,7 +302,7 @@ var builder =
 					options.memory.dtrip = true;
 					options.memory.need = defense.need;
 					options.memory.s = shortestchosen;
-					direction = [Memory.rooms[room_name].sources[shortestchosen].minedir];
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[shortestchosen]];	//It goes to a source initially.
 
 					//When we build a new dbuilder, our builders need their dtarget updated.
 					for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
