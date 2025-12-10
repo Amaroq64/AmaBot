@@ -47,8 +47,8 @@ var init =
 					goals: {level: 1}
 				}
 
-				Memory.rooms[room_name].spawns[0] = {id: Game.spawns[spawn].id, x: Game.spawns[spawn].pos.x, y: Game.spawns[spawn].pos.y};
-				Memory.rooms[room_name].spawns[1] = {id: null};
+				Memory.rooms[room_name].spawns[0] = {id: Game.spawns[spawn].id, x: Game.spawns[spawn].pos.x, y: Game.spawns[spawn].pos.y, dir: {}};
+				Memory.rooms[room_name].spawns[1] = {id: null, x: null, y: null, dir: {}};
 
 				Memory.rooms[room_name].spawns.marked = [];
 				Memory.rooms[room_name].spawns.blocked = [];
@@ -103,9 +103,13 @@ var init =
 				};
 
 				let temp = [];
+
+				console.log('Init Begin: ' + Game.cpu.getUsed());
 				
 				//Save the direction from the spawner to the start of this path.
 				Memory.rooms[room_name].upgradedir = Game.spawns[spawn].pos.getDirectionTo(Memory.rooms[room_name].upgrade[0].x, Memory.rooms[room_name].upgrade[0].y);
+
+				console.log('Init Upgrade 1: ' + Game.cpu.getUsed());
 
 				//For each source, build an optimal mining path.
 				for(let i = 0; i < len; i++)
@@ -558,6 +562,14 @@ var init =
 					}
 				}
 
+				console.log('Init Mine: ' + Game.cpu.getUsed());
+
+				//We don't need a live position object for source pos anymore.
+				for (let i = 0; i < len; i++)
+				{
+					Memory.rooms[room_name].sources[i].pos = {x: Memory.rooms[room_name].sources[i].pos.x, y: Memory.rooms[room_name].sources[i].pos.y};
+				}
+
 				//Rebuild the path from spawn to controller to take our previous paths into account.
 				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y),
 					{plainCost: 10, swampCost: 10, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,
@@ -595,10 +607,14 @@ var init =
 				//Save the direction from the spawner to the start of this path.
 				Memory.rooms[room_name].upgradedir = Game.spawns[spawn].pos.getDirectionTo(Memory.rooms[room_name].upgrade[0].x, Memory.rooms[room_name].upgrade[0].y);
 
+				console.log('Init Upgrade 2: ' + Game.cpu.getUsed());
+
 				//Now that our basic paths have been saved, we can generate our exit paths out of the room.
 				//Doing this here allows us to prefer the paths we've generated while also making the extensions avoid exit paths.
 				require('empire').room.exitpaths(room_name);
 				require('roomPlanner').setupDefense(room_name);	//If we do this here, we know which exits are safe too.
+
+				console.log('Init Empire 1: ' + Game.cpu.getUsed());
 
 				//Create a temporary exitpath path to any unsafe exits that aren't covered by an empire exitpath.
 				//This will exist solely to make a gap in the extensions.
@@ -707,6 +723,8 @@ var init =
 					}
 				}
 
+				console.log('Init Empire 2: ' + Game.cpu.getUsed());
+
 				//If we haven't chosen a spawn yet, we need to do that.
 				//First record every remaining position around the spawn.
 				let spawn_adjacent = [];
@@ -762,6 +780,23 @@ var init =
 					//Now mark it.
 					init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_adjacent, Memory.rooms[room_name].spawns[1]);
 				}
+
+				//Now that we know we have a spawn, set spawn-based directions.
+				Memory.rooms[room_name].spawns[0].dir.upgradedir = Memory.rooms[room_name].upgradedir;
+				Memory.rooms[room_name].spawns[1].dir.upgradedir = new RoomPosition(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, room_name)
+					.getDirectionTo(Memory.rooms[room_name].upgrade[0].x, Memory.rooms[room_name].upgrade[0].y);
+				for (let ns = 0; ns < 2; ns++)
+				{
+					Memory.rooms[room_name].spawns[ns].dir.minedir = [];
+				}
+				for (let i = 0; i < len; i++)
+				{
+					Memory.rooms[room_name].spawns[0].dir.minedir[i] = temp[i].minedir;
+					Memory.rooms[room_name].spawns[1].dir.minedir[i] = new RoomPosition(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, room_name)
+						.getDirectionTo(temp[i].mine[0].x, temp[i].mine[0].y);
+				}
+
+				console.log('Init Finalize Spawns: ' + Game.cpu.getUsed());
 
 				//Now place our initial construction sites.
 				Game.spawns[spawn].room.createConstructionSite(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, STRUCTURE_CONTAINER);	//Upgrader container.
@@ -943,6 +978,8 @@ var init =
 					}
 				}
 
+				console.log('Extensions 1: ' + Game.cpu.getUsed());
+
 				//Now go over our sources again. Record every one that wasn't explicitly set false by another.
 				let temp2 = {textensions: {}}
 				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
@@ -992,10 +1029,12 @@ var init =
 					delete Memory.rooms[room_name].ideal.textensions;	//If this succeeds, we don't need to save the room-wide list of extensions anymore.
 				}
 
+				console.log('Extensions 2: ' + Game.cpu.getUsed());
+
 				//Finish the room up.
 				//Finish this next tick in the RCL1 roomPlanner check.
 				Memory.rooms[room_name].init = 1;
-				console.log('Init ' + Game.cpu.getUsed());
+				console.log('Init Complete: ' + Game.cpu.getUsed());
 			}
 		}
 
