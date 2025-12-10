@@ -1137,7 +1137,15 @@ var calculate =
 					s[i]++;
 				}
 			}
-			sorted_extensions = sorted_extensions.concat(Game.rooms[room_name].find(FIND_MY_SPAWNS));
+			for (let sp = 0, spawn; sp < 2; sp++)	//We don't want to use our lab spawn's energy, since it's so difficult to refill.
+			{
+				spawn = Game.getObjectById(Memory.rooms[room_name].spawns[sp].id);
+				if (spawn)
+				{
+					sorted_extensions.push(spawn);
+				}
+			}
+			calculate.sortedextensions[room_name] = sorted_extensions;
 			return sorted_extensions;
 		}
 	},
