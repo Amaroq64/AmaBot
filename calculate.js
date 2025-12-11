@@ -3,6 +3,7 @@ var body = require('body');
 var calculate =
 {
 	extensions: {},
+	spawns: {},
 	sortedextensions: {},
 	nuke: {},
 
@@ -1050,14 +1051,13 @@ var calculate =
 		}
 		else if (typeof room === "string")
 		{
-			return (SPAWN_ENERGY_CAPACITY * Game.rooms[room].find(FIND_MY_SPAWNS).length) + (
-			EXTENSION_ENERGY_CAPACITY[Game.rooms[room].controller.level] * Game.rooms[room].find(FIND_MY_STRUCTURES,
+			if (!calculate.spawns[room] || !calculate.sortedextensions[room])
 			{
-				filter:
-				{
-					structureType: STRUCTURE_EXTENSION
-				}
-			}).length);
+				calculate.sortExtensions(room);
+			}
+			let spawns = calculate.spawns[room];
+			let extensions = calculate.sortedextensions[room].length - spawns;
+			return (SPAWN_ENERGY_CAPACITY * (spawns < 3 ? spawns : 2)) + (EXTENSION_ENERGY_CAPACITY[Game.rooms[room].controller.level] * extensions);
 		}
 		else
 		{
@@ -1081,7 +1081,8 @@ var calculate =
 		//Use extension and spawner coordinates to make an [x][y] multidimensional object. This makes addressing them faster.
 		//We will store them in calculate.extensions[room_name].
 		let existing_extensions = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_EXTENSION}})
-			.concat(Game.rooms[room_name].find(FIND_MY_SPAWNS));
+		let existing_spawns = Game.rooms[room_name].find(FIND_MY_SPAWNS);
+		existing_extensions = existing_extensions.concat(existing_spawns);
 		
 		let extension_positions = {};
 		for (let e = 0; e < existing_extensions.length; e++)
@@ -1113,6 +1114,7 @@ var calculate =
 			}
 		}
 
+		calculate.spawns[room_name] = existing_spawns.length;
 		calculate.extensions[room_name] = extension_positions;
 		return extension_positions;
 	},
