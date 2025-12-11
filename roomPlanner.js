@@ -251,6 +251,33 @@ var roomPlanner =
 					}
 				}
 
+				//Are we missing our store?
+				if (!Game.getObjectById(Memory.rooms[room_name].buildings.store.id))
+				{
+					if (Game.rooms[room_name].storage)
+					{
+						Memory.rooms[room_name].buildings.store.id = Game.rooms[room_name].storage.id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.store.x, Memory.rooms[room_name].buildings.store.y, STRUCTURE_STORAGE);
+					}
+				}
+
+				//Are we missing our terminal?
+				if (!Game.getObjectById(Memory.rooms[room_name].buildings.terminal.id))
+				{
+					let terminal = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_TERMINAL}});
+					if (terminal.length)
+					{
+						Memory.rooms[room_name].buildings.terminal.id = terminal[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.terminal.x, Memory.rooms[room_name].buildings.terminal.y, STRUCTURE_TERMINAL);
+					}
+				}
+
 				//Are we missing any of our labs?
 				for (la = 0; la < Memory.rooms[room_name].goals.labs; la++)
 				{
@@ -271,8 +298,7 @@ var roomPlanner =
 				}
 
 				//Are we missing any of our spawns?
-				//for (sa = 0; sa < CONTROLLER_STRUCTURES.spawn[Game.rooms[room_name].controller.level]; sa++)
-				for (sa = 0; sa < 2; sa++)
+				for (sa = 0; sa < CONTROLLER_STRUCTURES.spawn[Game.rooms[room_name].controller.level]; sa++)
 				{
 					if (!Game.getObjectById(Memory.rooms[room_name].spawns[sa].id))
 					{
