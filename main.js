@@ -92,9 +92,9 @@ module.exports.loop = function()
 		cpu_usage.Build = Game.cpu.getUsed();
 
 		//paths, extensions, defenses, newpath, labs, [room_name, action[a]]
-		let test = require('test');
-		test.run(false, false, false, false, true, false /*['E48S14', Memory.attack[0]]*/);
-		cpu_usage.Test = Game.cpu.getUsed();
+		//let test = require('test');
+		//test.run(false, true, false, false, true, false /*['E48S14', Memory.attack[0]]*/);
+		//cpu_usage.Test = Game.cpu.getUsed();
 
 		require('tower').monitor();
 		cpu_usage.Tower = Game.cpu.getUsed();
