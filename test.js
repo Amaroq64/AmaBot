@@ -52,6 +52,12 @@ var test =
 								continue;
 							}
 							style.backgroundColor = false;
+
+							/*if ()	//This can be used to test a specific tile type.
+							{
+								continue;
+							}*/
+
 							switch(path)
 							{
 								default:
@@ -98,10 +104,6 @@ var test =
 									{
 										if (typeof Memory.rooms[room_name].path[x][y][path][i] !== 'object')
 										{
-											/*if (room_name == 'E49S15')
-											{
-												console.log('1st test. x: ' + x2 + ' y: ' + y2);
-											}*/
 											continue;
 										}
 
@@ -140,16 +142,69 @@ var test =
 									}
 									break;
 
+								case 'labs':
+								case 'lreturn':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
+									if(!style.backgroundColor)
+									{
+										style.backgroundColor = 'purple';
+									}
+
+									for (i = 0; i < Memory.rooms[room_name].path[x][y][path].length; i++)
+									{
+										if (Memory.rooms[room_name].path[x][y][path][i])
+										{
+											Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path][i] || 0], x2, y2, style);
+										}
+									}
+									break;
+
 								case 'flipper':
 									if (Memory.test && Memory.test.indexOf(path) === -1)
 									{
 										continue;
 									}
-									style.backgroundColor = 'white';
 
-									for (let e in Memory.rooms[room_name].path[x][y][path])
+									for (let flippertype in Memory.rooms[room_name].path[x][y][path])
 									{
-										Game.rooms[room_name].visual.text(test.direction[0], x2, y2, style);
+										switch(flippertype)	//Uncomment one of these to color a flipper.
+										{
+											/*case 'mine':
+											case 'mreturn':
+											case 'mfat':
+												style.backgroundColor = 'blue';
+												break;
+											case 'upgrade':
+											case 'ureturn':
+												style.backgroundColor = 'red';
+												break;
+											case 'defpaths':
+											case 'dreturn':
+												style.backgroundColor = 'purple';
+												break;
+											case 'patrol':
+											case 'preturn':
+												style.backgroundColor = 'orange';
+												break;
+											case 'exitpath':
+											case 'exitreturn':
+												style.backgroundColor = 'green';
+												break;
+											case 'labs':
+											case 'lreturn':
+												style.backgroundColor = 'purple';
+												break;*/
+											default:
+												style.backgroundColor = 'white';
+										}
+
+										if (style.backgroundColor)
+										{
+											Game.rooms[room_name].visual.text(test.direction[0], x2, y2, style);
+										}
 									}
 							}
 						}
@@ -506,7 +561,7 @@ var test =
 
 	direction: ['[]', "\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"],
 	pindex: -1,
-	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'upgrader', 'mfat'],
+	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn'],
 
 	spawnmark: function(room_name = false, direction = false, reset = 0)	//When placing the initial 'spawn', pass an object with its x and y as direction.
 	{
