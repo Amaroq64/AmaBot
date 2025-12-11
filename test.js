@@ -552,7 +552,11 @@ var test =
 
 		minepath: function(room_name)
 		{
-			Game.rooms[room_name].visual.poly(Memory.mineTest[room_name].final_path, {stroke: 'darkblue', lineStyle: "dashed"});
+			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+			{
+				Game.rooms[room_name].visual.poly(Memory.rooms[room_name].sources[i].labs, {stroke: 'darkblue', lineStyle: "dashed"});
+				Game.rooms[room_name].visual.poly(Memory.rooms[room_name].sources[i].lreturn, {stroke: 'darkred', lineStyle: "dashed"});
+			}
 		},
 
 		stamp_color: ['gold', 'gray', 'black', 'white', 'gold'],
