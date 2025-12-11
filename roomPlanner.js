@@ -267,10 +267,9 @@ var roomPlanner =
 				//Are we missing our terminal?
 				if (!Game.getObjectById(Memory.rooms[room_name].buildings.terminal.id))
 				{
-					let terminal = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_TERMINAL}});
-					if (terminal.length)
+					if (Game.rooms[room_name].terminal)
 					{
-						Memory.rooms[room_name].buildings.terminal.id = terminal[0].id;
+						Memory.rooms[room_name].buildings.terminal.id = Game.rooms[room_name].terminal.id;
 					}
 					else
 					{
@@ -289,6 +288,20 @@ var roomPlanner =
 					else
 					{
 						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.factory.x, Memory.rooms[room_name].buildings.factory.y, STRUCTURE_FACTORY);
+					}
+				}
+
+				//Are we missing our nuker?
+				if (!Game.getObjectById(Memory.rooms[room_name].buildings.nuker.id))
+				{
+					let nuker = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_NUKER}});
+					if (nuker.length)
+					{
+						Memory.rooms[room_name].buildings.nuker.id = nuker[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.nuker.x, Memory.rooms[room_name].buildings.nuker.y, STRUCTURE_NUKER);
 					}
 				}
 
@@ -2997,9 +3010,10 @@ var roomPlanner =
 				}
 			}
 
-			//Once everything else is done, let's place a factory as well.
+			//Once everything else is done, let's place a factory and a nuke as well.
 			let fact_pos;
-			for (let fa = bpos_i, single_positions = [], temp_pos_live, tempx, tempy; fa >= 0; fa--)
+			let nuke_pos;
+			for (let fa = bpos_i, single_positions = [], tempx, tempy; fa >= 0; fa--)
 			{
 				for (let x = -1; x < 2; x++)
 				{
@@ -3010,7 +3024,8 @@ var roomPlanner =
 						tempy = final_choice.final_path[fa].y + y;
 
 						if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy)	//Don't use the path or labs. Don't touch an exit tile.
-							&& !(tempx === term_pos.x && tempy === term_pos.y) && !(tempx === store_pos.x && tempy === store_pos.y) && !(tempx === spawn_pos.x && tempy === spawn_pos.y))	//Don't use the terminal, store, or spawn if it's here.
+							&& !(tempx === term_pos.x && tempy === term_pos.y) && !(tempx === store_pos.x && tempy === store_pos.y) && !(tempx === spawn_pos.x && tempy === spawn_pos.y)	//Don't use the terminal, store, or spawn if it's here.
+							&& !(fact_pos && fact_pos.x === tempx && fact_pos.y === tempy))	//If we've placed the factory, don't use that either.
 						{
 							//temp_pos_live = new RoomPosition(tempx, tempy, room_name);
 							single_positions.push({x: tempx, y: tempy});
@@ -3020,19 +3035,65 @@ var roomPlanner =
 
 				if (single_positions.length)	//Once we've gotten a few, use them.
 				{
-					//Rather than deciding these arbitrarily, let's put the factory slightly closer to bpos.
-					fact_pos = calculate.true_closest(new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y, room_name), single_positions,
-						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
-							costCallback: function(roomName, costMatrix)
-							{
-								return tempcostmatrix;
-							}
-						})[0];
-					fact_pos = {x: fact_pos.x, y: fact_pos.y};
+					if (!fact_pos)
+					{
+						//Rather than deciding these arbitrarily, let's put the factory slightly closer to bpos.
+						fact_pos = calculate.true_closest(new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y, room_name), single_positions,
+							{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+								costCallback: function(roomName, costMatrix)
+								{
+									return tempcostmatrix;
+								}
+							})[0];
+						fact_pos = {x: fact_pos.x, y: fact_pos.y};
 
-					break;
+						//Since we're using one, get them again.
+						single_positions = [];
+						fa++;
+					}
+					else if (!nuke_pos)
+					{
+						//Rather than deciding these arbitrarily, let's put the factory slightly closer to bpos.
+						nuke_pos = calculate.true_closest(new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y, room_name), single_positions,
+							{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+								costCallback: function(roomName, costMatrix)
+								{
+									return tempcostmatrix;
+								}
+							})[0];
+						nuke_pos = {x: nuke_pos.x, y: nuke_pos.y};
+					}
+
+					if (nuke_pos && nuke_pos.x && nuke_pos.y)
+					{
+						break;
+					}
 				}
 			}
+
+			//Before we finish, get a path from the sources to bpos.
+			//This is what we're going to name it when we commit it.
+			let labs = [];
+			let lreturn = [];
+			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+			{
+				labs.push(Game.rooms[room_name].findPath(
+					new RoomPosition(Memory.rooms[room_name].sources[i].mine.slice(-1)[0].x, Memory.rooms[room_name].sources[i].mine.slice(-1)[0].y, room_name),
+					new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y, room_name),
+					{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+						costCallback: function(roomName, costMatrix)
+						{
+							return tempcostmatrix;
+						}
+					}));
+
+				//Get the reverse path too.
+				lreturn.push(calculate.reversepath(labs[labs.length - 1]));
+
+				//Now connect them together.
+				calculate.close_loop(labs[i], lreturn[i]);
+			}
+			
 
 			while (final_choice.final_path.length < final_choice.final_rpath.length)
 			{
@@ -3040,14 +3101,18 @@ var roomPlanner =
 				final_choice.final_rpath.shift();
 			}
 
+			//Raw values for testing.
 			final_choice.mine_pos = {x: mine_pos.x, y: mine_pos.y};
 			final_choice.hand_pos = {x: hand_pos.x, y: hand_pos.y};
 			final_choice.spawn_pos = spawn_pos;
 			final_choice.store_pos = store_pos;
 			final_choice.term_pos = term_pos;
 			final_choice.fact_pos = fact_pos;
+			final_choice.nuke_pos = nuke_pos;
 			final_choice.spawn_dir = spawn_dir;
 			final_choice.needs_towing = needs_towing;
+			final_choice.labs_path = labs;
+			final_choice.labs_return = lreturn;
 			final_choice.efat = efat;
 
 			if (!final_choice.efat)
@@ -3080,12 +3145,18 @@ var roomPlanner =
 				ereturn: final_choice.final_rpath,
 				efat: final_choice.efat
 			};
+			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+			{
+				Memory.rooms[room_name].sources[i].labs = final_choice.labs_path[i];
+				Memory.rooms[room_name].sources[i].lreturn = final_choice.labs_return[i];
+			}
 
 			//Structures will be stored in their intended places.
 			Memory.rooms[room_name].spawns[2] = {id: null, x: final_choice.spawn_pos.x, y: final_choice.spawn_pos.y};
 			Memory.rooms[room_name].buildings.store = {id: null, x: final_choice.store_pos.x, y: final_choice.store_pos.y};
 			Memory.rooms[room_name].buildings.terminal = {id: null, x: final_choice.term_pos.x, y: final_choice.term_pos.y};
 			Memory.rooms[room_name].buildings.factory = {id: null, x: final_choice.fact_pos.x, y: final_choice.fact_pos.y};
+			Memory.rooms[room_name].buildings.nuker = {id: null, x: final_choice.nuke_pos.x, y: final_choice.nuke_pos.y};
 
 			//If we need to build non-mining creeps, dir.all will be used. It points into the stamp, which will get us back to base.
 			Memory.rooms[room_name].spawns[2].dir = {all: final_choice.spawn_dir[0], mine: final_choice.spawn_dir};
