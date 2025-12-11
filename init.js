@@ -800,10 +800,69 @@ var init =
 
 				//Now place our initial construction sites.
 				Game.spawns[spawn].room.createConstructionSite(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, STRUCTURE_CONTAINER);	//Upgrader container.
+
+				//Prepare to find extension locations.
 				let keys = ['exitpaths', 'mine', 'mreturn', 'upgrade', 'ureturn'];
 				let matches = [];
 				temp = [];
-				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+
+				//Prepare the inner path checks ahead of time so it doesn't explode.
+				let check_paths = {};
+				let check_exit_paths = {};
+				for (let e in Memory.rooms[room_name].exitpaths)	//The exit path.
+				{
+					for (let m = 0; m < Memory.rooms[room_name].exitpaths[e].length; m++)
+					{
+						calculate.mark_found(Memory.rooms[room_name].exitpaths[e][m].x, Memory.rooms[room_name].exitpaths[e][m].y, check_exit_paths);
+					}
+				}
+				for (let te = 0; te < temp_exitpaths.length; te++)	//The temporary exit path.
+				{
+					if (temp_exitpaths[te])	//A temporary exit path.
+					{
+						for (let m = 0; m < temp_exitpaths[te].length; m++)
+						{
+							calculate.mark_found(temp_exitpaths[te][m].x, temp_exitpaths[te][m].y, check_exit_paths);
+						}
+					}
+				}
+				for (let p = 1; p < keys.length; p++)	//All other paths.
+				{
+					for (let i = 0; i < len; i++)
+					{
+						for (let m = 0; m < Memory.rooms[room_name].sources[i][keys[p]].length; m++)
+						{
+							calculate.mark_found(Memory.rooms[room_name].sources[i][keys[p]][m].x, Memory.rooms[room_name].sources[i][keys[p]][m].y, check_paths);
+						}
+					}
+				}
+				for (let i = -1; i < len; i++)
+				{
+					if (i === -1)	//Room-wide.
+					{
+						for (let x = -1; x < 2; x++)	//Are we within 1 range of the (starting) spawn or the upgrader?
+						{
+							for (let y = -1; y < 2; y++)
+							{
+								calculate.mark_found(Game.spawns[spawn].pos.x + x, Game.spawns[spawn].pos.y + y, check_paths);
+								calculate.mark_found(Memory.rooms[room_name].upgrade.slice(-1)[0].x + x, Memory.rooms[room_name].upgrade.slice(-1)[0].y + y, check_paths);
+							}
+						}
+					}
+					else	//Source-bound.
+					{
+						for (let x = -1; x < 2; x++)	//Are we within 1 range of a fatty miner?
+						{
+							for (let y = -1; y < 2; y++)
+							{
+								calculate.mark_found(Memory.rooms[room_name].sources[i].mfat[0].x + x, Memory.rooms[room_name].sources[i].mfat[0].y + y, check_paths);
+							}
+						}
+					}
+				}
+
+				//Now find the extension locations.
+				for (let i = 0, terrain = Game.rooms[room_name].getTerrain(); i < Memory.rooms[room_name].sources.length; i++)
 				{
 					Game.spawns[spawn].room.createConstructionSite(Memory.rooms[room_name].sources[i].mfat[0].x, Memory.rooms[room_name].sources[i].mfat[0].y, STRUCTURE_CONTAINER);	//Harvester containers.
 
@@ -832,7 +891,7 @@ var init =
 									let tempcont = false;
 
 									//Don't accidentally grab walls. Don't process a false one.
-									if (Game.rooms[room_name].getTerrain().get(tempx, tempy) != TERRAIN_MASK_WALL)
+									if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL)
 									{
 										if (typeof temp[i].textensions[tempx] != 'object')
 										{
@@ -843,15 +902,19 @@ var init =
 											temp[i].textensions[tempx][tempy] = {}
 										}
 
-										//Don't process a false one. But we don't need to process a true one either.
-										if (temp[i].textensions[tempx][tempy] === false || temp[i].textensions[tempx][tempy] === true)
+										//Now check this position against existing paths.
+										if (calculate.check_xy(tempx, tempy, check_paths) || calculate.check_xy(tempx, tempy, check_exit_paths))
 										{
+											calculate.mark_found(tempx, tempy, temp[i].textensions, false);
 											tempcont = true;
-											break;
 										}
 
-										//Now check this position against existing paths.
-										for (let p = 0; p < keys.length; p++)
+										if (temp[i].textensions[tempx][tempy] !== false)
+										{
+											calculate.mark_found(tempx, tempy, temp[i].textensions);
+										}
+
+										/*for (let p = 0; p < keys.length; p++)
 										{
 											if (keys[p] === 'exitpaths')
 											{
@@ -894,7 +957,7 @@ var init =
 													{
 														for (let m = 0; m < temp_exitpaths[te].length; m++)
 														{
-															//Are we within 1 range of any path steps?
+															//Are we on any path steps?
 															if (Math.max(Math.abs(temp_exitpaths[te][m].x - tempx), Math.abs(temp_exitpaths[te][m].y - tempy)) === 0
 																||	Game.spawns[spawn].pos.inRangeTo(tempx, tempy, 1)	//Are we within 1 range of the (starting) spawn or the upgrader?
 																||	Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y).inRangeTo(tempx, tempy, 1))
@@ -970,7 +1033,7 @@ var init =
 											{
 												break;
 											}
-										}
+										}*/
 									}
 								}
 							}
