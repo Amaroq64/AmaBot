@@ -551,8 +551,8 @@ var init =
 					temp[i].ureturn[0].dy = temp[i].ureturn.slice(0, 1)[0].y - tempPos.y;
 					temp[i].upgrade[0].direction =	Game.rooms[room_name].getPositionAt(temp[i].ureturn[temp[i].ureturn.length -2].x, temp[i].ureturn[temp[i].ureturn.length -2].y)
 						.getDirectionTo(Game.rooms[room_name].getPositionAt(tempPos2.x, tempPos2.y));
-					temp[i].upgrade[0].dx = temp[i].ureturn[temp[i].ureturn.length -2].x - tempPos2.x;
-					temp[i].upgrade[0].dy = temp[i].ureturn[temp[i].ureturn.length -2].y - tempPos2.y;
+					temp[i].upgrade[0].dx = temp[i].ureturn[temp[i].ureturn.length - 2].x - tempPos2.x;
+					temp[i].upgrade[0].dy = temp[i].ureturn[temp[i].ureturn.length - 2].y - tempPos2.y;
 
 					//Now store the paths we've built.
 					for (let path in temp[i])

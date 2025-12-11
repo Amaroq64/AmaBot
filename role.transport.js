@@ -50,7 +50,7 @@ var roleTransport =
 				}
 			}
 		}
-		
+
 		//If we're by energy, pick it up.
 		for (let e = 0; e < room_energy.length; e++)
 		{
