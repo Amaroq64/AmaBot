@@ -278,6 +278,20 @@ var roomPlanner =
 					}
 				}
 
+				//Are we missing our factory?
+				if (!Game.getObjectById(Memory.rooms[room_name].buildings.factory.id))
+				{
+					let factory = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_FACTORY}});
+					if (factory.length)
+					{
+						Memory.rooms[room_name].buildings.factory.id = factory[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.factory.x, Memory.rooms[room_name].buildings.factory.y, STRUCTURE_FACTORY);
+					}
+				}
+
 				//Are we missing any of our labs?
 				for (la = 0; la < Memory.rooms[room_name].goals.labs; la++)
 				{
@@ -2983,6 +2997,43 @@ var roomPlanner =
 				}
 			}
 
+			//Once everything else is done, let's place a factory as well.
+			let fact_pos;
+			for (let fa = bpos_i, single_positions = [], temp_pos_live, tempx, tempy; fa >= 0; fa--)
+			{
+				for (let x = -1; x < 2; x++)
+				{
+					tempx = final_choice.final_path[fa].x + x;
+
+					for (let y = -1; y < 2; y++)
+					{
+						tempy = final_choice.final_path[fa].y + y;
+
+						if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy)	//Don't use the path or labs. Don't touch an exit tile.
+							&& !(tempx === term_pos.x && tempy === term_pos.y) && !(tempx === store_pos.x && tempy === store_pos.y) && !(tempx === spawn_pos.x && tempy === spawn_pos.y))	//Don't use the terminal, store, or spawn if it's here.
+						{
+							//temp_pos_live = new RoomPosition(tempx, tempy, room_name);
+							single_positions.push({x: tempx, y: tempy});
+						}
+					}
+				}
+
+				if (single_positions.length)	//Once we've gotten a few, use them.
+				{
+					//Rather than deciding these arbitrarily, let's put the factory slightly closer to bpos.
+					fact_pos = calculate.true_closest(new RoomPosition(final_choice.final_path[bpos_i].x, final_choice.final_path[bpos_i].y, room_name), single_positions,
+						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+							costCallback: function(roomName, costMatrix)
+							{
+								return tempcostmatrix;
+							}
+						})[0];
+					fact_pos = {x: fact_pos.x, y: fact_pos.y};
+
+					break;
+				}
+			}
+
 			while (final_choice.final_path.length < final_choice.final_rpath.length)
 			{
 				console.log('Matching path array sizes.');
@@ -2994,6 +3045,7 @@ var roomPlanner =
 			final_choice.spawn_pos = spawn_pos;
 			final_choice.store_pos = store_pos;
 			final_choice.term_pos = term_pos;
+			final_choice.fact_pos = fact_pos;
 			final_choice.spawn_dir = spawn_dir;
 			final_choice.needs_towing = needs_towing;
 			final_choice.efat = efat;
@@ -3033,6 +3085,7 @@ var roomPlanner =
 			Memory.rooms[room_name].spawns[2] = {id: null, x: final_choice.spawn_pos.x, y: final_choice.spawn_pos.y};
 			Memory.rooms[room_name].buildings.store = {id: null, x: final_choice.store_pos.x, y: final_choice.store_pos.y};
 			Memory.rooms[room_name].buildings.terminal = {id: null, x: final_choice.term_pos.x, y: final_choice.term_pos.y};
+			Memory.rooms[room_name].buildings.factory = {id: null, x: final_choice.fact_pos.x, y: final_choice.fact_pos.y};
 
 			//If we need to build non-mining creeps, dir.all will be used. It points into the stamp, which will get us back to base.
 			Memory.rooms[room_name].spawns[2].dir = {all: final_choice.spawn_dir[0], mine: final_choice.spawn_dir};
