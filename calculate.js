@@ -165,6 +165,21 @@ var calculate =
 		return path2;
 	},
 
+	close_loop: function(path1, path2)
+	{
+		//Alter the first step in each path so it completes the loop.
+		tempPos = path1.slice(-1)[0];
+		tempPos2 = path1.slice(0, 1)[0];
+
+		path2[0].direction = calculate.orientation[path2.slice(0, 1)[0].x - tempPos.x][path2.slice(0, 1)[0].y - tempPos.y];
+		path2[0].dx = path2.slice(0, 1)[0].x - tempPos.x;
+		path2[0].dy = path2.slice(0, 1)[0].y - tempPos.y;
+
+		path1[0].direction = calculate.orientation[tempPos2.x - path2[path2.length - 1].x][tempPos2.y - path2[path2.length - 1].y];
+		path1[0].dx = tempPos2.x - path2[path2.length - 1].x;
+		path1[0].dy = tempPos2.y - path2[path2.length - 1].y;
+	},
+
 	true_closest: function(start, positions, options)
 	{
 		if (!positions.length || !positions[0].x || !positions[0].y)
@@ -275,6 +290,7 @@ var calculate =
 				calculate.cleanpaths(room_name, 'init');
 				calculate.cleanpaths(room_name, 'defender');
 				calculate.cleanpaths(room_name, 'empire');
+				calculate.cleanpaths(room_name, 'labs');
 				break;
 			//Since moveByPath() compliant steps state the direction of move from the previous step, we will need to concatenate one step from the followup path to be sure of any direction changes.
 			case 'init':
@@ -553,6 +569,24 @@ var calculate =
 					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'exitreturn', false, e, temppath,
 					{
 						exitreturn: Memory.rooms[room_name].exitpaths[e]
+					});
+				}
+				break;
+
+			case 'labs':
+				//We need to do the path to and from the lab stamp.
+				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+				{
+					temppath = Memory.rooms[room_name].sources[i].labs;
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'labs', i, false, temppath,
+					{
+						lreturn: Memory.rooms[room_name].sources[i].lreturn
+					});
+					dir = Memory.rooms[room_name].sources[i].lreturn[0].direction;
+					temppath = Memory.rooms[room_name].sources[i].lreturn;	//Try without dir.
+					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'lreturn', i, false, temppath,
+					{
+						labs: Memory.rooms[room_name].sources[i].labs
 					});
 				}
 				break;
