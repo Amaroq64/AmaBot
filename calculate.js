@@ -1055,9 +1055,9 @@ var calculate =
 			{
 				calculate.sortExtensions(room);
 			}
-			let spawns = calculate.spawns[room];
+			let spawns = calculate.spawns[room] < 3 ? calculate.spawns[room] : 2;
 			let extensions = calculate.sortedextensions[room].length - spawns;
-			return (SPAWN_ENERGY_CAPACITY * (spawns < 3 ? spawns : 2)) + (EXTENSION_ENERGY_CAPACITY[Game.rooms[room].controller.level] * extensions);
+			return (SPAWN_ENERGY_CAPACITY * spawns) + (EXTENSION_ENERGY_CAPACITY[Game.rooms[room].controller.level] * extensions);
 		}
 		else
 		{
