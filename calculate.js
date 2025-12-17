@@ -590,6 +590,23 @@ var calculate =
 						labs: Memory.rooms[room_name].sources[i].labs
 					});
 				}
+
+				//We need to do the path through the lab stamp as well.
+				temppath = Memory.rooms[room_name].mine.epath;
+				calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'epath', false, false, temppath,
+				{
+					lreturn: Memory.rooms[room_name].mine.ereturn,
+					efat: Memory.rooms[room_name].mine.efat
+				});
+				dir = Memory.rooms[room_name].mine.ereturn[0].direction;
+				temppath = Memory.rooms[room_name].mine.ereturn;	//Try without dir.
+				calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'ereturn', false, false, temppath,
+				{
+					labs: Memory.rooms[room_name].mine.epath
+				});
+				//Efat is the direction from the end of epath to the extraction container.
+				temppath = [Memory.rooms[room_name].mine.epath.slice(-1)[0], Memory.rooms[room_name].mine.efat[0]];
+				calculate.writethispath(room_name, calculate.cleanthispath(temppath, false), 'efat', false, false, temppath);
 				break;
 		}
 
@@ -922,6 +939,53 @@ var calculate =
 		return true;
 	},
 
+	deletethispath: function(room_name, types)
+	{
+		let path = Memory.rooms[room_name].path;
+		for (let x in path)
+		{
+			for (let y in path[x])
+			{
+				for (let type in path[x][y])
+				{
+					//Delete tiles of this type.
+					for (let t = 0; t < types.length; t++)
+					{
+						if (type === types[t])
+						{
+							path[x][y][type] = undefined;
+						}
+					}
+
+					if (type === 'flipper')
+					{
+						let fkeys = Object.keys(path[x][y][type]).length;
+						for (let flipper in path[x][y][type])
+						{
+							//Delete flippers of this type.
+							for (let t = 0; t < types.length; t++)
+							{
+								if (flipper === types[t])
+								{
+									if (fkeys === 1)	//If there was only one flipper, remove the whole flipper.
+									{
+										path[x][y][type] = undefined;
+										break;
+									}
+									else	//Remove this particular flipper.
+									{
+										path[x][y][type][flipper] = undefined;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return true;
+	},
+
 	deleteoldpaths: function(room_name, type)
 	{
 		switch(type)
@@ -963,6 +1027,15 @@ var calculate =
 							Memory.rooms[room_name].sources[i].dreturn[d] = [Memory.rooms[room_name].sources[i].dreturn[d][0], Memory.rooms[room_name].sources[i].dreturn[d].slice(-1)[0]];
 						}
 					}
+				}
+				break;
+			case 'labs':
+				Memory.rooms[room_name].mine.epath =	[Memory.rooms[room_name]  .mine.epath[0], Memory.rooms[room_name]  .mine.epath.slice(-1)[0]];
+				Memory.rooms[room_name].mine.ereturn =	[Memory.rooms[room_name].mine.ereturn[0], Memory.rooms[room_name].mine.ereturn.slice(-1)[0]];
+				for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+				{
+					Memory.rooms[room_name].sources[i].labs =		[Memory.rooms[room_name].sources[i]   .labs[0],	Memory.rooms[room_name].sources[i]   .labs.slice(-1)[0]];
+					Memory.rooms[room_name].sources[i].lreturn =	[Memory.rooms[room_name].sources[i].lreturn[0],	Memory.rooms[room_name].sources[i].lreturn.slice(-1)[0]];
 				}
 		}
 		return true;
