@@ -41,7 +41,7 @@ var init =
 					mineral: null,
 					mine: null,
 					react: {},
-					creeps: {upgrader: [], dbuilder: []},	//We don't need an upgrade builder because the source builders patrol to it.
+					creeps: {upgrader: [], dbuilder: [], custodian: [], handler: [], extractor: []},	//We don't need an upgrade builder because the source builders patrol to it.
 					buildings: {upgradecontainer: null},
 					ideal: {},
 					goals: {level: 1}
@@ -79,7 +79,7 @@ var init =
 
 				//Record the found mineral.
 				//Strip everything but id and position.
-				Memory.rooms[room_name].mineral = {id: mineral.id, pos: {x: mineral.pos.x, y: mineral.pos.y}};
+				Memory.rooms[room_name].mineral = {id: mineral.id, eid: null, pos: {x: mineral.pos.x, y: mineral.pos.y}};
 
 				//The first path that emerges diagonally from the spawn should block the opposing diagonal.
 				//Once a different path emerges from the spawn after this diagonal, we know our second spawn location and weigh all paths after that to touch the second spawn.
