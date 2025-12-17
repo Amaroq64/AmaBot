@@ -162,6 +162,19 @@ var test =
 									}
 									break;
 
+								case 'epath':
+								case 'ereturn':
+									if (Memory.test && Memory.test.indexOf(path) === -1)
+									{
+										continue;
+									}
+									if(!style.backgroundColor)
+									{
+										style.backgroundColor = 'brown';
+									}
+
+									Game.rooms[room_name].visual.text(test.direction[Memory.rooms[room_name].path[x][y][path] || 0], x2, y2, style);
+
 								case 'flipper':
 									if (Memory.test && Memory.test.indexOf(path) === -1)
 									{
@@ -555,8 +568,10 @@ var test =
 			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 			{
 				Game.rooms[room_name].visual.poly(Memory.rooms[room_name].sources[i].labs, {stroke: 'darkblue', lineStyle: "dashed"});
-				Game.rooms[room_name].visual.poly(Memory.rooms[room_name].sources[i].lreturn, {stroke: 'darkred', lineStyle: "dashed"});
+				Game.rooms[room_name].visual.poly(Memory.rooms[room_name].sources[i].lreturn, {stroke: 'darkblue', lineStyle: "dashed"});
 			}
+			Game.rooms[room_name].visual.poly(Memory.rooms[room_name].mine.epath, {stroke: 'darkred', lineStyle: "dashed"});
+			Game.rooms[room_name].visual.poly(Memory.rooms[room_name].mine.ereturn, {stroke: 'darkred', lineStyle: "dashed"});
 		},
 
 		stamp_color: ['gold', 'gray', 'black', 'white', 'gold'],
