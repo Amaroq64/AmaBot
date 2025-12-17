@@ -52,6 +52,7 @@ var roomPlanner =
 					{
 						calculate.deleteoldpaths(room_name, 'init');
 						calculate.deleteoldpaths(room_name, 'defender');
+						calculate.deleteoldpaths(room_name, 'labs');
 					}
 					Memory.rooms[room_name].init = 2;
 					console.log('Init 2 ' + Game.cpu.getUsed());
@@ -81,7 +82,10 @@ var roomPlanner =
 				require('defender').setDefense(room_name);	//Our walls should be done by now.
 				break;
 			case 6:
+				roomideal.custodian = 1;
 			case 7:
+				roomideal.extractor = 1;
+				roomideal.handler = 1;
 			case 8:
 				require('defender').checkDefense(room_name);
 				Memory.rooms[room_name].goals.labs = CONTROLLER_STRUCTURES.lab[Game.rooms[room_name].controller.level];
@@ -341,6 +345,20 @@ var roomPlanner =
 						}
 					}
 				}
+
+				//Are we missing our extractor?
+				if (!Game.getObjectById(Memory.rooms[room_name].mineral.eid))
+				{
+					let extractor = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_EXTRACTOR}});
+					if (extractor.length)
+					{
+						Memory.rooms[room_name].mineral.eid = extractor[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mineral.pos.x, Memory.rooms[room_name].mineral.pos.y, STRUCTURE_EXTRACTOR);
+					}
+				}
 			}
 
 			if ((Game.time % 100 === 0 || Memory.rooms[room_name].defense.update) && Game.rooms[room_name].controller.level > 1)	//Let's only check every once in a while. No rush here.
@@ -357,6 +375,14 @@ var roomPlanner =
 				{
 					Memory.rooms[room_name].defense.update = undefined;
 				}
+			}
+
+			//Refresh our extensions every once in a while.
+			if (Game.time % 5000 === 0)
+			{
+				console.log('Refreshing Extensions.');
+				calculate.extensions[room_name] = undefined;
+				calculate.sortedextensions[room_name] = undefined;
 			}
 		}
 
@@ -633,6 +659,12 @@ var roomPlanner =
 						{
 							costMatrix.set(Memory.rooms[room_name].sources[i].buildings.extensions[e].x, Memory.rooms[room_name].sources[i].buildings.extensions[e].y, 255);
 						}
+					}
+
+					//Block our two main spawns. (This will be needed for later.)
+					for (let sp = 0; sp < 2; sp++)
+					{
+						costMatrix.set(Memory.rooms[room_name].spawns[sp].x, Memory.rooms[room_name].spawns[sp].y, 255);
 					}
 
 					//Never leave the room.
@@ -1838,9 +1870,6 @@ var roomPlanner =
 						//Since we have mine_pos, hand_pos, and spawn_pos, let's point the spawn to them.
 						spawn_dir.push(calculate.orientation[hand_pos.x - spawn_pos.x][hand_pos.y - spawn_pos.y]);
 						spawn_dir.push(calculate.orientation[mine_pos.x - spawn_pos.x][mine_pos.y - spawn_pos.y]);
-
-						//Since the last position goes one step beyond apos and touches the mineral, we can cut it off and make apos our last step.
-						efat = final_choice.final_path.pop();
 					}
 					else
 					{
@@ -2792,9 +2821,6 @@ var roomPlanner =
 						hand_pos = new RoomPosition(final_choice.final_path[last_i - 1].x, final_choice.final_path[last_i - 1].y, room_name);
 					}*/
 
-					//Since the last position goes one step beyond apos and we found an alternative lab-touching space that touches the mineral, we can cut it off and make apos our last step.
-					efat = final_choice.final_path.pop();
-
 					//Since we have mine_pos, hand_pos, and spawn_pos, let's point the spawn to them.
 					if (needs_towing)
 					{
@@ -3010,6 +3036,18 @@ var roomPlanner =
 				}
 			}
 
+			//Dedicate the last step to the stationary miner. But if the last step isn't already there, we need to fabricate it.
+			if (final_choice.final_path[final_choice.final_path.length - 1].x === mine_pos.x && final_choice.final_path[final_choice.final_path.length - 1].y == mine_pos.y)
+			{
+				efat = final_choice.final_path.pop();
+			}
+			else
+			{
+				efat = {x: mine_pos.x, y: mine_pos.y,
+					dx: mine_pos.x - final_choice.final_path[final_choice.final_path.length - 1].x, dy: mine_pos.y - final_choice.final_path[final_choice.final_path.length - 1].y,
+					direction: calculate.orientation[mine_pos.x - final_choice.final_path[final_choice.final_path.length - 1].x][mine_pos.y - final_choice.final_path[final_choice.final_path.length - 1].y]}
+			}
+
 			//Once everything else is done, let's place a factory and a nuke as well.
 			let fact_pos;
 			let nuke_pos;
@@ -3101,7 +3139,24 @@ var roomPlanner =
 				final_choice.final_rpath.shift();
 			}
 
-			//Raw values for testing.
+			//Point our first two spawns to the stamp path. They should be capable of producing the stamp roles if necessary.
+			//The first step might be inconsistent.
+			let first_step_index = 0;
+			if (Memory.rooms[room_name].spawns[0].x === final_choice.final_path[0].x && Memory.rooms[room_name].spawns[0].y === final_choice.final_path[0].y)
+			{
+				first_step_index = 1;
+			}
+			Memory.rooms[room_name].spawns[0].dir.labdir = calculate.orientation[final_choice.final_path[first_step_index].dx][final_choice.final_path[first_step_index].dy];
+			Memory.rooms[room_name].spawns[1].dir.labdir = calculate.orientation[final_choice.final_path[first_step_index].x - Memory.rooms[room_name].spawns[1].x][final_choice.final_path[first_step_index].y - Memory.rooms[room_name].spawns[1].y];
+
+			//The main path shouldn't go in and out of the spawn. Just touch it.
+			final_choice.final_path.shift();
+			final_choice.final_rpath.pop();
+
+			//Now connect the paths together.
+			calculate.close_loop(final_choice.final_path, final_choice.final_rpath);
+
+			//Raw values before finalization.
 			final_choice.mine_pos = {x: mine_pos.x, y: mine_pos.y};
 			final_choice.hand_pos = {x: hand_pos.x, y: hand_pos.y};
 			final_choice.spawn_pos = spawn_pos;
@@ -3113,21 +3168,23 @@ var roomPlanner =
 			final_choice.needs_towing = needs_towing;
 			final_choice.labs_path = labs;
 			final_choice.labs_return = lreturn;
-			final_choice.efat = efat;
 
+			//Efat needs to be an array with one element in it, just like mfat.
+			final_choice.efat = [efat];
 			if (!final_choice.efat)
 			{
+				console.log('Generating efat.');
 				final_choice.efat =
-				{
+				[{
 					x: final_choice.mine_pos.x,
 					y: final_choice.mine_pos.y,
 					dx: final_choice.mine_pos.x - final_choice.hand_pos.x,
 					dy: final_choice.mine_pos.y - final_choice.hand_pos.y,
 					direction: calculate.orientation[final_choice.mine_pos.x - final_choice.hand_pos.x][final_choice.mine_pos.y - final_choice.hand_pos.y]
-				};
+				}];
 			}
 
-			//For testing.
+			//For observing the results during testing.
 			if (!Memory.mineTest)
 			{
 				Memory.mineTest = {};
@@ -3141,7 +3198,7 @@ var roomPlanner =
 				labs: final_choice.labs,
 				miner: final_choice.mine_pos,
 				handler: final_choice.hand_pos,
-				expath: final_choice.final_path,
+				epath: final_choice.final_path,
 				ereturn: final_choice.final_rpath,
 				efat: final_choice.efat
 			};
@@ -3171,6 +3228,13 @@ var roomPlanner =
 		}
 	},
 
+	redo_labs: function(room_name)
+	{
+		calculate.deletethispath(room_name, ['labs', 'lreturn', 'epath', 'ereturn', 'efat']);
+		roomPlanner.setupMining(room_name);
+		calculate.cleanpaths(room_name, 'labs');
+	},
+
 	init_complete(room_name, test = false)
 	{
 		//Finalize the room.
@@ -3186,6 +3250,7 @@ var roomPlanner =
 		{
 			calculate.deleteoldpaths(room_name, 'init');
 			calculate.deleteoldpaths(room_name, 'defender');
+			calculate.deleteoldpaths(room_name, 'labs');
 		}
 		Memory.rooms[room_name].init = 2;
 		console.log('Init 2 ' + Game.cpu.getUsed());
@@ -3195,6 +3260,8 @@ var roomPlanner =
 			roomPlanner.run(room_name);
 			Memory.rooms[room_name].init = undefined;
 		}
+
+		return !test;
 	}
 };
 
