@@ -32,7 +32,6 @@ var control =
 				for (let n = 0; n < Memory.rooms[room_name].creeps[creep_type].length; n++)	//Iterate each creep in this role.
 				{
 					let creep = Game.creeps[Memory.rooms[room_name].creeps[creep_type][n]];
-					//console.log(creep.name);
 					//Run the role method for this creep. It does its thing, then decides whether we move or not.
 					//Assumes we have a method for every creep role we could find here.
 					if (!creep.spawning)
@@ -46,13 +45,11 @@ var control =
 			}
 			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)	//Iterate over each source in this room.
 			{
-				//let totalcreeps = 0;
 				for (let creep_type in Memory.rooms[room_name].sources[i].creeps)	//Enumerate creep roles assigned to this source.
 				{
 					for (let n = 0; n < Memory.rooms[room_name].sources[i].creeps[creep_type].length; n++)		//Iterate each creep in this role.
 					{
 						let creep = Game.creeps[Memory.rooms[room_name].sources[i].creeps[creep_type][n]];
-						//console.log(creep.name);
 						//Run the role method for this creep. It does its thing, then decides whether we move or not.
 						//Assumes we have a method for every creep role we could find here.
 						if (creep && !creep.spawning)
