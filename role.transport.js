@@ -3,7 +3,6 @@ var roleTransport =
 	room_containers: undefined,
 	room_energy: undefined,
 	room_ruins: undefined,
-	
 
 	withdraw: function(creep)
 	{
@@ -23,8 +22,10 @@ var roleTransport =
 
 		for (let e = 0; e < room_containers.length; e++)
 		{
-			//Find the one we're by, but make sure it's not the upgrader container.
-			if (creep.pos.inRangeTo(room_containers[e], 1) && !creep.pos.inRangeTo(creep.room.getPositionAt(Memory.rooms[creep.room.name].upgrade.slice(-1)[0].x, Memory.rooms[creep.room.name].upgrade.slice(-1)[0].y), 1))
+			//Find the one we're by. Make sure it's not the upgrader container.
+			if (creep.pos.inRangeTo(room_containers[e], 1)
+				&& ((!Memory.rooms[creep.room.name].ideal.upgrader && creep.name.indexOf('Utransport') === -1)	//If we have no upgrader, we have a hybrid.
+				|| !creep.pos.inRangeTo(creep.room.getPositionAt(Memory.rooms[creep.room.name].upgrade.slice(-1)[0].x, Memory.rooms[creep.room.name].upgrade.slice(-1)[0].y), 1)))
 			{
 				//If we're by a full source container, we need to not leave thousands of energy on the ground.
 				for (let ee = 0; ee < room_energy.length; ee++)
@@ -116,14 +117,15 @@ var roleTransport =
 
 		if (creep.pos.inRangeTo(tpos, 1) && creep.carry.energy > 0)
 		{
-			let room_targets = creep.room.lookForAt(LOOK_STRUCTURES, tpos) //Try to deposit into a structure.
-			if(creep.transfer(room_targets[0], RESOURCE_ENERGY) == OK)
+			let room_targets = creep.room.lookForAt(LOOK_CREEPS, tpos, {filter: function(tcreep) {return tcreep.store.getFreeCapacity(RESOURCE_ENERGY) >= creep.store.getUsedCapacity(RESOURCE_ENERGY)}}); //Try to deposit into a creep.
+
+			if(creep.transfer(room_targets[0], RESOURCE_ENERGY) === OK)
 			{
 				//console.log(creep.name + " is depositing at " + room_targets[0].pos.x + ", " + room_targets[0].pos.y + ".");
 			}
-			else
+			else if (creep.transfer(creep.room.lookForAt(LOOK_STRUCTURES, tpos)[0], RESOURCE_ENERGY) !== OK)	//Try to deposit into a structure.
 			{
-				let room_targets = creep.room.lookForAt(LOOK_CREEPS, tpos) //Try to deposit into a creep.
+				room_targets = creep.room.lookForAt(LOOK_CREEPS, tpos) //Try to deposit into a creep.
 				creep.transfer(room_targets[0], RESOURCE_ENERGY);
 				//console.log("Depositing into a creep.");
 			}

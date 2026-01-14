@@ -15,13 +15,20 @@ var roomPlanner =
 
 		//Returns transports[source][miner/upgrader]
 		let transports = [];
-		if (Game.rooms[room_name].controller.level > 5 || Game.rooms[room_name].controller.level == 1)	//Having one of each at level 1 works around an issue.
+		if (Game.rooms[room_name].controller.level > 5 || Game.rooms[room_name].controller.level === 1)	//Having one of each at level 1 works around an issue.
 		{
 			//When our creeps get too big, we can't keep all roles alive.
 			//Have just one transport of each type.
 			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 			{
-				transports[i] = {miner: 1, upgrader: 1};
+				if (Memory.rooms[room_name].sources[i].creeps.hybrid)
+				{
+					transports[i] = {miner: 1, hybrid: 1, upgrader: undefined};
+				}
+				else
+				{
+					transports[i] = {miner: 1, hybrid: undefined, upgrader: 1};
+				}
 			}
 		}
 		else
@@ -29,10 +36,20 @@ var roomPlanner =
 			transports = calculate.idealTransports(room_name); //Using the room's maximum energy for that level, and the lengths of its paths, this calculates the ideal number of transports.
 		}
 
-		let roomideal = {};
-		let sourceideal = [{}, {}];
+		let roomideal = {upgrader: 1};	//Each room will always need a fatty upgrader.
+		let sourceideal = [];
 
-		roomideal.upgrader = 1; //Each room will always need a fatty upgrader.
+		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+		{
+			sourceideal.push({miner: undefined, hybrid: undefined, upgrader: undefined});
+
+			if (Memory.rooms[room_name].sources[i].creeps.hybrid)
+			{
+				roomideal.upgrader = undefined;	//If there's a hybrid, it plays the role of our upgrader.
+				delete Memory.rooms[room_name].creeps.upgrader;
+				break;
+			}
+		}
 		switch(Game.rooms[room_name].controller.level)
 		{
 			case 1:
@@ -59,7 +76,7 @@ var roomPlanner =
 
 					roomideal.dbuilder = 0;	//We can't build walls yet.
 				}
-				else if (Game.cpu.bucket >= 600 && Memory.rooms[room_name].init !== 2)
+				else if (Game.cpu.bucket >= 100 && Memory.rooms[room_name].init !== 2)
 				{
 					//Keep trying until we succeed.
 					//console.log('Trying again.');
@@ -75,17 +92,18 @@ var roomPlanner =
 				Memory.rooms[room_name].init = undefined;
 			default:
 				roomideal.dbuilder = 1;	//we can build walls now.
-				//console.log('We can build walls now.');
 				require('defender').checkDefense(room_name);
 				break;
 			case 3:
 				require('defender').setDefense(room_name);	//Our walls should be done by now.
 				break;
-			case 6:
-				roomideal.custodian = 1;
 			case 7:
-				roomideal.extractor = 1;
-				roomideal.handler = 1;
+				//Keep these at 0 while we're still developing the roles.
+				roomideal.custodian = 0;
+				roomideal.extractor = 0;
+				roomideal.handler = 0;
+			case 6:
+				roomideal.custodian = 0;
 			case 8:
 				require('defender').checkDefense(room_name);
 				Memory.rooms[room_name].goals.labs = CONTROLLER_STRUCTURES.lab[Game.rooms[room_name].controller.level];
@@ -95,9 +113,19 @@ var roomPlanner =
 		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 		{
 			//Each source will always need a fatty harvester, and a certain number of mining transports and upgrading transports.
-			sourceideal[i].harvester = 1;
-			sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
-			sourceideal[i].utransport = transports[i].upgrader;	//This is an alias.
+			if (Memory.rooms[room_name].sources[i].creeps.harvester)
+			{
+				sourceideal[i].harvester = 1;
+				sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
+				sourceideal[i].utransport = transports[i].upgrader;	//This is an alias.
+				delete Memory.rooms[room_name].sources[i].creeps.hybrid;
+			}
+			else if(Memory.rooms[room_name].sources[i].creeps.hybrid)
+			{
+				sourceideal[i].hybrid = 1;
+				sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
+				delete Memory.rooms[room_name].sources[i].creeps.harvester;
+			}
 			sourceideal[i].builder = 1;	//We don't need an upgrade builder because the source builders patrol to it.
 			sourceideal[i].miningcontainer = 1; //The fatty needs a container to sit on.
 			sourceideal[i].extensions = 0;	//Initialize this so we can count it later.
@@ -107,13 +135,27 @@ var roomPlanner =
 		//Commit our ideals for each role.
 		for (let role in roomideal)
 		{
-			Memory.rooms[room_name].ideal[role] = roomideal[role];
+			if (roomideal[role])
+			{
+				Memory.rooms[room_name].ideal[role] = roomideal[role];
+			}
+			else
+			{
+				delete Memory.rooms[room_name].ideal[role];
+			}
 		}
 		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 		{
 			for (let role in sourceideal[i])
 			{
-				Memory.rooms[room_name].sources[i].ideal[role] = sourceideal[i][role];
+				if (sourceideal[i][role])
+				{
+					Memory.rooms[room_name].sources[i].ideal[role] = sourceideal[i][role];
+				}
+				else if (role !== 'extensions')
+				{
+					delete Memory.rooms[room_name].sources[i].ideal[role];
+				}
 			}
 		}
 
@@ -183,7 +225,7 @@ var roomPlanner =
 				let tpos = Memory.rooms[room_name].upgrade.slice(-1)[0];
 				tpos = Game.rooms[room_name].getPositionAt(tpos.x, tpos.y);
 				tcontainer = Game.rooms[room_name].lookForAt(LOOK_CONSTRUCTION_SITES, tpos);
-				if (tcontainer.length == 0)
+				if (tcontainer.length === 0)
 				{
 					tcontainer = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, tpos);
 				}
@@ -198,7 +240,7 @@ var roomPlanner =
 				}
 
 				//Now build it if it's missing. Save it if it's not.
-				if (tcontainer.length == 0)
+				if (tcontainer.length === 0)
 				{
 					Game.rooms[room_name].createConstructionSite(tpos, STRUCTURE_CONTAINER);
 				}
@@ -224,7 +266,7 @@ var roomPlanner =
 					//We have to get the container even if there's a road under it.
 					for (let c = 0; c < tcontainer.length; c++)
 					{
-						if (tcontainer[c].structureType == "container")
+						if (tcontainer[c].structureType === "container")
 						{
 							tcontainer = tcontainer[c];
 							break;
@@ -246,6 +288,22 @@ var roomPlanner =
 			//Do some basic checks every once in a while.
 			if (Game.time % 100 === 0)
 			{
+				//Since we're at war, has any of the enemy creeps come in?
+				//Due to our current arrangement, we're mostly interested in safeguarding the rooms behind our bulwark room.
+				if (room_name === 'E49S14')
+				{
+					let checkallies = require('empire').checkallies;
+					let enemies = Game.rooms[room_name].find(FIND_HOSTILE_CREEPS, {filter: checkallies});
+
+					for (let e = 0; e < enemies.length; e++)
+					{
+						if (enemies[e].owner.username !== 'Invader')
+						{
+							Game.rooms[room_name].controller.activateSafeMode();
+						}
+					}
+				}
+
 				//Are we missing any of our towers?
 				if (Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_TOWER}}).length < CONTROLLER_STRUCTURES.tower[Game.rooms[room_name].controller.level])
 				{
@@ -315,7 +373,7 @@ var roomPlanner =
 					if (!Game.getObjectById(Memory.rooms[room_name].mine.labs[la].id))
 					{
 						let lab = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: function(lab_obj)
-							{return lab_obj.structureType === STRUCTURE_LAB && lab_obj.pos.x === Memory.rooms[room_name].mine.labs[la].x && Memory.rooms[room_name].mine.labs[la].y}});
+							{return lab_obj.structureType === STRUCTURE_LAB && lab_obj.pos.x === Memory.rooms[room_name].mine.labs[la].x && lab_obj.pos.y === Memory.rooms[room_name].mine.labs[la].y}});
 
 						if (lab.length)
 						{
@@ -359,6 +417,36 @@ var roomPlanner =
 						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mineral.pos.x, Memory.rooms[room_name].mineral.pos.y, STRUCTURE_EXTRACTOR);
 					}
 				}
+
+				//Are we missing the mineral mining container?
+				if (!Game.getObjectById(Memory.rooms[room_name].mineral.cid))
+				{
+					let extractor = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: function(contain)
+						{return contain.structureType === STRUCTURE_CONTAINER && contain.pos.x === Memory.rooms[room_name].mine.miner.x && contain.pos.y === Memory.rooms[room_name].mine.miner.y}});
+					if (extractor.length)
+					{
+						Memory.rooms[room_name].mineral.cid = extractor[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mine.miner.x, Memory.rooms[room_name].mine.miner.y, STRUCTURE_CONTAINER);
+					}
+				}
+
+				//Are we missing the lab boosting container?
+				if (!Game.getObjectById(Memory.rooms[room_name].mineral.cid))
+				{
+					let labcon = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: function(contain)
+						{return contain.structureType === STRUCTURE_CONTAINER && contain.pos.x === Memory.rooms[room_name].mine.miner.x && contain.pos.y === Memory.rooms[room_name].mine.miner.y}});
+					if (labcon.length)
+					{
+						Memory.rooms[room_name].mineral.cid = labcon[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mine.miner.x, Memory.rooms[room_name].mine.miner.y, STRUCTURE_CONTAINER);
+					}
+				}
 			}
 
 			if ((Game.time % 100 === 0 || Memory.rooms[room_name].defense.update) && Game.rooms[room_name].controller.level > 1)	//Let's only check every once in a while. No rush here.
@@ -387,11 +475,11 @@ var roomPlanner =
 		}
 
 		//Are there flags?
-		let myflags = {Attack: [], Claims: [], Reserves: [], Signs: [], Transfer: [], Pave: []};
+		let myflags = {Attack: [], Claims: [], Reserves: [], Signs: [], Transfer: [], Pave: [], Rescue: []};
 		for (let flag in Game.flags)
 		{
 			//We currently aren't doing anything with Road flags.
-			//Safe flags are handled elsewhere.
+			//Safe and Join flags are handled elsewhere.
 			for (let type in myflags)
 			{
 				if (flag.indexOf(type) != -1)
@@ -637,9 +725,13 @@ var roomPlanner =
 							}
 							else
 							{
-								for (let n = 0; n < Memory.rooms[room_name].sources[i][paths[pa]].length; n++)
+								if (Memory.rooms[room_name].sources[i][paths[pa]][0])	//Skip empty paths in case of hybrids.
 								{
-									costMatrix.set(Memory.rooms[room_name].sources[i][paths[pa]][n].x, Memory.rooms[room_name].sources[i][paths[pa]][n].y, 1);
+									for (let n = 0; n < Memory.rooms[room_name].sources[i][paths[pa]].length; n++)
+									{
+										//console.log(paths[pa]);
+										costMatrix.set(Memory.rooms[room_name].sources[i][paths[pa]][n].x, Memory.rooms[room_name].sources[i][paths[pa]][n].y, 1);
+									}
 								}
 							}
 						}
@@ -3036,6 +3128,12 @@ var roomPlanner =
 				}
 			}
 
+			//If we have a duplicate spawn_dir, we can collapse them.
+			if (spawn_dir.length === 2 && spawn_dir[1] === spawn_dir[0])
+			{
+				spawn_dir.pop();
+			}
+
 			//Dedicate the last step to the stationary miner. But if the last step isn't already there, we need to fabricate it.
 			if (final_choice.final_path[final_choice.final_path.length - 1].x === mine_pos.x && final_choice.final_path[final_choice.final_path.length - 1].y == mine_pos.y)
 			{
@@ -3146,12 +3244,60 @@ var roomPlanner =
 			{
 				first_step_index = 1;
 			}
+
+			//Assign the stamp path directions to the spawns.
 			Memory.rooms[room_name].spawns[0].dir.labdir = calculate.orientation[final_choice.final_path[first_step_index].dx][final_choice.final_path[first_step_index].dy];
-			Memory.rooms[room_name].spawns[1].dir.labdir = calculate.orientation[final_choice.final_path[first_step_index].x - Memory.rooms[room_name].spawns[1].x][final_choice.final_path[first_step_index].y - Memory.rooms[room_name].spawns[1].y];
+			//The creep needs to know which way to go once it leaves the spawn. This will be recorded temporarily, to be written to the path[x][y]. This handles cases where untouching spawns leave a gap in the path[x][y].
+			Memory.rooms[room_name].spawns[0].dir.cdir = calculate.orientation[final_choice.final_path[first_step_index + 1].dx][final_choice.final_path[first_step_index + 1].dy];
+			if (calculate.orientation[final_choice.final_path[first_step_index].x - Memory.rooms[room_name].spawns[1].x])	//Prevent a bad dx from crashing the script.
+			{
+				Memory.rooms[room_name].spawns[1].dir.labdir = calculate.orientation[final_choice.final_path[first_step_index].x - Memory.rooms[room_name].spawns[1].x]
+																					[final_choice.final_path[first_step_index].y - Memory.rooms[room_name].spawns[1].y];
+				//The creep needs to know which way to go once it leaves the spawn. This will be recorded temporarily, to be written to the path[x][y]. This handles cases where untouching spawns leave a gap in the path[x][y].
+				Memory.rooms[room_name].spawns[1].dir.cdir = Memory.rooms[room_name].spawns[0].dir.cdir
+			}
+			else
+			{
+				Memory.rooms[room_name].spawns[1].dir.labdir = null;	//This is just a formality.
+				Memory.rooms[room_name].spawns[1].dir.cdir = null;
+			}
 
 			//The main path shouldn't go in and out of the spawn. Just touch it.
 			final_choice.final_path.shift();
 			final_choice.final_rpath.pop();
+
+			//Before we commit, we should make sure the second spawn is also touching it.
+			if (!Memory.rooms[room_name].spawns[1].dir.labdir)	//A bad calculate.orientation provides undefined due to not existing.
+			{
+				console.log('Connecting the second spawn.');
+
+				let connection = Game.rooms[room_name].findPath(
+					new RoomPosition(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, room_name),
+					new RoomPosition(final_choice.final_path[0].x, final_choice.final_path[0].y, room_name),
+					{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+						costCallback: function(roomName, costMatrix)
+						{
+							costMatrix = tempcostmatrix.clone();
+
+							costMatrix.set(Memory.rooms[room_name].spawns[0].x, Memory.rooms[room_name].spawns[0].y, 255);
+							return costMatrix;
+						}
+					});
+				//Connect the second spawn to the first.
+				final_choice.final_path.shift();
+				final_choice.final_path = connection.concat(final_choice.final_path);
+
+				//Assign the stamp path direction to the spawn.
+				Memory.rooms[room_name].spawns[1].dir.labdir = calculate.orientation[final_choice.final_path[0].dx][final_choice.final_path[0].dy];
+
+				//Regenerate the return path. Make them touch the spawn, not go in and out of it.
+				final_choice.final_rpath = calculate.reversepath(final_choice.final_path);
+				final_choice.final_path.shift();
+				final_choice.final_rpath.pop();
+
+				//The creep needs to know which way to go once it leaves the spawn. This will be recorded temporarily, to be written to the path[x][y]. This handles cases where untouching spawns leave a gap in the path[x][y].
+				Memory.rooms[room_name].spawns[1].dir.cdir = calculate.orientation[final_choice.final_path[0].dx][final_choice.final_path[0].dy];
+			}
 
 			//Now connect the paths together.
 			calculate.close_loop(final_choice.final_path, final_choice.final_rpath);
@@ -3230,9 +3376,12 @@ var roomPlanner =
 
 	redo_labs: function(room_name)
 	{
+		roomPlanner.redo_labs.clean(room_name);
 		calculate.deletethispath(room_name, ['labs', 'lreturn', 'epath', 'ereturn', 'efat']);
 		roomPlanner.setupMining(room_name);
 		calculate.cleanpaths(room_name, 'labs');
+		calculate.deleteoldpaths(room_name, 'labs');
+		return true;
 	},
 
 	init_complete(room_name, test = false)
@@ -3264,5 +3413,28 @@ var roomPlanner =
 		return !test;
 	}
 };
+
+roomPlanner.redo_labs.clean = function(room_name)
+{
+	let types = [STRUCTURE_LAB, STRUCTURE_STORAGE, STRUCTURE_TERMINAL, STRUCTURE_FACTORY, STRUCTURE_NUKER];
+	let clean =
+	{
+		sites: Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES, {filter: function(site) {return types.indexOf(site.structureType) !== -1
+			|| (site.pos.x === Memory.rooms[room_name].spawns[2].x && site.pos.y === Memory.rooms[room_name].spawns[2].y)
+			;}}),
+		structs: Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: function(site) {return types.indexOf(site.structureType) !== -1
+			|| (site.pos.x === Memory.rooms[room_name].spawns[2].x && site.pos.y === Memory.rooms[room_name].spawns[2].y)
+			;}})
+	}
+
+	for (let t = 0, type = ['sites', 'structs'], op = ['remove', 'destroy']; t < 2; t++)
+	{
+		for (let s = 0; s < clean[type[t]].length; s++)
+		{
+			clean[type[t]][s][op[t]]();
+		}
+	}
+	return true;
+}
 
 module.exports = roomPlanner;
