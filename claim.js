@@ -24,6 +24,25 @@ var claim =
 		{
 			//If we own the room we're starting in, use an exit path.
 			start_position = new RoomPosition(Memory.rooms[start_room].exitpaths[room_path[0].room].slice(-1)[0].x, Memory.rooms[start_room].exitpaths[room_path[0].room].slice(-1)[0].y, start_room);
+
+			//Shift the starting position out of the room. This prevents a crash associated with expecting our first room to be the room exited to.
+			let exits = Game.map.describeExits(start_room);
+			if (start_position.x === 0)	//We're moving west.
+			{
+				start_position = new RoomPosition(49, start_position.y, exits[7]);
+			}
+			else if (start_position.x === 49)	//We're moving east.
+			{
+				start_position = new RoomPosition(0, start_position.y, exits[3]);
+			}
+			else if (start_position.y === 0)	//We're moving north.
+			{
+				start_position = new RoomPosition(start_position.x, 49, exits[1]);
+			}
+			else if (start_position.y === 49)	//We're moving south.
+			{
+				start_position = new RoomPosition(start_position.x, 0, exits[5]);
+			}
 		}
 		else
 		{
@@ -33,28 +52,44 @@ var claim =
 		//console.log(JSON.stringify("Start: " + start_position));
 
 		//Now we have to build the low level paths through the rooms.
+		let calculate = require('calculate');
 		let longpath = PathFinder.search(start_position, target_position,
 		{maxOps: room_path.length * 1000, maxRooms: room_path.length + 6,
 			roomCallback: function(roomName)
 			{
 				let inpath = false;
+
 				for (let r = 0; r < room_path.length; r++)
 				{
 					if (roomName == room_path[r].room || roomName == start_room)
 					{
 						//If this room is in the chain of rooms.
-						//console.log("Checking  if " + roomName + " is " + room_path[r].room)
-						//console.log("Ruling in " + room_path[r].room);
 						inpath = true;
 					}
-					/*else
-					{
-						console.log("Checking  if " + roomName + " is " + room_path[r].room)
-						console.log("Ruling out " + room_path[r].room);
-					}*/
 				}
-				if (!inpath)	//If it's not.
+
+				if (inpath)
 				{
+					let costMatrix = new PathFinder.CostMatrix;
+
+					//If we can see the room, we should take its terrain and structures into account.
+					if (Game.rooms[roomName])
+					{
+						let structs = Game.rooms[roomName].find(FIND_STRUCTURES, {filter: calculate.blockingStructure});
+
+						for (let s = 0; s < structs.length; s++)
+						{
+							costMatrix.set(structs[s].pos.x, structs[s].pos.y, 255);
+						}
+					}
+
+					//If it's in the chain of rooms, we need to make exit tiles heavier so it's more eager to clear them.
+					calculate.coaxThroughExit(roomName, costMatrix);
+					return costMatrix;
+				}
+				else
+				{
+					//If it's not in the chain of rooms, don't search it.
 					return inpath;
 				}
 			}
@@ -86,6 +121,7 @@ var claim =
 			longpath.path[0].dy = -1;
 		}
 		longpath.path[0].direction = start_position.getDirectionTo(longpath.path[0]);
+
 		for (let l = 1; l < longpath.path.length; l++)
 		{
 			longpath.path[l].dx = longpath.path[l].x - longpath.path[l - 1].x;
@@ -112,6 +148,10 @@ var claim =
 			}
 			longpath.path[l].direction = longpath.path[l - 1].getDirectionTo(longpath.path[l]);
 		}
+
+		//Include the first step for cleaning.
+		longpath.path.unshift({x: start_position.x, y: start_position.y, dx: longpath.path[0].x - start_position.x, dy: longpath.path[0].y - start_position.y, direction: start_position.getDirectionTo(longpath.path[0]),
+			roomName: longpath.path[0].roomName});
 
 		//console.log(JSON.stringify(longpath));
 		return longpath;	//We made it this far without any errors.
@@ -144,6 +184,10 @@ var claim =
 			{
 				type = 'claims';
 			}
+			else if (Array.isArray(Memory.rescue))
+			{
+				type = 'rescue';
+			}
 			else
 			{
 				return false;
@@ -172,25 +216,27 @@ var claim =
 					{
 						body = require('body')['h' + role](Game.rooms[room_name].energyCapacityAvailable);
 					}
+					else if(role.indexOf('harvester') !== -1)
+					{
+						body = require('body')['far' + role](Game.rooms[room_name].energyCapacityAvailable);	//Harvesters that leave our room should be prepared to go off-road.
+					}
 					else
 					{
 						body = require('body')[role](Game.rooms[room_name].energyCapacityAvailable);
 					}
 					//We should wait until the room has enough to build it.
 					let cost = require('calculate').bodyCost(body);
-					let spawns;
 					//If we have enough to build it, then build it.
 					if (cost <= Game.rooms[room_name].energyAvailable)
 					{
-						spawns = Game.rooms[room_name].find(FIND_MY_SPAWNS);
-						for (let s = 0; s < spawns.length; s++)
+						for (let s = 0, spawns; s < 2; s++)
 						{
-							//Find a spawn that's not spawning.
-							if (!spawns[s].spawning)
+							//Find a spawn that's not spawning. Assign the live object within the comparison.
+							if ((spawns = Game.getObjectById(Memory.rooms[room_name].spawns[s].id)) && !spawns.spawning)
 							{
 								//Now build it.
-								let name = spawns[s].name.slice(0, 3) + spawns[s].name.slice(6) + role.charAt(0).toUpperCase() + role.slice(1) + a + "_" + Game.time.toString()
-								let status = spawns[s].spawnCreep(body, name, {memory: {target: {}, movenow: [], direction: false, path: 8}, energyStructures: require('calculate').sortExtensions(room_name), directions: [spawns[s].pos.getDirectionTo(
+								let name = spawns.name.slice(0, 3) + spawns.name.slice(require('builder').newSpawn.basename.length) + role.charAt(0).toUpperCase() + role.slice(1) + a + "_" + Game.time.toString();
+								let status = spawns.spawnCreep(body, name, {memory: {target: {}, movenow: [], direction: false, path: 8}, energyStructures: require('calculate').sortExtensions(room_name), directions: [spawns.pos.getDirectionTo(
 									Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]][0].x,
 									Memory.rooms[Memory[type][a].closest].exitpaths[Object.keys(Memory[type][a].path)[0]][0].y
 								)]});
@@ -276,8 +322,26 @@ var claim =
 							}
 							else if (creep.pos.roomName != Memory[type][a].pos.roomName)	//If we aren't at our target room yet, move along our inter-room path.
 							{
-								//console.log(JSON.stringify(Memory[type][a].path));
-								//creep.moveByPath(Memory[type][a].path[creep.room.name]);
+								let calculate = require('calculate');
+
+								//If this is the fist time stepping in this room, make sure we have a path through.
+								if (Memory[type][a].path[creep.room.name].clean === undefined)
+								{
+									Memory[type][a].path[creep.room.name].clean = calculate.isPathClear(creep.room.name, Memory[type][a].path[creep.room.name], direction = creep.memory.direction, creep.pos.x, creep.pos.y);
+
+									//If there wasn't a path through, we need to redo it.
+									if (!Memory[type][a].path[creep.room.name].clean)
+									{
+										let endpoint = calculate.endOfPath(creep.room.name, Memory[type][a].path[creep.room.name], direction = creep.memory.direction, creep.pos.x, creep.pos.y);
+										//console.log(creep.room.name + ' ' + type +  ' ' + JSON.stringify(creep.pos) + ' ' + JSON.stringify(endpoint));
+										Memory[type][a].path[creep.room.name].clean = calculate.newpath(creep.room.name, type, a, creep.pos.x, creep.pos.y, endpoint.x, endpoint.y);
+										console.log(creep.room.name + " checked. It was not clear.");
+									}
+									else
+									{
+										console.log(creep.room.name + " checked. It was clear.");
+									}
+								}
 
 								let tempdir;
 								//Assign within comparison.
@@ -290,7 +354,6 @@ var claim =
 								tempdir = creep.memory.direction;
 
 								//If we're about to move into another room, we need to obey the path tile we're about to land on.
-								let calculate = require('calculate');
 								if ((creep.pos.x === 1 || creep.pos.x === 49) && calculate.dxdy[tempdir].dx)	//-1 and 1 are both truthy values.
 								{
 									let this_exit = Game.map.describeExits(creep.room.name)[calculate.orientation[calculate.dxdy[tempdir].dx][0]];
@@ -335,7 +398,7 @@ var claim =
 			}
 		}
 	},
-	
+
 	//Basic initialization on a room action object.
 	init: function(object, type)
 	{
@@ -358,8 +421,39 @@ var claim =
 			let tpath;
 			let closest;
 
-			//Don't re-use a room if it's already committed to this type of action.
+			//Cycle through rooms with the lowest type of this action.
 			let temp_rooms = {};
+			let equal_rooms = 0;
+			let room_count = {};
+			let highest_room = 0;
+
+			for (let room_name in Memory.rooms)
+			{
+				room_count[room_name] = 0;
+			}
+
+			for (let t = 0; t < Memory[type].length; t++)
+			{
+				//Don't process the room action that we're trying to initialize.
+				if (!Memory[type][t].closest)
+				{
+					continue;
+				}
+
+				room_count[Memory[type][t].closest]++;
+				if (room_count[Memory[type][t].closest] > highest_room)
+				{
+					highest_room = room_count[Memory[type][t].closest];
+					equal_rooms = 0;
+				}
+
+				//If all rooms are sending the same amount, our initialization breaks because they are all considered busy. This fixes that.
+				if (room_count[Memory[type][t].closest] === highest_room)
+				{
+					equal_rooms++;
+				}
+			}
+
 			for (let room_name in Memory.rooms)
 			{
 				let free = true;
@@ -367,14 +461,16 @@ var claim =
 				{
 					for (let t = 0; t < Memory[type].length; t++)
 					{
-						if (Memory[type][t].closest === room_name)
+						//This accidentally doesn't process the room action that we're trying to initialize. (Undefined can't equal a room name.)
+						if (Memory[type][t].closest === room_name && room_count[Memory[type][t].closest] >= highest_room)
 						{
 							free = false;
+							break;
 						}
 					}
 				}
 
-				if (free)
+				if (free || equal_rooms === Object.keys(Memory.rooms).length)	//If they are all unfree, then consider them all free.
 				{
 					temp_rooms[room_name] = true;
 				}
@@ -391,14 +487,14 @@ var claim =
 			}
 
 			//Once we have the closest, generate the path.
-			if (type != 'deposit')
+			if (type === 'deposit')
 			{
-				tpath = claim.map(closest, object.pos);
-				object.closest = closest;
+				
 			}
 			else
 			{
-				
+				tpath = claim.map(closest, object.pos);
+				object.closest = closest;
 			}
 
 			//Clean the path.
@@ -416,9 +512,36 @@ var claim =
 			}
 
 			//Now arrange the cleaned steps into [x][y] tiles.
+			let room_border = null;
 			for (let room in object.path)
 			{
 				let temp_tile = {};
+
+				//If we assigned a beginning step to this room, use it.
+				if (room_border !== null)
+				{
+					if (!temp_tile[room_border.x])
+					{
+						temp_tile[room_border.x] = {};
+					}
+
+					temp_tile[room_border.x][room_border.y] = room_border.direction;
+				}
+
+				//If the last step rested on the exit of this room, it should be in the same spot on the next room's entrance.
+				if (object.path[room].slice(-1)[0].x === 0 || object.path[room].slice(-1)[0].x === 49)
+				{
+					room_border = {x: 49 - object.path[room].slice(-1)[0].x, y: object.path[room].slice(-1)[0].y, direction: object.path[room].slice(-1)[0].direction};
+				}
+				else if (object.path[room].slice(-1)[0].y === 0 || object.path[room].slice(-1)[0].y === 49)
+				{
+					room_border = {x: object.path[room].slice(-1)[0].x, y: 49 - object.path[room].slice(-1)[0].y};
+				}
+				else
+				{
+					room_border = null;
+				}
+
 				for (let tile = 0; tile < object.path[room].length; tile++)
 				{
 					if (!temp_tile[object.path[room][tile].x])
@@ -431,6 +554,14 @@ var claim =
 
 				object.path[room] = temp_tile;
 			}
+
+			//Now traverse every room to make sure instructions leading out of it are translated into the following room.
+			/*let endpoint;
+			let endOfPath = require('calculate').endOfPath;
+			for (let room in object.path)
+			{
+				endpoint = endOfPath(room_name, path, direction = null, tempx, tempy);
+			}*/
 
 			object.ops = tpath.ops;
 			object.cost = tpath.cost;
@@ -756,7 +887,7 @@ var claim =
 						else
 						{
 							//We need to get a path.
-							Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y);
+							Memory.creeps[creep.name].movenow = creep.pos.findPathTo(Memory.attack[a].pos.x, Memory.attack[a].pos.y, {maxRooms: 1});
 							if (Memory.creeps[creep.name].movenow.length)
 							{
 								creep.move(Memory.creeps[creep.name].movenow[0].direction);
@@ -1179,6 +1310,354 @@ var claim =
 		}
 	},
 
+	//This runs every rescue object.
+	rescue: function()
+	{
+		//Iterate the room actions of this type.
+		for (let a = 0; a < Memory.rescue.length; a++)
+		{
+			//Iterate each role in this room action.
+			for (let role in Memory.rescue[a].creeps)
+			{
+				//Iterate each creep in this role.
+				for (let c = 0; c < Memory.rescue[a].creeps[role].length; c++)
+				{
+					let creep = Game.creeps[Memory.rescue[a].creeps[role][c]];
+					//If we're in our target room, do our tasks.
+					if (Game.creeps[Memory.rescue[a].creeps[role][c]].pos.roomName == Memory.rescue[a].pos.roomName)
+					{
+						//If our spawn is completed, turn over control of the room.
+						let spawn = Game.rooms[creep.room.name].find(FIND_MY_SPAWNS).concat(Game.rooms[creep.room.name].find(FIND_HOSTILE_SPAWNS));
+						if (spawn.length !== 0 && !Memory.rescue[a].multi)
+						{
+							//If we get this far without errors, turn the room over.
+							//Re-run our creep iterating code.
+							//Iterate each role in this room action.
+							for (let role in Memory.rescue[a].creeps)
+							{
+								//Iterate each creep in this role.
+								for (let c = 0; c < Memory.rescue[a].creeps[role].length; c++)
+								{
+									Game.creeps[Memory.rescue[a].creeps[role][c]].suicide();
+								}
+							}
+
+							//Creeps should be suicided by now. Delete the action.
+							Memory.rescue.splice(a, 1);
+							if (Memory.rescue.length == 0)
+							{
+								delete Memory.rescue;
+							}
+
+							return true;
+						}
+
+						//If we've just arrived, create some paths.
+						if (!Memory.rescue[a].claimpaths)
+						{
+							Memory.rescue[a].claimpaths = {sources: [], upgrade: [], ureturn: []}
+							sources = Game.rooms[creep.room.name].find(FIND_SOURCES);
+							for (let i = 0; i < sources.length; i++)
+							{
+								Memory.rescue[a].claimpaths.sources.push({pos: sources[i].pos, id: sources[i].id, mine: [], mreturn: [], mfat: []});
+							}
+
+							//Since the room init will care which source is closer to the spawn, we should too.
+							let closest = Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y).findClosestByPath(FIND_SOURCES, {ignoreCreeps: true}).id;
+							while (closest != Memory.rescue[a].claimpaths.sources[0].id)
+							{
+								Memory.rescue[a].claimpaths.sources.push(Memory.rescue[a].claimpaths.sources.shift());
+							}
+
+							//Now generate the paths.
+							let home = Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y);
+							for (let i = 0; i < Memory.rescue[a].claimpaths.sources.length; i++)
+							{
+								//We can be a bit sloppy with these. Who cares about the finer points when the room being rescued will handle it?
+								Memory.rescue[a].claimpaths.sources[i].mine = home.findPathTo(Memory.rescue[a].claimpaths.sources[i].pos.x, Memory.rescue[a].claimpaths.sources[i].pos.y, {range: 1, maxRooms: 1});
+								Memory.rescue[a].claimpaths.sources[i].mfat.push(Memory.rescue[a].claimpaths.sources[i].mine.pop());
+								Memory.rescue[a].claimpaths.sources[i].mreturn = Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].claimpaths.sources[i].mine.slice(-1)[0].x, Memory.rescue[a].claimpaths.sources[i].mine.slice(-1)[0].y)
+									.findPathTo(home, {range: 1, maxRooms: 1});
+							}
+
+							if (role === "builder")
+							{
+								//Assign our target positions to the builders.
+								let i;	//Which source do we belong to?
+								for (i = 0; i < Memory.rescue[a].claimpaths.sources.length; i++)
+								{
+									if (creep.name == Memory.rescue[a].creeps.builder[i])
+									{
+										break;
+									}
+								}
+								creep.memory.target.x = Memory.rescue[a].claimpaths.sources[i].mine.slice(-1)[0].x;
+								creep.memory.target.y = Memory.rescue[a].claimpaths.sources[i].mine.slice(-1)[0].y;
+							}
+
+							Memory.rescue[a].claimpaths.upgrade = home.findPathTo(Game.rooms[creep.room.name].controller, {range: 1, maxRooms: 1});
+							let tempupgrade = Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].claimpaths.upgrade.slice(-1)[0].x, Memory.rescue[a].claimpaths.upgrade.slice(-1)[0].y)
+							Memory.rescue[a].claimpaths.ureturn = tempupgrade.findPathTo(tempupgrade.findClosestByPath
+							([
+								Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].claimpaths.sources[0].mine.slice(-1)[0].x, Memory.rescue[a].claimpaths.sources[0].mine.slice(-1)[0].y),
+								Game.rooms[creep.room.name].getPositionAt(
+									Memory.rescue[a].claimpaths.sources[Memory.rescue[a].claimpaths.sources.length - 1].mine.slice(-1)[0].x,
+									Memory.rescue[a].claimpaths.sources[Memory.rescue[a].claimpaths.sources.length - 1].mine.slice(-1)[0].y)
+							]), {maxRooms: 1});
+							//We're altering the upgrade path.
+							Memory.rescue[a].claimpaths.upgrade = Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].claimpaths.ureturn.slice(-1)[0].x, Memory.rescue[a].claimpaths.ureturn.slice(-1)[0].y)
+								.findPathTo(tempupgrade, {maxRooms: 1});
+						}
+
+						//Now that we're here, we need to do our duties.
+						if (!creep.memory.movenow.length)
+						{
+							switch (role)
+							{
+								case "harvester":
+								{
+									//Which source do we belong to?
+									let i;
+									for (i = 0; i < Memory.rescue[a].claimpaths.sources.length; i++)
+									{
+										if (creep.name == Memory.rescue[a].creeps.harvester[i])
+										{
+											break;
+										}
+									}
+
+									if (creep.pos.isEqualTo(Game.rooms[creep.room.name].getPositionAt(Memory.rescue[a].claimpaths.sources[i].mfat[0].x, Memory.rescue[a].claimpaths.sources[i].mfat[0].y)))
+									{
+										//If we're at our source, mine it.
+										let status;	//Assign within comparison.
+										creep.harvest(creep.pos.findInRange(FIND_SOURCES, 1)[0]);
+										/*if ((status = creep.harvest(creep.pos.findInRange(FIND_SOURCES, 1)[0])) !== OK)
+										{
+											switch (status)
+											{
+												case ERR_NOT_OWNER:
+													status = 'ERR_NOT_OWNER';
+													break;
+												case ERR_NOT_ENOUGH_RESOURCES:
+													status = 'ERR_NOT_ENOUGH_RESOURCES';
+													break;
+											}
+											console.log(creep.name + ' ' + status);
+										}*/
+									}
+									else if(!creep.memory.movenow.length)
+									{
+										//If we're not at our source, go to it.
+										for (let i = 0; i < Memory.rescue[a].claimpaths.sources.length; i++)
+										{
+											if (creep.name == Memory.rescue[a].creeps.harvester[i])
+											{
+												creep.memory.movenow = creep.pos.findPathTo(Memory.rescue[a].claimpaths.sources[i].mfat[0].x, Memory.rescue[a].claimpaths.sources[i].mfat[0].y, {maxRooms: 1,
+													costCallback: function(roomName, costMatrix)
+													{
+														//We need to avoid our other harvester.
+														if (i > 0 && Memory.creeps[Memory.rescue[a].creeps.harvester[i - 1]].movenow.length)
+														{
+															costMatrix.set(Memory.creeps[Memory.rescue[a].creeps.harvester[i - 1]].movenow.slice(-1)[0].x, Memory.creeps[Memory.rescue[a].creeps.harvester[i - 1]].movenow.slice(-1)[0].y, 255);
+														}
+													}
+												});
+												break;
+											}
+										}
+									}
+									break;
+								}
+								case "builder":
+								{
+									let builder = require('role.builder');
+
+									if (Memory.rescue[a].scavenge)
+									{										
+										//If we're set to scavenge mode, we find energy wherever we can.
+										if (!creep.memory.movenow.length)
+										{
+											let workp = creep.getActiveBodyparts(WORK);
+
+											//If we're by energy, we need to pick it up.
+											let energy;
+											if (creep.carry.energy === 0 || !Memory.creeps[creep.name].return)
+											{
+												//Find the closest source of scavenged energy.
+												energy = Game.rooms[creep.room.name].find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
+												energy = energy.concat(Game.rooms[creep.room.name].find(FIND_STRUCTURES,
+													{filter: function(struct) {return struct.structureType === STRUCTURE_WALL || struct.structureType === STRUCTURE_RAMPART}}));
+												energy = creep.pos.findClosestByPath(energy);
+
+												let status;
+
+												if (builder.transport.withdrawRuins(creep) ||
+													((status = creep.dismantle(energy)) === OK && Math.floor(workp / 4) >= creep.store.getFreeCapacity()))	//Clean up ruins and dropped energy. Dismantle walls.
+												{
+													Memory.creeps[creep.name].return = true;
+												}
+												else if (status !== OK)
+												{
+													Memory.creeps[creep.name].return = false;
+												}
+												else if (creep.pos.findInRange(FIND_CONSTRUCTION_SITES, 3, {filter: {structureType: STRUCTURE_SPAWN}}).length !== 0)
+												{
+													Memory.creeps[creep.name].return = false;
+												}
+											}
+											else if (creep.build(creep.pos.findInRange(FIND_CONSTRUCTION_SITES, 3, {filter: {structureType: STRUCTURE_SPAWN}})[0]) === OK
+												&& workp >= creep.carry.energy)
+											{
+												Memory.creeps[creep.name].return = false;
+											}
+
+											//If we're not on our path, we need to go to it.
+											if (creep.memory.return)	//We're going to build the spawn
+											{
+												creep.memory.movenow = creep.pos.findPathTo(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, {range: 3, maxRooms: 1,
+													costCallback: function(roomName, costMatrix)
+													{
+														//We need to make sure we don't stomp the spawn.
+														costMatrix.set(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, 255);
+													}
+												});
+											}
+											else	//We're returning to the energy.
+											{
+												if (!energy)
+												{
+													//Find the closest source of scavenged energy.
+													energy = Game.rooms[creep.room.name].find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
+													energy = energy.concat(Game.rooms[creep.room.name].find(FIND_STRUCTURES,
+														{filter: function(struct) {return struct.structureType === STRUCTURE_WALL || struct.structureType === STRUCTURE_RAMPART}}));
+													energy = creep.pos.findClosestByPath(energy);
+												}
+												creep.memory.movenow = creep.pos.findPathTo(energy.pos.x, energy.pos.y, {range: 1, maxRooms: 1,
+													costCallback: function(roomName, costMatrix)
+													{
+														//We need to make sure we don't stomp the spawn.
+														costMatrix.set(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, 255);
+													}
+												});
+											}
+
+											/*if (creep.carry.energy === 0)	//If we don't have energy, we need to obtain it.
+											{
+												
+
+												if (creep.pos.inRangeTo(energy, 1))	//Are we in range to do something with it?
+												{
+													if (energy.resourceType)	//It's dropped energy.
+													{
+														creep.pickup(energy);
+													}
+													else if (energy.structureType)
+													{
+														creep.dismantle(energy);
+													}
+												}
+												else	//If we're not in range, get in range.
+												{
+													creep.memory.movenow = creep.pos.findPathTo(energy.x, energy.y, {range: 1, maxRooms: 1,
+														costCallback: function(roomName, costMatrix)
+														{
+															//We need to make sure not to stomp the spawn.
+															costMatrix.set(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, 255);
+														}
+													});
+												}
+											}
+											else	//If we have energy, we need to use it.
+											{
+												if (creep.pos.inRangeTo(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, 3))	//Are we in range to do something with it?
+												{
+													
+												}
+												else	//If we're not in range, get in range.
+												{
+													creep.memory.movenow = creep.pos.findPathTo(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, {range: 3, maxRooms: 1,
+															costCallback: function(roomName, costMatrix)
+															{
+																//We need to make sure not to stomp the spawn.
+																costMatrix.set(Memory.rescue[a].pos.x, Memory.rescue[a].pos.y, 255);
+															}
+														});
+												}
+											}*/
+										}
+										else
+										{
+											creep.moveByPath(creep.memory.movenow);
+										}
+									}
+									else
+									{
+										//Which source do we belong to?
+										let i;
+										for (i = 0; i < Memory.rescue[a].claimpaths.sources.length; i++)
+										{
+											if (creep.name == Memory.rescue[a].creeps.builder[i])
+											{
+												break;
+											}
+										}
+
+										//If we're by energy, we need to pick it up.
+										if (creep.carry.energy === 0)
+										{
+											if (builder.transport.withdrawRuins(creep))	//Clean up ruins.
+											{
+												Memory.creeps[creep.name].return = true;
+											}
+											else if (creep.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 1).length != 0)
+											{
+												Memory.creeps[creep.name].return = false;
+											}
+										}
+										else
+										{
+											creep.build(creep.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 3)[0]);
+										}
+
+										//If we're not on our path, we need to go to it.
+										if (creep.memory.return && creep.moveByPath(Memory.rescue[a].claimpaths.sources[i].mreturn) == ERR_NOT_FOUND)	//We're going to build the spawn
+										{
+											creep.moveTo(Memory.rescue[a].claimpaths.sources[i].mreturn.slice(-1)[0].x, Memory.rescue[a].claimpaths.sources[i].mreturn.slice(-1)[0].y, {maxRooms: 1, reusePath: 20});
+										}
+										else if (!creep.memory.return && creep.moveByPath(Memory.rescue[a].claimpaths.sources[i].mine) == ERR_NOT_FOUND)	//We're returning to the source.
+										{
+											creep.moveTo(Memory.rescue[a].claimpaths.sources[i].mine.slice(-1)[0].x, Memory.rescue[a].claimpaths.sources[i].mine.slice(-1)[0].y, {maxRooms: 1, reusePath: 20});
+										}
+									}
+									break;
+								}
+							}
+						}
+						else
+						{
+							status = creep.moveByPath(creep.memory.movenow)
+							if(status == OK || status == ERR_TIRED)
+							{
+								//console.log(creep.name + ": Using stored move.");
+							}
+							else if (status == ERR_NOT_FOUND)	//We've presumably completed our move orders. Switch back to normal movement.
+							{
+								Memory.creeps[creep.name].movenow = [];
+								console.log(creep.name + ": Switching to normal pathing.");
+								//return control.move(creep, role, source);
+							}
+
+							if (creep.pos.isEqualTo(Game.rooms[creep.room.name].getPositionAt(creep.memory.movenow.slice(-1).x, creep.memory.movenow.slice(-1).y)))
+							{
+								creep.memory.movenow = [];
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+
 	//This runs every sign object.
 	signs: function()
 	{
@@ -1396,20 +1875,22 @@ var claim =
 		}
 	},
 
-	roomactions: ["attack", "reserves", "claims", "signs", "withdraw", "deposit"],
+	roomactions: ['attack', 'reserves', 'claims', 'signs', 'withdraw', 'deposit', 'pave', 'rescue'],
 
 	actionideal:
 	{
-		attack: {tank: 0, attacker: 1, rattacker: 0, dattacker: 0, healer: 0, paver: 0, tank: 0},
-		reserves: {reserver: 1}, claims: {harvester: 2, builder: 2, claimer: 1},
+		attack: {tank: 0, attacker: 0, rattacker: 0, dattacker: 0, healer: 0, paver: 0, tank: 0},
+		reserves: {reserver: 1},
+		claims: {harvester: 2, builder: 2, claimer: 1},
 		signs: {scout: 1},
 		withdraw: {transport: 4},
 		deposit: {transport: 0},
-		pave: {paver: 1}
+		pave: {paver: 1},
+		rescue: {harvester: 2, builder: 2}
 	},
 
 	signature: "I am, therefore I'll think. [Bad_Named_Alliance]",
-	oversignature: "Overmind destroyed by [Bad_Named_Alliance]",
+	oversignature: 'Overmind destroyed by [Bad_Named_Alliance]',
 
 	checkallies: undefined,
 
