@@ -149,6 +149,26 @@ var tower =
 					if (leasthp < mosthp && towers[t].store.getUsedCapacity(RESOURCE_ENERGY) > (towers[t].store.getCapacity(RESOURCE_ENERGY) / 2))
 					{
 						towers[t].repair(choice);
+						fired = true;
+					}
+				}
+			}
+
+			if (Game.time % 100 === 0 && !fired)	//If we are idle, we can maintain any ramparts that are about to die.
+			{
+				let ramparts = Game.rooms[room_name].find(FIND_STRUCTURES,
+				{
+					filter: function(structure)
+					{
+						return structure.structureType === STRUCTURE_RAMPART && structure.hits < 3000;
+					}
+				});
+
+				for (let t = 0; t < towers.length; t++)
+				{
+					if (ramparts.length && towers[t].store.getUsedCapacity(RESOURCE_ENERGY) > (towers[t].store.getCapacity(RESOURCE_ENERGY) / 2))
+					{
+						towers[t].repair(ramparts[0]);
 					}
 				}
 			}
