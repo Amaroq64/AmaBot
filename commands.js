@@ -2,8 +2,10 @@ var calculate = require('calculate');
 
 global.help =
 "attack(attack_number, x, y, [room_name])\n" +
+"rescue(rescue_number, x, y, [room_name])\n" +
 "attackdisplay\n" +
 "attackrole(attack_number, role_type, number_of_role)\n" +
+"rescuerole(rescue_number, role_type, number_of_role)\n" +
 "movenow(creep_name, x, y)\n" +
 "newpath(current_room, action_type, action_number, [x], [y], [x2], [y2], [target_room pos or true])\n" +
 "clearcreep(creep_name)\n" +
@@ -35,6 +37,28 @@ global.attack = function(i = false, x = false, y = false, room_name = false)
 	}
 };
 
+global.rescue = function(i = false, x = false, y = false, room_name = false)
+{
+	if (Array.isArray(Memory.rescue) && i > -1 && x > -1 && y > -1)
+	{
+		Memory.rescue[i].pos.x = x;
+		Memory.rescue[i].pos.y = y;
+		if (typeof room_name == 'string')
+		{
+			Memory.rescue[i].pos.roomName = room_name;
+		}
+		else if (room_name !== false)
+		{
+			return "Invalid Room. " + i + ": " + Memory.rescue[i].pos.x + ", " + Memory.rescue[i].pos.y;
+		}
+		return "Rescue " + i + ": " + Memory.rescue[i].pos.x + ", " + Memory.rescue[i].pos.y;
+	}
+	else
+	{
+		return false;
+	}
+};
+
 Object.defineProperty(global, 'attackdisplay',
 {
 	get: function()
@@ -44,7 +68,7 @@ Object.defineProperty(global, 'attackdisplay',
 			let str = '';
 			for (let i = 0; i < Memory.attack.length; i++)
 			{
-				str = str + "Attack " + i + ": " + Memory.attack[i].pos.x + ", " + Memory.attack[i].pos.y;
+				str = str + Memory.attack[i].closest + ' -> ' + Memory.attack[i].pos.roomName + " Attack[" + i + "]: " + Memory.attack[i].pos.x + ", " + Memory.attack[i].pos.y;
 				if (i < Memory.attack.length - 1)
 				{
 					str = str + "\n"
@@ -69,7 +93,19 @@ global.attackrole = function(i, role, r)
 	{
 		return false;
 	}
-}
+};
+
+global.rescuerole = function(i, role, r)
+{
+	if (Array.isArray(Memory.rescue))
+	{
+		return Memory.rescue[i].ideal[role] = r;
+	}
+	else
+	{
+		return false;
+	}
+};
 
 global.movenow = function(creep_name, x, y)
 {
@@ -82,7 +118,7 @@ global.movenow = function(creep_name, x, y)
 	{
 		return false;
 	}
-}
+};
 
 global.newpath = function(room_name, action_type, action_number, x = false, y = false, x2 = false, y2 = false, room_name2 = false, direction = false)
 {
@@ -126,6 +162,7 @@ global.newpath = function(room_name, action_type, action_number, x = false, y = 
 		}
 
 		Memory[action_type][action_number].path[room_name] = temp_tile;
+		Memory[action_type][action_number].path[room_name].clean = true;
 
 		return true;
 	}
@@ -133,7 +170,7 @@ global.newpath = function(room_name, action_type, action_number, x = false, y = 
 	{
 		return false;
 	}
-}
+};
 
 global.clearcreep = function(creep_name)
 {
@@ -145,7 +182,7 @@ global.clearcreep = function(creep_name)
 	{
 		return false;
 	}
-}
+};
 
 Object.defineProperty(global, 'countextensions',
 {
@@ -176,7 +213,7 @@ global.oversign = function(creep_name)
 	{
 		return false;
 	}
-}
+};
 
 /*global.backupAttack = function(n)
 {
