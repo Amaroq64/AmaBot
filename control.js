@@ -1,16 +1,20 @@
 var control =
 {
 	harvester: require('role.harvester'),
+	hybrid: require('role.hybrid'),
+	extractor: require('role.extractor'),
 	upgrader: require('role.upgrader'),
-	transport: require('role.transport'),
+	//transport: require('role.transport'),
 
-	//These aliases both draw upon and modify our transport role.
+	//These draw upon and modify our transport role.
 	mtransport: require('role.mtransport'),
 	utransport: require('role.utransport'),
 
 	builder: require('role.builder'),
-	//ubuilder: require('role.ubuilder'),
 	dbuilder: require('role.dbuilder'),
+
+	custodian: require('role.custodian'),
+	handler: require('role.handler'),
 
 	//transfer: require('role.transfer'),
 
@@ -119,6 +123,8 @@ var control =
 					case 2:	//upgrade[]
 					case 3:	//ureturn[]
 					case 10://mfat[]
+					case 12://labs[]
+					case 13://lreturn[]
 						if (tempdir && tempdir[source])
 						{
 							tempdir = tempdir[source];
@@ -283,12 +289,23 @@ var control =
 						switch (creep.memory.path)
 						{
 							case 0:
-								if (creep.memory.utrip)	//We're still coming back from the upgrader.
+								if (creep.memory.utrip || !flipper[control.paths[2]])	//We're still coming back from the upgrader along the mine path. Go this way if the upgrade path doesn't exist.
 								{
-									creep.memory.path = 1;
-									creep.memory.utrip = false;
+									if (role === 'builder' && Memory.rooms[room_name].creeps.dbuilder.length > 0)	//If we're a builder and there's no upgrade path, skip to the defpaths.
+									{
+										//The builder has the same routine as the mtransport, but after visiting the upgrader it visits the dbuilder.
+										creep.memory.path = 4;	//We've completed our return from the upgrader and are going to the dbuilder if it exists.
+										creep.memory.utrip = false;
+										creep.memory.dtrip = true;
+										creep.memory.need = Memory.rooms[room_name].defense.need;	//This should only be updated when we first choose a defpath.
+									}
+									else	//If we're not a builder, keep circling around.
+									{
+										creep.memory.path = 1;
+										creep.memory.utrip = false;
+									}
 								}
-								else	//We're doing a fresh run to the upgrader.
+								else	//We're doing a fresh run to the upgrader along the mine path.
 								{
 									creep.memory.path = 2;
 									creep.memory.utrip = true;
@@ -363,7 +380,7 @@ var control =
 						{
 							creep.memory.path = 3;
 						}
-						else if (creep.memory.path === 3)
+						else if (creep.memory.path === 3 || creep.memory.path === 0)
 						{
 							creep.memory.path = 2;
 						}
@@ -371,7 +388,40 @@ var control =
 						//If we're switching to a completely new path, we need to override our previous direction change.
 						tempdir = flipper[control.paths[creep.memory.path]];
 						break;
+					case 'custodian':
+						//custodians don't need to worry about complex path jumping. When they are moving between source and lab stamp, they just loop to and from it.
+						if (creep.memory.path === 12)
+						{
+							creep.memory.path = 13;
+						}
+						else if (creep.memory.path === 13)
+						{
+							creep.memory.path = 12;
+						}
+						/*else if (creep.memory.path === 14)	//If the custodian goes down the main path from the spawn, it is probably using the handler role to traverse that path.
+						{
+							creep.memory.path = 13;
+						}*/
+
+						//If we're switching to a completely new path, we need to override our previous direction change.
+						tempdir = flipper[control.paths[creep.memory.path]];
+						break;
+					case 'handler':
+						//handlers don't need to worry about complex path jumping. They just loop to and from the mineral miner.
+						if (creep.memory.path === 14)
+						{
+							creep.memory.path = 15;
+						}
+						else if (creep.memory.path === 15)
+						{
+							creep.memory.path = 14;
+						}
+
+						//If we're switching to a completely new path, we need to override our previous direction change.
+						tempdir = flipper[control.paths[creep.memory.path]];
+						break;
 					case 'harvester':
+					case 'hybrid':
 						//If we're switching to a completely new path, we need to override our previous direction change.
 						creep.memory.path = 10;
 						tempdir = flipper[control.paths[creep.memory.path]];
@@ -602,7 +652,7 @@ var control =
 		}
 	},
 
-	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn']
+	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn', 'epath', 'ereturn']
 };
 
 module.exports = control;
