@@ -183,9 +183,13 @@ var test =
 
 									for (let flippertype in Memory.rooms[room_name].path[x][y][path])
 									{
+										/*if ()
+										{
+											continue;
+										}*/
 										switch(flippertype)	//Uncomment one of these to color a flipper.
 										{
-											/*case 'mine':
+											case 'mine':
 											case 'mreturn':
 											case 'mfat':
 												style.backgroundColor = 'blue';
@@ -209,7 +213,7 @@ var test =
 											case 'labs':
 											case 'lreturn':
 												style.backgroundColor = 'purple';
-												break;*/
+												break;
 											default:
 												style.backgroundColor = 'white';
 										}
