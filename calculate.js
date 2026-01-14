@@ -25,6 +25,7 @@ var calculate =
 			{
 				roundTrip[roundTrip.length - 1].miner += roundTrip[roundTrip.length - 1].upgrader;
 			}
+
 			idealTransport.push({miner: null, upgrader: null});	//We're doing this here so we can be agnostic of how many sources are in a room.
 		}
 		//console.log("Round Trip: " + JSON.stringify(roundTrip));
@@ -55,6 +56,16 @@ var calculate =
 				 idealTransport[s][role] = Math.ceil(roundTrip[s][role] / ticksToFull);
 			}
 		}
+
+		//If we have a hybrid, that source doesn't need any upgrade transports.
+		for (let s = 0; s < Memory.rooms[room].sources.length; s++)
+		{
+			if (Memory.rooms[room].sources[s].ideal.hybrid)
+			{
+				idealTransport[s].upgrader = undefined;
+			}
+		}
+
 								//idealTransport[source][role]
 		return idealTransport;	//We now know how many transports we need from each source servicing each role.
 	},
@@ -68,10 +79,26 @@ var calculate =
 		let safe = [];	//We're juggling this a bit. It will end up in Memory.rooms[room_name].defense.safe.
 		let flipper = [1, 0, 0];	//The first two modifies our x and y increment. The third is a flag.
 
+		//Join flags flip the status of the tile.
+		let joins = {};
+		for (let flag in Game.flags)
+		{
+			if (flag.indexOf('Join') !== -1 && Game.flags[flag].pos.roomName === room_name)
+			{
+				calculate.mark_found(Game.flags[flag].pos.x, Game.flags[flag].pos.y, joins);
+			}
+		}
+
 		for (let x = 0, y = 0; !(x == 0 && y == 49 && flipper[2] == 2); x += flipper[0], y += flipper[1])	//Go around the outside.
 		{
 			currenttile = terrain.get(x, y);
-			//console.log("Current tile: " + currenttile);
+
+			//If it's a join, flip its status.
+			if (calculate.check_xy(x, y, joins))
+			{
+				currenttile = 1 - currenttile;
+			}
+
 			if (currenttile === 0)	//We've found an empty tile.
 			{
 				if (lasttile === 1)	//Our previous tile was a wall. Therefore we have found a new exit.
@@ -338,14 +365,26 @@ var calculate =
 					//Mine goes from spawn to source, then mreturn comes back.
 					temppath = Memory.rooms[room_name].sources[i].mine;
 					let tempupgrade = Memory.rooms[room_name].sources[i].upgrade.slice();
-					tempupgrade[0].direction = Memory.rooms[room_name].sources[i].upgradedir2;
-					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mine', i, false, temppath,
+					if (tempupgrade[0])
 					{
-						upgrade: tempupgrade,
-						mreturn: Memory.rooms[room_name].sources[i].mreturn,
-						mfat: Memory.rooms[room_name].sources[i].mfat,
-						defpaths: tempdefpaths	//Mine can also go to defpaths[need].
-					});
+						tempupgrade[0].direction = Memory.rooms[room_name].sources[i].upgradedir2;
+						calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mine', i, false, temppath,
+						{
+							upgrade: tempupgrade,
+							mreturn: Memory.rooms[room_name].sources[i].mreturn,
+							mfat: Memory.rooms[room_name].sources[i].mfat,
+							defpaths: tempdefpaths	//Mine can also go to defpaths[need].
+						});
+					}
+					else
+					{
+						calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mine', i, false, temppath,
+						{
+							mreturn: Memory.rooms[room_name].sources[i].mreturn,
+							mfat: Memory.rooms[room_name].sources[i].mfat,
+							defpaths: tempdefpaths	//Mine can also go to defpaths[need].
+						});
+					}
 					temppath = Memory.rooms[room_name].sources[i].mreturn;
 					dir = Memory.rooms[room_name].sources[i].mreturn[0].direction;	//Try without dir.
 					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'mreturn', i, false, temppath,
@@ -357,19 +396,22 @@ var calculate =
 					calculate.writethispath(room_name, calculate.cleanthispath(temppath, false), 'mfat', i, false, temppath);
 
 					//Upgrade goes from source to the upgrader, then comes back to mine.
-					temppath = Memory.rooms[room_name].sources[i].upgrade;
-					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'upgrade', i, false, temppath,
+					if (tempupgrade[0])
 					{
-						ureturn: Memory.rooms[room_name].sources[i].ureturn
-					});
-					dir = Memory.rooms[room_name].sources[i].ureturn[0].direction;
-					temppath = Memory.rooms[room_name].sources[i].ureturn;		//Try without dir.
-					calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'ureturn', i, false, temppath,
-					{
-						upgrade: tempupgrade,
-						mreturn: Memory.rooms[room_name].sources[i].mreturn,
-						defpaths: tempdefpaths	//Ureturn can also go to defpaths[need].
-					});
+						temppath = Memory.rooms[room_name].sources[i].upgrade;
+						calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'upgrade', i, false, temppath,
+						{
+							ureturn: Memory.rooms[room_name].sources[i].ureturn
+						});
+						dir = Memory.rooms[room_name].sources[i].ureturn[0].direction;
+						temppath = Memory.rooms[room_name].sources[i].ureturn;		//Try without dir.
+						calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'ureturn', i, false, temppath,
+						{
+							upgrade: tempupgrade,
+							mreturn: Memory.rooms[room_name].sources[i].mreturn,
+							defpaths: tempdefpaths	//Ureturn can also go to defpaths[need].
+						});
+					}
 				}
 
 				break;
@@ -592,17 +634,38 @@ var calculate =
 				}
 
 				//We need to do the path through the lab stamp as well.
+				//First mark a direction from any untouched spawns.
+				for (let sp = 0, tpos, dxdy, path = Memory.rooms[room_name].path; sp < 2; sp++)
+				{
+					dxdy = calculate.dxdy[Memory.rooms[room_name].spawns[sp].dir.labdir];
+					tpos = {x: Memory.rooms[room_name].spawns[sp].x + dxdy.dx, y: Memory.rooms[room_name].spawns[sp].y + dxdy.dy};
+
+					if (!path[tpos.x])
+					{
+						path[tpos.x] = {};
+					}
+					if (!path[tpos.x][tpos.y])
+					{
+						path[tpos.x][tpos.y] = {};
+					}
+
+					path[tpos.x][tpos.y].epath = Memory.rooms[room_name].spawns[sp].dir.cdir;	//This will get us onto the path if our spawn doesn't touch the path.
+					Memory.rooms[room_name].spawns[sp].dir.cdir = undefined;	//Once it's been marked onto our path[x][y], we don't need to save it anymore.
+				}
+
+				//Now do the path from spawn to stamp.
 				temppath = Memory.rooms[room_name].mine.epath;
 				calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'epath', false, false, temppath,
 				{
 					lreturn: Memory.rooms[room_name].mine.ereturn,
 					efat: Memory.rooms[room_name].mine.efat
 				});
+				//Back from the stamp to the spawn.
 				dir = Memory.rooms[room_name].mine.ereturn[0].direction;
 				temppath = Memory.rooms[room_name].mine.ereturn;	//Try without dir.
 				calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'ereturn', false, false, temppath,
 				{
-					labs: Memory.rooms[room_name].mine.epath
+					epath: Memory.rooms[room_name].mine.epath
 				});
 				//Efat is the direction from the end of epath to the extraction container.
 				temppath = [Memory.rooms[room_name].mine.epath.slice(-1)[0], Memory.rooms[room_name].mine.efat[0]];
@@ -1038,7 +1101,7 @@ var calculate =
 					Memory.rooms[room_name].sources[i].lreturn =	[Memory.rooms[room_name].sources[i].lreturn[0],	Memory.rooms[room_name].sources[i].lreturn.slice(-1)[0]];
 				}
 		}
-		return true;
+		return typeof room_name === 'string' && typeof type === 'string';
 	},
 
 	backuppaths: function(room_name = false)
@@ -1136,6 +1199,24 @@ var calculate =
 		{
 			return false;
 		}
+	},
+
+	currentEnergy: function(room_name)
+	{
+		if (!calculate.spawns[room_name] || !calculate.sortedextensions[room_name])
+		{
+			calculate.sortExtensions(room_name);
+		}
+
+		let energy = Game.rooms[room_name].energyAvailable;
+		let spawn = Game.getObjectById(Memory.rooms[room_name].spawns[2].id);
+
+		if (spawn)
+		{
+			energy -= spawn.store.getUsedCapacity(RESOURCE_ENERGY);
+		}
+
+		return energy;
 	},
 
 	bodyCost: function(body)
@@ -1378,7 +1459,7 @@ var calculate =
 
 	check_xy: function(x, y, obj)
 	{
-		return obj[x] && obj[x][y];
+		return obj[x] !== undefined && obj[x][y] !== undefined;
 	},
 
 	get_xy: function(x, y, obj)
@@ -1386,6 +1467,242 @@ var calculate =
 		if (obj[x])
 		{
 			return obj[x][y];
+		}
+	},
+
+	findtile: function(room_name, x, y, type, s = null)	//type can be a string or an array.
+	{
+		if (typeof type === 'string')
+		{
+			type = [type];
+		}
+		else if (typeof type !== 'array')
+		{
+			console.log('Invalid tile type.')
+			return false;	//Error.
+		}
+
+		let tile;
+		if (Memory.rooms[room_name].path[x] && (tile = Memory.rooms[room_name].path[x][y]))
+		{
+			//We found a tile. Let's see if it's relevant to us.
+			if (s === null)	//Not source bound.
+			{
+				for (let t = 0; t < type.length; t++)
+				{
+					if (tile[type[t]] || (tile.flipper && tile.flipper[type[t]]))
+					{
+						return true;
+					}
+					else if (t === type.length - 1)
+					{
+						return false;
+					}
+				}
+			}
+			else	//Source bound.
+			{
+				for (let t = 0; t < type.length; t++)
+				{
+					if ((tile[type[t]] && tile[type[t]][s]) || (tile.flipper && tile.flipper[type[t]] && tile.flipper[type[t]][s]))
+					{
+						return true;
+					}
+					else if (t === type.length - 1)
+					{
+						return false;
+					}
+				}
+			}
+		}
+		else
+		{
+			return false;
+		}
+	},
+
+	isPathClear: function(room_name, path, direction = null, x1, y1, x2 = null, y2 = null)
+	{
+		//We're traversing an inter-room path[x][y] object to make sure there's no structures in its way.
+		//First get all blocking structures in the room.
+		let structs = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: calculate.blockingStructure});
+
+		//Now organize them into an easily testable format.
+		let structs_xy = {};
+		for (let st = 0; st < structs.length; st++)
+		{
+			calculate.mark_found(structs[st].pos.x, structs[st].pos.y, structs_xy);
+		}
+
+		//What's the initial direction?
+		if (calculate.check_xy(x1, y1, path))
+		{
+			direction = path[x1][y1];
+		}
+
+		//console.log('x: ' + x1 + ' y: ' + y1 + ' room: ' + room_name + ' direction: ' + direction);
+
+		//Now iterate the path.
+		if (x2 === null || y2 === null)	//If we didn't specify a destination, we're testing until we hit an exit.
+		{
+			for (let tempx = x1, tempy = y1, dx = calculate.dxdy[direction].dx, dy = calculate.dxdy[direction].dy, first_step = true, last_step = false; first_step || !last_step; tempx += dx, tempy += dy, first_step = false)
+			{
+				//Have we found a structure blocking our path?
+				if (calculate.check_xy(tempx, tempy, structs_xy))
+				{
+					//console.log('Failure reported.');
+					return false;	//Report the failure.
+				}
+
+				//Is there a change in direction before the next tile?
+				if (calculate.check_xy(tempx, tempy, path))
+				{
+					//console.log('Changing direction.');
+					direction = path[tempx][tempy];
+					dx = calculate.dxdy[direction].dx;
+					dy = calculate.dxdy[direction].dy;
+				}
+
+				//We do need to test the last step.
+				if ((tempx === 0 || tempx === 49 || tempy === 0 || tempy === 49) && !first_step)
+				{
+					last_step = true;
+				}
+			}
+		}
+		else	//If we did specify a destination, we're testing until we hit that.
+		{
+			for (let tempx = x1, tempy = y1, dx = calculate.dxdy[direction].dx, dy = calculate.dxdy[direction].dy, last_step = false; !last_step || (tempx !== x2 && tempy !== y2); tempx += dx, tempy += dy)
+			{
+				//Have we found a structure blocking our path?
+				if (calculate.check_xy(tempx, tempy, structs_xy))
+				{
+					//console.log('Failure reported.');
+					return false;	//Report the failure.
+				}
+
+				//Is there a change in direction before the next tile?
+				if (calculate.check_xy(tempx, tempy, path))
+				{
+					//console.log('Changing direction.');
+					direction = path[tempx][tempy];
+					dx = calculate.dxdy[direction].dx;
+					dy = calculate.dxdy[direction].dy;
+				}
+
+				//We do need to test the last step.
+				if (tempx === x2 || tempy === y2)
+				{
+					last_step = true;
+				}
+			}
+		}
+
+		return true;	//We made it this far with no errors or blocking structures.
+	},
+
+	blockingStructure: function(structure)
+	{
+		return structure.structureType !== STRUCTURE_CONTAINER && structure.structureType !== STRUCTURE_ROAD && (structure.structureType !== STRUCTURE_RAMPART || (!structure.isPublic && !structure.my));
+	},
+
+	endOfPath: function(room_name, path, direction = null, tempx, tempy)
+	{
+		//What's the initial direction?
+		if (calculate.check_xy(tempx, tempy, path))
+		{
+			direction = path[tempx][tempy];
+		}
+
+		//Find the last step in this room's inter-room [x][y] path.
+		for (let dx = calculate.dxdy[direction].dx, dy = calculate.dxdy[direction].dy, first_step = true;
+			first_step || (tempx !== 0 && tempx !== 49 && tempy !== 0 && tempy !== 49); tempx += dx, tempy += dy, first_step = false)
+		{
+			//Is there a change in direction before the next tile?
+			if (calculate.check_xy(tempx, tempy, path))
+			{
+				direction = path[tempx][tempy];
+				dx = calculate.dxdy[direction].dx;
+				dy = calculate.dxdy[direction].dy;
+			}
+		}
+
+		//After we're done iterating, we should have the last step in this room.
+		return {x: tempx, y: tempy};
+	},
+
+	newpath: function(room_name, action_type, action_number, x = false, y = false, x2 = false, y2 = false, room_name2 = false, direction = false)	//room_name2 and direction unworking or unimplemented.
+	{
+		if (typeof room_name === 'string' && typeof action_type === 'string' && typeof action_number === 'number')
+		{
+			if (typeof x !== 'number' && typeof y !== 'number' && typeof x2 !== 'number' && typeof y2 !== 'number')
+			{
+				let temproom = Memory[action_type][action_number].path[room_name];
+				x = temproom[0].x;
+				y = temproom[0].y;
+				x2 = temproom[temproom.length - 1].x;
+				y2 = temproom[temproom.length - 1].y;
+			}
+
+			let temppath;
+			if (typeof room_name2 === 'string')
+			{
+				temppath = calculate.cleanthispath(Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)), {plainCost: 1, swampCost: 2, maxRooms: 1}));
+				Memory[action_type][action_number].pos.roomName = room_name2;
+			}
+			else if(room_name2)
+			{
+				temppath = calculate.cleanthispath(Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)), {plainCost: 1, swampCost: 2, maxRooms: 1}));
+			}
+			else
+			{
+				temppath = calculate.cleanthispath(Game.rooms[room_name].findPath((new RoomPosition(x, y, room_name)), (new RoomPosition(x2, y2, room_name)), {plainCost: 1, swampCost: 2}));
+			}
+
+			temppath.unshift({x: x, y: y, direction: temppath[0].direction});
+
+			let temp_tile = {};
+			for (let tile = 0; tile < temppath.length; tile++)
+			{
+				if (!temp_tile[temppath[tile].x])
+				{
+					temp_tile[temppath[tile].x] = {};
+				}
+
+				temp_tile[temppath[tile].x][temppath[tile].y] = temppath[tile].direction;
+			}
+
+			Memory[action_type][action_number].path[room_name] = temp_tile;
+
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	},
+
+	coaxThroughExit: function(room_name, costMatrix)
+	{
+		//To make our interroom pathing want to go straight through an exit, let's make the exit tiles expensive so it doesn't stay on them.
+		for (let x = 0, increment, terrain = Game.map.getRoomTerrain(room_name); x < 50; x++)
+		{
+			if (x === 0 || x === 49)
+			{				
+				increment = 1;
+			}
+			else
+			{
+				increment = 49;
+			}
+
+			for (let y = 0; y < 50; y+= increment)
+			{
+				if (terrain.get(x, y) !== TERRAIN_MASK_WALL)
+				{
+					costMatrix.set(x, y, 10);
+				}
+			}
 		}
 	},
 
@@ -1460,8 +1777,8 @@ var calculate =
 	orientation:
 	{
 		"-1": {"-1": 8, 0: 7, 1: 6},
-		 0: {"-1": 1,       1: 5},
-		 1: {"-1": 2, 0: 3, 1: 4}
+		  0 : {"-1": 1,       1: 5},
+		  1 : {"-1": 2, 0: 3, 1: 4}
 	},
 
 	dxdy:
