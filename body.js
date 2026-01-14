@@ -27,7 +27,7 @@ var body =
 		return body;
 	},
 	
-	fatty: function(energy = 550, upgrader = false, eminer = false)
+	fatty: function(energy = 550, upgrader = false, eminer = false, moveneed = 1.5)
 	{	//Minimal parts for ideal fatty.
 		if (energy < 550)
 		{
@@ -42,14 +42,15 @@ var body =
 		{
 			eight = true;	//If we're in a level 8 room, we're not delivering much energy to the upgrader. Only use one carry.
 		}
+		energy -= 450;
 
 		//Upgrading fatties require a carry. We'll put more carries on at the end if we can spare the energy.
 		let maxWork;
 		if (upgrader)
 		{
-			body.unshift(CARRY);
-			extracarry++;
-			energy += 50;
+			body.unshift(CARRY, CARRY);
+			extracarry += 2;
+			energy -= 100;
 
 			if (eight)
 			{
@@ -71,9 +72,9 @@ var body =
 				maxWork = 5;	//An owned or reserved source generates 10 energy per tick. If we harvest more than that, there will be idle time.
 			}
 			body.push(WORK);
+			energy -= 100;
 			workcount++;
 		}
-		energy -= 550;
 
 		while (energy >= 100 && upgrader && workcount < maxWork && body.length < 50)	//More work if he's upgrading a controller.
 		{
@@ -87,7 +88,7 @@ var body =
 			extracarry++;
 			energy -= 50;
 		}
-		while (energy >= 50 && body.length - extracarry < Math.ceil(maxWork * 1.5) && body.length < 50)	//There should be one move for every two work.
+		while (energy >= 50 && body.length - extracarry < Math.ceil(maxWork * moveneed) && body.length < 50)	//There should be one move for every two work, unless we're offroad.
 		{
 			body.unshift(MOVE);
 			energy -= 50;
@@ -323,9 +324,9 @@ var body =
 
 	custodian: function(energy)
 	{
-		let body = [MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY];
-		energy -= 1050;
-		while (energy >= 100 && body.length < 50)	//The ideal custodian quickly harvests both sources, then tends to the rest of the room. It will be T3 boosted.
+		let body = new Array(10).fill(MOVE).concat(new Array(15).fill(CARRY));	//This leaves room for 25 WORK and can also move well enough before it's boosted.
+		energy -= 1250;
+		while (energy >= 100 && body.length < 50)	//The ideal custodian quickly harvests both sources, then tends to the rest of the room. MOVE will be T1 boosted, WORK will be T2 boosted, and CARRY will be T3 boosted.
 		{
 			body.unshift(WORK);
 		}
@@ -381,10 +382,15 @@ var body =
 
 //We have some aliases so the calling functions don't need to care.
 body.harvester = body.fatty;
+body.farharvester = function(energy)
+{
+	return body.fatty(energy, false, false, 2);
+}
 body.upgrader = function(energy)
 {
 	return body.fatty(energy, true);
 };
+body.hybrid = body.upgrader;
 body.mtransport = body.transport;
 body.utransport = function(energy)
 {
