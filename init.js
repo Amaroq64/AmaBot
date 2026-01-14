@@ -8,11 +8,11 @@ var calculate = require('calculate');
 
 var init =
 {
-	run: function(specific_room = false)
+	run: function(specific_room = false, hybrid_override = false)
 	{
 
 		//Initialize memory if we're starting anew.
-		if (Memory.rooms == undefined)
+		if (Memory.rooms === undefined)
 		{
 			//console.log('Rooms undefined.');
 			Memory.rooms = {};
@@ -66,20 +66,119 @@ var init =
 				for (let i = 0; i < len; i++)
 				{
 					//Current entities start at zero. Ideal entity amounts will be populated by roomPlanner.
-					Memory.rooms[room_name].sources[i] = {id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], mtransport: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
-					//Memory.rooms[room_name].sources[i].pos = {x: Memory.rooms[room_name].sources[i].pos.x, y: Memory.rooms[room_name].sources[i].pos.y};
+					Memory.rooms[room_name].sources[i] = {id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], hybrid: [], mtransport: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
 				}
 
 				//Move sources to end of array until the closest one is [0].
 				let closest = Game.spawns[spawn].pos.findClosestByPath(FIND_SOURCES, {ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1}).id;
-				while (closest != Memory.rooms[room_name].sources[0].id)
+				while (closest !== Memory.rooms[room_name].sources[0].id)
 				{
 					Memory.rooms[room_name].sources.push(Memory.rooms[room_name].sources.shift());
 				}
 
+				//Detect if the source is close to the controller.
+				let hybrid = new Array(len);
+				for (let h = 0; h < len; h++)
+				{
+					hybrid[h] = {status: false, spaces: {}};
+				}
+				let hybrid_found = 0;
+				for (let i = 0, terrain = Game.rooms[room_name].getTerrain(), roompos; i < len; i++)
+				{
+					//If it's in range of the controller, it gets a hybrid role. Otherwise it doesn't.
+					for (let x = -1, tempx, tempy; x < 2; x++)
+					{
+						tempx = Memory.rooms[room_name].sources[i].pos.x + x;
+						for (let y = -1; y < 2; y++)
+						{
+							tempy = Memory.rooms[room_name].sources[i].pos.y + y;
+							roompos = new RoomPosition(tempx, tempy, room_name);
+							//We might not want a hybrid in an established room that we're retesting.
+							if (!hybrid_override && terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && roompos.getRangeTo(Game.rooms[room_name].controller) <= 3 && !(x === 0 && y === 0))
+							{
+								hybrid[i].status = true;
+								calculate.mark_found(tempx, tempy, hybrid[i].spaces);
+							}
+						}
+					}
+
+					//If it's in range, we don't need the harvester or utransport. If it's not, we don't need the hybrid.
+					if (hybrid[i].status)
+					{
+						Memory.rooms[room_name].sources[i].creeps.harvester = undefined;
+						Memory.rooms[room_name].sources[i].creeps.utransport = undefined;
+						hybrid_found++;
+					}
+					else
+					{
+						Memory.rooms[room_name].sources[i].creeps.hybrid = undefined;
+					}
+				}
+
+				//If we found more than one source in range of the controller, let's combine them if possible.
+				//This is extremely rare.
+				//Most of our code doesn't assume two sources, but this part will.
+				if (hybrid_found >= 2)
+				{
+					let both_spaces = {};
+					let both_found = false;
+
+					for (let i = 0, temp_found = {}; i < len; i++)
+					{
+						for (let x in hybrid[i].spaces)
+						{
+							for (let y in hybrid[i].spaces[x])
+							{
+								if (!temp_found[x])
+								{
+									temp_found[x] = {};
+								}
+
+								if (temp_found[x][y])
+								{
+									calculate.mark_found(Number(x), Number(y), both_spaces);
+									both_found = true;
+								}
+								else
+								{
+									calculate.mark_found(Number(x), Number(y), temp_found);
+								}
+							}
+						}
+					}
+
+					if (both_found)
+					{
+						//If we can combine them, we should.
+						console.log('Both found.');
+						Memory.rooms[room_name].sources = [Memory.rooms[room_name].sources[0]];
+						len = 1;
+						hybrid = [{status: true, spaces: both_spaces}];
+					}
+				}
+
+				//Rather than deciding these arbitrarily, let's choose the one slightly closer to the spawn.
+				for (let i = 0, temp_chosen = []; i < len; i++)
+				{
+					if (hybrid[i].status)
+					{
+						for (let x in hybrid[i].spaces)
+						{
+							for (let y in hybrid[i].spaces[x])
+							{
+								temp_chosen.push({x: Number(x), y: Number(y)});
+							}
+						}
+
+						//Now choose.
+						hybrid[i].chosen = calculate.true_closest(Game.spawns[spawn].pos, temp_chosen,
+							{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true})[0];
+					}
+				}
+
 				//Record the found mineral.
 				//Strip everything but id and position.
-				Memory.rooms[room_name].mineral = {id: mineral.id, eid: null, pos: {x: mineral.pos.x, y: mineral.pos.y}};
+				Memory.rooms[room_name].mineral = {id: mineral.id, eid: null, cid: null, pos: {x: mineral.pos.x, y: mineral.pos.y}};
 
 				//The first path that emerges diagonally from the spawn should block the opposing diagonal.
 				//Once a different path emerges from the spawn after this diagonal, we know our second spawn location and weigh all paths after that to touch the second spawn.
@@ -91,16 +190,50 @@ var init =
 				let spawnblock = [];
 
 				//Build the path from spawn to controller so a fatty can get into position.
-				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].controller.pos,
-					{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
+				if (hybrid_found)
+				{
+					for (let i = 0; i < len; i++)
+					{
+						if (hybrid[i].status)
+						{
+							Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, hybrid[i].chosen,
+								{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
+							break;
+						}
+					}
+				}
+				else
+				{
+					Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].controller.pos,
+						{plainCost: 1, swampCost: 2, range: 3, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
+				}
 
 				//Record our upgrader container.
-				Memory.rooms[room_name].buildings.upgradecontainer =
+				if (hybrid_found)	//If there's a hybrid, its mining position is also the upgrading position.
 				{
-					id: null,
-					x: Memory.rooms[room_name].upgrade[Memory.rooms[room_name].upgrade.length - 1].x,
-					y: Memory.rooms[room_name].upgrade[Memory.rooms[room_name].upgrade.length - 1].y
-				};
+					for (let i = 0; i < len; i++)
+					{
+						if (hybrid[i].status)
+						{
+							Memory.rooms[room_name].buildings.upgradecontainer =
+							{
+								id: null,
+								x: hybrid[i].chosen.x,
+								y: hybrid[i].chosen.y
+							};
+							break;
+						}
+					}
+				}
+				else
+				{
+					Memory.rooms[room_name].buildings.upgradecontainer =
+					{
+						id: null,
+						x: Memory.rooms[room_name].upgrade[Memory.rooms[room_name].upgrade.length - 1].x,
+						y: Memory.rooms[room_name].upgrade[Memory.rooms[room_name].upgrade.length - 1].y
+					};
+				}
 
 				let temp = [];
 
@@ -156,8 +289,16 @@ var init =
 					tempPos2 = Game.rooms[room_name].getPositionAt(temp[i].mine[0].x, temp[i].mine[0].y);
 
 					//Get the path from end of path to source, for generics and fatties.
-					temp[i].mfat = Game.rooms[room_name].findPath(tempPos, Memory.rooms[room_name].sources[i].pos,
-						{plainCost: 1, swampCost: 2, range: 1, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
+					if (hybrid[i].status)
+					{
+						temp[i].mfat = Game.rooms[room_name].findPath(tempPos, new RoomPosition(hybrid[i].chosen.x, hybrid[i].chosen.y, room_name),
+							{plainCost: 1, swampCost: 2, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
+					}
+					else
+					{
+						temp[i].mfat = Game.rooms[room_name].findPath(tempPos, Memory.rooms[room_name].sources[i].pos,
+							{plainCost: 1, swampCost: 2, range: 1, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true});
+					}
 
 					//It's possible for the mine path to stop one short while avoiding swamps, or other rare circumstances.
 					//However, mfat (accidentally) picks up the slack when this happens.
@@ -173,6 +314,7 @@ var init =
 					//Record our mining container.
 					Memory.rooms[room_name].sources[i].buildings.miningcontainer =
 					{
+						id: null,
 						x: temp[i].mfat[0].x,
 						y: temp[i].mfat[0].y
 					};
@@ -184,7 +326,7 @@ var init =
 							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
 								costCallback: function(roomName, costMatrix)
 								{
-									if (p == 1)	//Go down our return path and give it a wider berth.
+									if (p === 1)	//Go down our return path and give it a wider berth.
 									{
 										//Go down the first generated path and make space around it.
 										/*for (let n = 1; n < temp[i].mine.length - 1; n++)
@@ -194,7 +336,7 @@ var init =
 												for (let y = -1; y < 2; y++)
 												{
 													//Don't accidentally lower the cost of walls.
-													if (Game.rooms[room_name].getTerrain().get(temp[i].mine[n].x + x, temp[i].mine[n].y + y) != TERRAIN_MASK_WALL)
+													if (Game.rooms[room_name].getTerrain().get(temp[i].mine[n].x + x, temp[i].mine[n].y + y) !== TERRAIN_MASK_WALL)
 													{
 														costMatrix.set(temp[i].mine[n].x + x, temp[i].mine[n].y + y, 10)	//Make room for extensions.
 													}
@@ -208,7 +350,7 @@ var init =
 												for (let y = -1; y < 2; y++)
 												{
 													//Don't accidentally lower the cost of walls.
-													if (Game.rooms[room_name].getTerrain().get(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y) != TERRAIN_MASK_WALL)
+													if (Game.rooms[room_name].getTerrain().get(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y) !== TERRAIN_MASK_WALL)
 													{
 														costMatrix.set(temp[i].mreturn[n].x + x, temp[i].mreturn[n].y + y, 10)	//Make room for extensions.
 													}
@@ -275,208 +417,83 @@ var init =
 						}
 
 						//Build the path from source to controller's fatty.
-						temp[i].upgrade = Game.rooms[room_name].findPath(tempPos,
-							Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-2)[0].x, Memory.rooms[room_name].upgrade.slice(-2)[0].y),
-							{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
-								costCallback: function(roomName, costMatrix)
-								{
-									let templen;
-
-									let s = 0;
-									if (i == 1)
-									{
-										s = -1;
-									}
-
-									//Avoid going against traffic when we leave the source.
-									while (s < 1)
-									{
-										templen = temp[i + s].mine.length;
-										for (let n = 0; n <  templen; n++)
-										{
-											costMatrix.set(temp[i + s].mine[n].x, temp[i + s].mine[n].y, 1);	//Here we don't mind going against the traffic of both sources.
-										}
-										costMatrix.set(temp[i + s].mfat[0].x, temp[i + s].mfat[0].y, 255);	//Make sure to go around both mining fatties.
-										s++;
-									}
-									costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around the spawner.
-
-									s = 0;
-									if (i == 1)
-									{
-										s = -1;
-									}
-
-									//But prefer the mreturn path since there will be roads.
-									while (s < 1)
-									{
-										templen = temp[i + s].mreturn.length;
-										for(let n = 0; n < templen; n++)
-										{
-											costMatrix.set(temp[i + s].mreturn[n].x, temp[i + s].mreturn[n].y, 1);
-											
-										}
-										s++;
-									}
-
-									//Also prefer the previous upgrader path.
-									if (i > 0)
-									{
-										let templen = temp[i - 1].upgrade.length;
-										for (let n = 0; n < templen; n++)
-										{
-											costMatrix.set(temp[i - 1].upgrade[n].x, temp[i - 1].upgrade[n].y, 1); //Prefer the previous path slightly.
-										}
-									}
-
-									//Once our 2nd spawner has been selected, we must block it.
-									if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
-									{
-										costMatrix.set(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, 255);
-									}
-
-									return costMatrix;
-								}
-							})
-						temp[i].upgrade.unshift({x: temp[i].mine[temp[i].mine.length - 1].x, y: temp[i].mine[temp[i].mine.length - 1].y,
-							dx: temp[i].mine[temp[i].mine.length - 1].x - temp[i].upgrade[0].x, dy: temp[i].mine[temp[i].mine.length - 1].y - temp[i].upgrade[0].y,
-							direction: Game.rooms[room_name].getPositionAt(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y).getDirectionTo(temp[i].upgrade[0].x, temp[i].upgrade[0].y)});
-
-						//A path that doesn't go to or from the spawn can theoretically cross the position of our second spawn. We should try to eliminate this possibility early.
-						if (last_try)
+						if (hybrid_found && hybrid[i].status)
 						{
-							//Once we've detected a spawn placement, we are done here.
-							try_again = false;
+							temp[i].upgrade = [];
+							break;
 						}
 						else
 						{
-							//Mark any position where our path touched the first spawn.
-							for (let tu = 0; tu < temp[i].upgrade.length; tu++)
+							let upgrade_target;
+							let urange = 0;
+							if (hybrid_found)	//If we have a hybrid in the room, the upgrade path of the non-hybrid goes to it.
 							{
-								calculate.mark_found(temp[i].upgrade[tu].x, temp[i].upgrade[tu].y, upath_xy);
-							}
-
-							//Now check to see if it touched it.
-							try_again = false;	//If we don't detect any touching steps, there's no conflict.
-							for (let x = -1; !try_again && x < 2; x++)
-							{
-								tempx = Game.spawns[spawn].pos.x + x;
-
-								for (let y = 0; !try_again && y < 2; y++)
+								for (let i2 = 0; i2 < len; i2++)
 								{
-									tempy = Game.spawns[spawn].pos.y + y;
-
-									//If a path step touches the spawn, we should run the blocking function to mark it.
-									if (calculate.check_xy(tempx, tempy, upath_xy))
+									if (hybrid[i2].status)
 									{
-										try_again = true;
-
-										//Since the blocker expects a path step emerging from the spawn, we have to fabricate one.
-										let temp_step = [{x: tempx, y: tempy, dx: tempx - Game.spawns[spawn].pos.x, dy: tempy - Game.spawns[spawn].pos.y,
-											direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
-
-										init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
-
-										//While we're here, did the second spawn position get generated?
-										if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
-										{
-											//Did it land on a path step?
-											if (calculate.check_xy(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, upath_xy))
-											{
-												last_try = true;
-											}
-										}
+										upgrade_target = Game.rooms[room_name].getPositionAt(hybrid[i2].chosen.x, hybrid[i2].chosen.y);
+										urange = 1;
+										break;
 									}
 								}
 							}
-						}
-					}
+							else
+							{
+								upgrade_target = Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-2)[0].x, Memory.rooms[room_name].upgrade.slice(-2)[0].y);
+							}
 
-					//To go back to source, we really go from final upgrading position to initial upgrading position.
-					tempPos = Game.rooms[room_name].getPositionAt(temp[i].upgrade.slice(-1)[0].x, temp[i].upgrade.slice(-1)[0].y);
-					tempPos2 = Game.rooms[room_name].getPositionAt(temp[i].upgrade[0].x, temp[i].upgrade[0].y);
-
-					for (let last_try = false, try_again = true, upath_xy, tempx, tempy; try_again; )	//If we crossed our second spawn position, we need to recreate this path.
-					{
-						upath_xy = {};
-
-						//Do we already have a 2nd spawn placement?
-						if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
-						{
-							last_try = true;
-						}
-
-						//Here, we go back.
-						for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
-						{
-							temp[i].ureturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
-								{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+							temp[i].upgrade = Game.rooms[room_name].findPath(tempPos, upgrade_target,
+								{plainCost: 1 + i, swampCost: 2 + i, range: urange, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second path to slightly prefer going over the first.
 									costCallback: function(roomName, costMatrix)
 									{
-										if (p == 1)	//Go down our return path and give it a wider berth.
+										let templen;
+
+										let s = 0;
+										if (i === 1)
 										{
-											//Go down the first generated path and make space around it.
-											/*for (let n = 1; n < temp[i].upgrade.length - 1; n++)
+											s = -1;
+										}
+
+										//Avoid going against traffic when we leave the source.
+										while (s < 1)
+										{
+											templen = temp[i + s].mine.length;
+											for (let n = 0; n <  templen; n++)
 											{
-												for (let x = -1; x < 2; x++)
-												{
-													for (let y = -1; y < 2; y++)
-													{
-														//Don't accidentally lower the cost of walls.
-														if (Game.rooms[room_name].getTerrain().get(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y) != TERRAIN_MASK_WALL)
-														{
-															costMatrix.set(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y, 10)	//Make room for extensions.
-														}
-													}
-												}
-											}*/
-											for (let n = 1; n < temp[i].ureturn.length - 1; n++)
-											{
-												for (let x = -1; x < 2; x++)
-												{
-													for (let y = -1; y < 2; y++)
-													{
-														//Don't accidentally lower the cost of walls.
-														if (Game.rooms[room_name].getTerrain().get(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y) != TERRAIN_MASK_WALL)
-														{
-															costMatrix.set(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y, 10)	//Make room for extensions.
-														}
-													}
-												}
+												costMatrix.set(temp[i + s].mine[n].x, temp[i + s].mine[n].y, 1);	//Here we don't mind going against the traffic of both sources.
 											}
+											costMatrix.set(temp[i + s].mfat[0].x, temp[i + s].mfat[0].y, 255);	//Make sure to go around both mining fatties.
+											s++;
+										}
+										costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around the spawner.
+
+										s = 0;
+										if (i === 1)
+										{
+											s = -1;
 										}
 
-										//Avoid backtracking on the way back.
-										let templen = temp[i].upgrade.length;
-										for (let n = 0; n < templen; n++)
+										//But prefer the mreturn path since there will be roads.
+										while (s < 1)
 										{
-											costMatrix.set(temp[i].upgrade[n].x, temp[i].upgrade[n].y, 10); //Unless absolutely necessary.
-										}
-										costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
-										costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
-
-										for (let i2 = 0; i2 < len; i2++)
-										{
-											costMatrix.set(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y, 255);	//Make sure to go around both mining fatties.
-										}
-										
-										//But prefer the mine path since there will be roads.
-										templen = temp[i].mine.length;
-										for(let n = 0; n < templen; n++)
-										{
-											costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 1);
-										}
-										//We don't mind preferring the mreturn path too since there will be roads.
-										templen = temp[i].mreturn.length;
-										for(let n = 0; n < templen; n++)
-										{
-											costMatrix.set(temp[i].mreturn[n].x, temp[i].mreturn[n].y, 1);
+											templen = temp[i + s].mreturn.length;
+											for(let n = 0; n < templen; n++)
+											{
+												costMatrix.set(temp[i + s].mreturn[n].x, temp[i + s].mreturn[n].y, 1);
+												
+											}
+											s++;
 										}
 
-										//Hook in our blocked spawn positions.
-										for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+										//Also prefer the previous upgrader path.
+										if (i > 0)
 										{
-											costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+											let templen = temp[i - 1].upgrade.length;
+											for (let n = 0; n < templen; n++)
+											{
+												costMatrix.set(temp[i - 1].upgrade[n].x, temp[i - 1].upgrade[n].y, 1); //Prefer the previous path slightly.
+											}
 										}
 
 										//Once our 2nd spawner has been selected, we must block it.
@@ -487,51 +504,54 @@ var init =
 
 										return costMatrix;
 									}
-								});
-						}
+								})
+							temp[i].upgrade.unshift({x: temp[i].mine[temp[i].mine.length - 1].x, y: temp[i].mine[temp[i].mine.length - 1].y,
+								dx: temp[i].mine[temp[i].mine.length - 1].x - temp[i].upgrade[0].x, dy: temp[i].mine[temp[i].mine.length - 1].y - temp[i].upgrade[0].y,
+								direction: Game.rooms[room_name].getPositionAt(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y).getDirectionTo(temp[i].upgrade[0].x, temp[i].upgrade[0].y)});
 
-						//A path that doesn't go to or from the spawn can theoretically cross the position of our second spawn. We should try to eliminate this possibility early.
-						if (last_try)
-						{
-							//Once we've detected a spawn placement, we are done here.
-							try_again = false;
-						}
-						else
-						{
-							//Mark any position where our path touched the first spawn.
-							for (let tu = 0; tu < temp[i].ureturn.length; tu++)
+							//A path that doesn't go to or from the spawn can theoretically cross the position of our second spawn. We should try to eliminate this possibility early.
+							if (last_try)
 							{
-								calculate.mark_found(temp[i].ureturn[tu].x, temp[i].ureturn[tu].y, upath_xy);
+								//Once we've detected a spawn placement, we are done here.
+								try_again = false;
 							}
-
-							//Now check to see if it touched it.
-							try_again = false;	//If we don't detect any touching steps, there's no conflict.
-							for (let x = -1; !try_again && x < 2; x++)
+							else
 							{
-								tempx = Game.spawns[spawn].pos.x + x;
-
-								for (let y = 0; !try_again && y < 2; y++)
+								//Mark any position where our path touched the first spawn.
+								for (let tu = 0; tu < temp[i].upgrade.length; tu++)
 								{
-									tempy = Game.spawns[spawn].pos.y + y;
+									calculate.mark_found(temp[i].upgrade[tu].x, temp[i].upgrade[tu].y, upath_xy);
+								}
 
-									//If a path step touches the spawn, we should run the blocking function to mark it.
-									if (calculate.check_xy(tempx, tempy, upath_xy))
+								//Now check to see if it touched it.
+								try_again = false;	//If we don't detect any touching steps, there's no conflict.
+								for (let x = -1; !try_again && x < 2; x++)
+								{
+									tempx = Game.spawns[spawn].pos.x + x;
+
+									for (let y = 0; !try_again && y < 2; y++)
 									{
-										try_again = true;
+										tempy = Game.spawns[spawn].pos.y + y;
 
-										//Since the blocker expects a path step emerging from the spawn, we have to fabricate one.
-										let temp_step = [{x: tempx, y: tempy, dx: tempx - Game.spawns[spawn].pos.x, dy: tempy - Game.spawns[spawn].pos.y,
-											direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
-
-										init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
-
-										//While we're here, did the second spawn position get generated?
-										if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+										//If a path step touches the spawn, we should run the blocking function to mark it.
+										if (calculate.check_xy(tempx, tempy, upath_xy))
 										{
-											//Did it land on a path step?
-											if (calculate.check_xy(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, upath_xy))
+											try_again = true;
+
+											//Since the blocker expects a path step emerging from the spawn, we have to fabricate one.
+											let temp_step = [{x: tempx, y: tempy, dx: tempx - Game.spawns[spawn].pos.x, dy: tempy - Game.spawns[spawn].pos.y,
+												direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
+
+											init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
+
+											//While we're here, did the second spawn position get generated?
+											if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
 											{
-												last_try = true;
+												//Did it land on a path step?
+												if (calculate.check_xy(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, upath_xy))
+												{
+													last_try = true;
+												}
 											}
 										}
 									}
@@ -540,19 +560,187 @@ var init =
 						}
 					}
 
-					//Save some more values for our new path system.
-					temp[i].upgradedir2 = temp[i].upgrade[1].direction;
-					temp[i].ulength = temp[i].upgrade.length;
-					temp[i].urlength = temp[i].ureturn.length;
 
-					//Alter the first step in each upgrade path so it completes the loop.
-					temp[i].ureturn[0].direction = tempPos.getDirectionTo(Game.rooms[room_name].getPositionAt(temp[i].ureturn.slice(0, 1)[0].x, temp[i].ureturn.slice(0, 1)[0].y));
-					temp[i].ureturn[0].dx = temp[i].ureturn.slice(0, 1)[0].x - tempPos.x;
-					temp[i].ureturn[0].dy = temp[i].ureturn.slice(0, 1)[0].y - tempPos.y;
-					temp[i].upgrade[0].direction =	Game.rooms[room_name].getPositionAt(temp[i].ureturn[temp[i].ureturn.length -2].x, temp[i].ureturn[temp[i].ureturn.length -2].y)
-						.getDirectionTo(Game.rooms[room_name].getPositionAt(tempPos2.x, tempPos2.y));
-					temp[i].upgrade[0].dx = temp[i].ureturn[temp[i].ureturn.length - 2].x - tempPos2.x;
-					temp[i].upgrade[0].dy = temp[i].ureturn[temp[i].ureturn.length - 2].y - tempPos2.y;
+					if (hybrid_found && hybrid[i].status)
+					{
+						temp[i].ureturn = [];
+
+						//Save some more values for our new path system.
+						for (let i2 = 0; i2 < hybrid.length; i2++)
+						{
+							//If we're not using an upgrade path, then our upgrade path is our mining path.
+							if (hybrid[i2].status)
+							{
+								temp[i].upgradedir2 = temp[i2].mine[1].direction;
+							}
+						}
+						temp[i].ulength = temp[i].upgrade.length;
+						temp[i].urlength = temp[i].ureturn.length;
+					}
+					else
+					{
+						//To go back to source, we really go from final upgrading position to initial upgrading position.
+						tempPos = Game.rooms[room_name].getPositionAt(temp[i].upgrade.slice(-1)[0].x, temp[i].upgrade.slice(-1)[0].y);
+						tempPos2 = Game.rooms[room_name].getPositionAt(temp[i].upgrade[0].x, temp[i].upgrade[0].y);
+
+						for (let last_try = false, try_again = true, upath_xy, tempx, tempy; try_again; )	//If we crossed our second spawn position, we need to recreate this path.
+						{
+							upath_xy = {};
+
+							//Do we already have a 2nd spawn placement?
+							if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+							{
+								last_try = true;
+							}
+
+							//Here, we go back.
+							for (let p = 0; p < 2; p++)	//Generate this twice, so we can make space in-between for more extensions.
+							{
+								temp[i].ureturn = Game.rooms[room_name].findPath(tempPos, tempPos2,
+									{plainCost: 1 + i, swampCost: 2 + i, range: 0, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,	//We want our second return path to slightly prefer going over the first.
+										costCallback: function(roomName, costMatrix)
+										{
+											if (p === 1)	//Go down our return path and give it a wider berth.
+											{
+												//Go down the first generated path and make space around it.
+												/*for (let n = 1; n < temp[i].upgrade.length - 1; n++)
+												{
+													for (let x = -1; x < 2; x++)
+													{
+														for (let y = -1; y < 2; y++)
+														{
+															//Don't accidentally lower the cost of walls.
+															if (Game.rooms[room_name].getTerrain().get(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y) !== TERRAIN_MASK_WALL)
+															{
+																costMatrix.set(temp[i].upgrade[n].x + x, temp[i].upgrade[n].y + y, 10)	//Make room for extensions.
+															}
+														}
+													}
+												}*/
+												for (let n = 1; n < temp[i].ureturn.length - 1; n++)
+												{
+													for (let x = -1; x < 2; x++)
+													{
+														for (let y = -1; y < 2; y++)
+														{
+															//Don't accidentally lower the cost of walls.
+															if (Game.rooms[room_name].getTerrain().get(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y) !== TERRAIN_MASK_WALL)
+															{
+																costMatrix.set(temp[i].ureturn[n].x + x, temp[i].ureturn[n].y + y, 10)	//Make room for extensions.
+															}
+														}
+													}
+												}
+											}
+
+											//Avoid backtracking on the way back.
+											let templen = temp[i].upgrade.length;
+											for (let n = 0; n < templen; n++)
+											{
+												costMatrix.set(temp[i].upgrade[n].x, temp[i].upgrade[n].y, 10); //Unless absolutely necessary.
+											}
+											costMatrix.set(Game.spawns[spawn].pos.x, Game.spawns[spawn].pos.y, 255);	//Make sure to go around our spawn.
+											costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
+
+											for (let i2 = 0; i2 < len; i2++)
+											{
+												costMatrix.set(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y, 255);	//Make sure to go around both mining fatties.
+											}
+											
+											//But prefer the mine path since there will be roads.
+											templen = temp[i].mine.length;
+											for(let n = 0; n < templen; n++)
+											{
+												costMatrix.set(temp[i].mine[n].x, temp[i].mine[n].y, 1);
+											}
+											//We don't mind preferring the mreturn path too since there will be roads.
+											templen = temp[i].mreturn.length;
+											for(let n = 0; n < templen; n++)
+											{
+												costMatrix.set(temp[i].mreturn[n].x, temp[i].mreturn[n].y, 1);
+											}
+
+											//Hook in our blocked spawn positions.
+											for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+											{
+												costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
+											}
+
+											//Once our 2nd spawner has been selected, we must block it.
+											if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+											{
+												costMatrix.set(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, 255);
+											}
+
+											return costMatrix;
+										}
+									});
+							}
+
+							//A path that doesn't go to or from the spawn can theoretically cross the position of our second spawn. We should try to eliminate this possibility early.
+							if (last_try)
+							{
+								//Once we've detected a spawn placement, we are done here.
+								try_again = false;
+							}
+							else
+							{
+								//Mark any position where our path touched the first spawn.
+								for (let tu = 0; tu < temp[i].ureturn.length; tu++)
+								{
+									calculate.mark_found(temp[i].ureturn[tu].x, temp[i].ureturn[tu].y, upath_xy);
+								}
+
+								//Now check to see if it touched it.
+								try_again = false;	//If we don't detect any touching steps, there's no conflict.
+								for (let x = -1; !try_again && x < 2; x++)
+								{
+									tempx = Game.spawns[spawn].pos.x + x;
+
+									for (let y = 0; !try_again && y < 2; y++)
+									{
+										tempy = Game.spawns[spawn].pos.y + y;
+
+										//If a path step touches the spawn, we should run the blocking function to mark it.
+										if (calculate.check_xy(tempx, tempy, upath_xy))
+										{
+											try_again = true;
+
+											//Since the blocker expects a path step emerging from the spawn, we have to fabricate one.
+											let temp_step = [{x: tempx, y: tempy, dx: tempx - Game.spawns[spawn].pos.x, dy: tempy - Game.spawns[spawn].pos.y,
+												direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
+
+											init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
+
+											//While we're here, did the second spawn position get generated?
+											if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
+											{
+												//Did it land on a path step?
+												if (calculate.check_xy(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, upath_xy))
+												{
+													last_try = true;
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+
+						//Save some more values for our new path system.
+						temp[i].upgradedir2 = temp[i].upgrade[1].direction;
+						temp[i].ulength = temp[i].upgrade.length;
+						temp[i].urlength = temp[i].ureturn.length;
+
+						//Alter the first step in each upgrade path so it completes the loop.
+						temp[i].ureturn[0].direction = tempPos.getDirectionTo(Game.rooms[room_name].getPositionAt(temp[i].ureturn.slice(0, 1)[0].x, temp[i].ureturn.slice(0, 1)[0].y));
+						temp[i].ureturn[0].dx = temp[i].ureturn.slice(0, 1)[0].x - tempPos.x;
+						temp[i].ureturn[0].dy = temp[i].ureturn.slice(0, 1)[0].y - tempPos.y;
+						temp[i].upgrade[0].direction =	Game.rooms[room_name].getPositionAt(temp[i].ureturn[temp[i].ureturn.length -2].x, temp[i].ureturn[temp[i].ureturn.length -2].y)
+							.getDirectionTo(Game.rooms[room_name].getPositionAt(tempPos2.x, tempPos2.y));
+						temp[i].upgrade[0].dx = temp[i].ureturn[temp[i].ureturn.length - 2].x - tempPos2.x;
+						temp[i].upgrade[0].dy = temp[i].ureturn[temp[i].ureturn.length - 2].y - tempPos2.y;
+					}
 
 					//Now store the paths we've built.
 					for (let path in temp[i])
@@ -571,7 +759,23 @@ var init =
 				}
 
 				//Rebuild the path from spawn to controller to take our previous paths into account.
-				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y),
+				let final_upgrade_pos;
+				if (hybrid_found)
+				{
+					for (let i = 0; i < len; i++)
+					{
+						if (hybrid[i].status)
+						{
+							final_upgrade_pos = Game.rooms[room_name].getPositionAt(hybrid[i].chosen.x, hybrid[i].chosen.y);
+							break;
+						}
+					}
+				}
+				else
+				{
+					final_upgrade_pos = Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y);
+				}
+				Memory.rooms[room_name].upgrade = Game.rooms[room_name].findPath(Game.spawns[spawn].pos, final_upgrade_pos,
 					{plainCost: 10, swampCost: 10, ignoreRoads: true, ignoreCreeps: true, ignoreDestructibleStructures: true, maxRooms: 1,
 						costCallback: function(roomName, costMatrix)
 						{
@@ -636,7 +840,7 @@ var init =
 							//Now that we have the last tile in this exitpath, check to see if it's on any of our exit tiles.
 							for (let et = 0; et < Memory.rooms[room_name].exits[te].length; et++)
 							{
-								if (Memory.rooms[room_name].exits[te][et].x == last.x && Memory.rooms[room_name].exits[te][et].y == last.y)
+								if (Memory.rooms[room_name].exits[te][et].x === last.x && Memory.rooms[room_name].exits[te][et].y === last.y)
 								{
 									//If we found a match, ignore this exit.
 									temp_exitpaths[te] = false;
@@ -655,19 +859,19 @@ var init =
 					{
 						//Which direction does the exit lead?
 						let described_exit;
-						if (Memory.rooms[room_name].exits[te][0].y == 0)		//Is it northern?
+						if (Memory.rooms[room_name].exits[te][0].y === 0)		//Is it northern?
 						{
 							described_exit = describe[1];
 						}
-						else if (Memory.rooms[room_name].exits[te][0].x == 49)	//Is it eastern?
+						else if (Memory.rooms[room_name].exits[te][0].x === 49)	//Is it eastern?
 						{
 							described_exit = describe[3];
 						}
-						else if (Memory.rooms[room_name].exits[te][0].y == 49)	//Is it southern?
+						else if (Memory.rooms[room_name].exits[te][0].y === 49)	//Is it southern?
 						{
 							described_exit = describe[5];
 						}
-						else if (Memory.rooms[room_name].exits[te][0].x == 0)	//Is it western?
+						else if (Memory.rooms[room_name].exits[te][0].x === 0)	//Is it western?
 						{
 							described_exit = describe[7];
 						}
@@ -806,6 +1010,16 @@ var init =
 				let matches = [];
 				temp = [];
 
+				//If we have reserve flags, mark the reserved locations.
+				let reserved = {};
+				for (let flag in Game.flags)
+				{
+					if (flag.indexOf('Reserved') !== -1 && Game.flags[flag].pos.roomName === room_name)
+					{
+						calculate.mark_found(Game.flags[flag].pos.x, Game.flags[flag].pos.y, reserved);
+					}
+				}
+
 				//Prepare the inner path checks ahead of time so it doesn't explode.
 				let check_paths = {};
 				let check_exit_paths = {};
@@ -861,6 +1075,20 @@ var init =
 					}
 				}
 
+				//To make sure we aren't touching an exit tile.
+				let exit_tiles = Game.rooms[room_name].find(FIND_EXIT);
+				let exit_tiles_xy = {};
+				for (let ex = 0; ex < exit_tiles.length; ex++)
+				{
+					for (let x = -1; x < 2; x++)
+					{
+						for (let y = -1; y < 2; y++)
+						{
+							calculate.mark_found(exit_tiles[ex].x + x, exit_tiles[ex].y + y, exit_tiles_xy);
+						}
+					}
+				}
+
 				//Now find the extension locations.
 				for (let i = 0, terrain = Game.rooms[room_name].getTerrain(); i < Memory.rooms[room_name].sources.length; i++)
 				{
@@ -880,24 +1108,25 @@ var init =
 						for (let n = 0; n < Memory.rooms[room_name].sources[i][keys[k]].length && matches[i] < 30; n++)
 						{
 							//Get everything within one range of these path steps.
-							for (let x = -1; x < 2; x++)
+							for (let x = -1, tempx, temp_pos; x < 2; x++)
 							{
-								for (let y = -1; y < 2; y++)
+								for (let y = -1, tempy; y < 2; y++)
 								{
 									//The position we're comparing.
-									let tempx = Memory.rooms[room_name].sources[i][keys[k]][n].x + x;
-									let tempy = Memory.rooms[room_name].sources[i][keys[k]][n].y + y;
+									tempx = Memory.rooms[room_name].sources[i][keys[k]][n].x + x;
+									tempy = Memory.rooms[room_name].sources[i][keys[k]][n].y + y;
+									temp_pos = new RoomPosition(tempx, tempy, room_name);
 
 									let tempcont = false;
 
-									//Don't accidentally grab walls. Don't process a false one.
-									if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL)
+									//Don't accidentally grab walls. Don't process a reserved spot. Don't process a false one. Don't process a spot touching an exit tile.
+									if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && !calculate.check_xy(tempx, tempy, reserved) && !calculate.check_xy(tempx, tempy, exit_tiles_xy))
 									{
-										if (typeof temp[i].textensions[tempx] != 'object')
+										if (typeof temp[i].textensions[tempx] !== 'object')
 										{
 											temp[i].textensions[tempx] = {}
 										}
-										if (typeof temp[i].textensions[tempx][tempy] != 'object')
+										if (typeof temp[i].textensions[tempx][tempy] !== 'object')
 										{
 											temp[i].textensions[tempx][tempy] = {}
 										}
@@ -996,7 +1225,7 @@ var init =
 											{
 												for (let m = 0; m < Memory.rooms[room_name].sources[i][keys[p]].length; m++)
 												{
-													if (Memory.rooms[room_name].sources[i][keys[p]][m].x == tempx && Memory.rooms[room_name].sources[i][keys[p]][m].y == tempy	//Did we match the position to any path steps?
+													if (Memory.rooms[room_name].sources[i][keys[p]][m].x === tempx && Memory.rooms[room_name].sources[i][keys[p]][m].y === tempy	//Did we match the position to any path steps?
 														||	Game.spawns[spawn].pos.inRangeTo(tempx, tempy, 1)	//Are we within 1 range of the (starting) spawn or the upgrader?
 														||	Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y).inRangeTo(tempx, tempy, 1))
 													{
@@ -1198,32 +1427,31 @@ var init =
 		{
 			if (Game.rooms[room_name])
 			{
-				let construction =
-							Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_CONTAINER}})
+				let construction = Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES);
+					/*		Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_CONTAINER}})
 					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_WALL}}))
 					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_RAMPART}}))
 					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_EXTENSION}}))
-					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_TOWER}}));
+					.concat(Game.rooms[room_name].find(FIND_CONSTRUCTION_SITES,	{filter: {structureType: STRUCTURE_TOWER}}));*/
 
-				if (construction.length > 0)
+				for (let c = 0; c < construction.length; c++)
 				{
-					for (let c = 0; c < construction.length; c++)
-					{
-						construction[c].remove();
-					}
+					construction[c].remove();
 				}
 
 				construction = Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_EXTENSION}})
 					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_TOWER}}))
+					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_LAB}}))
+					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_STORAGE}}))
+					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_TERMINAL}}))
+					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_FACTORY}}))
+					   .concat(Game.rooms[room_name].find(FIND_MY_STRUCTURES,	{filter: {structureType: STRUCTURE_NUKER}}))
 					   .concat(Game.rooms[room_name].find(FIND_STRUCTURES,		{filter: {structureType: STRUCTURE_CONTAINER}}))
 					   .concat(Game.rooms[room_name].find(FIND_STRUCTURES,		{filter: {structureType: STRUCTURE_ROAD}}));
 
-				if (construction.length > 0)
+				for (let c = 0; c < construction.length; c++)
 				{
-					for (let c = 0; c < construction.length; c++)
-					{
-						construction[c].destroy();
-					}
+					construction[c].destroy();
 				}
 			}
 		}
