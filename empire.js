@@ -266,16 +266,16 @@ var empire =
 	checkallies: function(target)
 	{
 		//If they aren't in our allies list, return true so we can attack them.
-		return (target.owner && Memory.allies && Memory.allies.indexOf(target.owner.username) == -1);
+		return (target.owner && Memory.allies && Memory.allies.indexOf(target.owner.username) === -1);
 	},
 
 	allowallies: function(creep)
 	{
 		//If they are in our allies list, return true so we can permit them.
-		return (Memory.allies && Memory.allies.indexOf(creep.owner.username) != -1);
+		return (Memory.allies && Memory.allies.indexOf(creep.owner.username) !== -1);
 	},
 
-	allies: ["kotyara", "suyu", "dodzai", "Pwk", "WoodenRobot", "Belthazor", "Screepburner", "Maxrocket"]
+	allies: ['kotyara', 'suyu', 'dodzai', 'Pwk', 'WoodenRobot', 'Belthazor', 'Screepburner', 'Maxrocket', 'kirk']
 };
 
 module.exports = empire;
