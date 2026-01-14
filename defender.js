@@ -32,6 +32,7 @@ var defender =
 		{
 			//Instead of the source itself, we need to get the end of the mining path, since that's the junction point for many other paths.
 			sourcepos.push(Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[i].mine.slice(-1)[0].x, Memory.rooms[room_name].sources[i].mine.slice(-1)[0].y));
+			console.log(JSON.stringify(sourcepos[i]));
 		}
 
 		//Get position objects for each step in our patrol paths.
@@ -109,9 +110,12 @@ var defender =
 								{
 									costMatrix.set(Memory.rooms[room_name].sources[i2].mreturn[n].x, Memory.rooms[room_name].sources[i2].mreturn[n].y, 1);
 								}
+							}
 
+							for (let i2 = 0; i2 < Memory.rooms[room_name].sources.length; i2++)
+							{
 								//But avoid the mining fatties.
-								costMatrix.set(Memory.rooms[room_name].sources[i2].mfat.x, Memory.rooms[room_name].sources[i2].mfat.y, 255);
+								costMatrix.set(Memory.rooms[room_name].sources[i2].mfat[0].x, Memory.rooms[room_name].sources[i2].mfat[0].y, 255);
 
 								//Avoid the extensions as well.
 								for (let ex = 0; ex < Memory.rooms[room_name].sources[i2].buildings.extensions.length; ex++)
@@ -167,9 +171,12 @@ var defender =
 								{
 									costMatrix.set(Memory.rooms[room_name].sources[i2].mreturn[n].x, Memory.rooms[room_name].sources[i2].mreturn[n].y, 1);
 								}
+							}
 
+							for (let i2 = 0; i2 < Memory.rooms[room_name].sources.length; i2++)
+							{
 								//But avoid the mining fatties.
-								costMatrix.set(Memory.rooms[room_name].sources[i].mfat.x, Memory.rooms[room_name].sources[i2].mfat.y, 255);
+								costMatrix.set(Memory.rooms[room_name].sources[i2].mfat[0].x, Memory.rooms[room_name].sources[i2].mfat[0].y, 255);
 
 								//Avoid the extensions as well.
 								for (let ex = 0; ex < Memory.rooms[room_name].sources[i2].buildings.extensions.length; ex++)
@@ -592,7 +599,14 @@ var defender =
 					rampart_positions[existing_ramparts[r].x] = {};
 				}
 
-				rampart_positions[existing_ramparts[r].x][existing_ramparts[r].y] = tempwall[0].id;	//There should only be a rampart here.
+				for (let tw = 0; tw < tempwall.length; tw++)
+				{
+					if (tempwall[tw].structureType === STRUCTURE_RAMPART)
+					{
+						rampart_positions[existing_ramparts[r].x][existing_ramparts[r].y] = tempwall[tw].id;	//There should only be a rampart here.
+						break;
+					}
+				}
 			}
 		}
 
@@ -607,7 +621,14 @@ var defender =
 					wall_positions[existing_walls[w].x] = {};
 				}
 
-				wall_positions[existing_walls[w].x][existing_walls[w].y] =	tempwall[0].id;	//There should only be a wall here.
+				for (let tw = 0; tw < tempwall.length; tw++)
+				{
+					if (tempwall[tw].structureType === STRUCTURE_WALL)
+					{
+						wall_positions[existing_walls[w].x][existing_walls[w].y] =	tempwall[tw].id;	//There should only be a wall here.
+						break;
+					}
+				}
 			}
 		}
 
@@ -653,7 +674,7 @@ var defender =
 			for (let w = 0; w < saved_walls.length; w++)
 			{
 				tempwall = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, saved_walls[w].x, saved_walls[w].y);
-				if (tempwall.length && tempwall[0].structureType === STRUCTURE_ROAD)
+				if (tempwall.length && (tempwall[0].structureType !== STRUCTURE_WALL || tempwall[0].structureType !== STRUCTURE_RAMPART))
 				{
 					tempwall.shift();
 				}
