@@ -99,9 +99,6 @@ module.exports.loop = function()
 		require('tower').monitor();
 		cpu_usage.Tower = Game.cpu.getUsed();
 
-		//Game.getObjectById('691cf97e8f43a8ef6fe5c06d').runReaction(Game.getObjectById('691df96d13223f94217c4600'), Game.getObjectById('691ddaa59fbea602ac255a96'));
-		//Game.getObjectById('691c5e3465f7191d555ad7eb').runReaction(Game.getObjectById('691e15ca2144a3de5af2e962'), Game.getObjectById('691d7ecdd966ad7ce0329cf2'));
-
 		//test.cpu_usage = cpu_usage;
 
 		if(cpu_usage[Object.keys(cpu_usage)[Object.keys(cpu_usage).length - 1]] >= 20 || (Memory.cpu && !(Memory.cpu = undefined)))
