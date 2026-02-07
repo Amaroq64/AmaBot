@@ -30,7 +30,14 @@ var builder =
 					//|| myextensions.length < CONTROLLER_STRUCTURES.extension[Game.rooms[room_name].controller.level])
 				{
 					emergency = true;
+					break;
 				}
+			}
+
+			//If we're using a custodian, then we must always have one.
+			if (Memory.rooms[room_name].ideal.custodian && Memory.rooms[room_name].creeps.custodian.length === 0)
+			{
+				emergency = true;
 			}
 
 			//We should only build if our energy is full. Or if it's an emergency.
@@ -72,7 +79,7 @@ var builder =
 			let anyharvest = true;
 			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 			{
-				if (Memory.rooms[room_name].sources[i].creeps.mtransport.length - anticipate.sources[i].mtransport === 0)
+				if (Memory.rooms[room_name].sources[i].ideal.mtransport && Memory.rooms[room_name].sources[i].creeps.mtransport.length - anticipate.sources[i].mtransport === 0)
 				{
 					anyharvest = false;
 				}
@@ -193,19 +200,29 @@ var builder =
 				case 'custodian':
 				{
 					let labs = require('labs');
+					let sites = Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES, {filter: require('role.custodian').buildfilter});
+					let chosen_direction;
+					if (sites.length)
+					{
+						chosen_direction = Memory.rooms[room_name].spawns[spawn_index].dir.minedir[0];	//If it needs to be built, we need to harvest first.
+					}
+					else
+					{
+						chosen_direction = Memory.rooms[room_name].spawns[spawn_index].dir.labdir;	//Otherwise, go directly to get boosted.
+					}
 					//labs.request(name, [RESOURCE_ZYNTHIUM_OXIDE, RESOURCE_UTRIUM_ALKALIDE, RESOURCE_CATALYZED_KEANIUM_ACID]);
 					options.memory.mission = require('role.custodian').missions.length - 1;	//It needs to select a mission. By default we start with getting boosted.
-					options.memory.harv = body[role](Game.rooms[room_name].energyAvailable).reduce(calculate.reduceManyWork, 0) * 2;
+					options.memory.harv = body[role](Game.rooms[room_name].energyAvailable).reduce(calculate.reduceManyWork, 0) * 2;	//Its harvesting capacity.
 					options.memory.t = 0;
-					options.memory.lmission = [];	//It should track what missions it has already performed.
+					options.memory.lmission = [options.memory.mission];	//It should track what missions it has already performed.
 					options.memory.direction = false;
 					//options.memory.ldirection = false;	//If it makes a pit stop, it needs to go back where it came from.
-					options.memory.path = 0;	//The mine path is the initial path from the spawn.
+					options.memory.path = 14;	//When we first spawn, there's a good chance we are going to boost.
 					options.memory.s = -1;	//We'll probably get boosted first, which is a room-wide path.
 					options.memory.d_path = 0;	//Desired path. It needs to get to the right path for the job from its current path.
 					options.memory.d_s = 0;	//Sometimes it needs to switch to another source.
 					options.memory.target = {x: null, y: null};	//Not sure if we need this.
-					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[0]];
+					direction = [chosen_direction];	//We're going to the labs first.
 					break;
 				}
 				case 'harvester':
@@ -350,6 +367,13 @@ var builder =
 						{
 							Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtarget.x = Memory.rooms[room_name].sources[i].defpaths[defense.need].slice(-1)[0].x;
 							Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtarget.y = Memory.rooms[room_name].sources[i].defpaths[defense.need].slice(-1)[0].y;
+
+							//Any builder that started going to a dbuilder should be sent back.
+							if (Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].path === 4)
+							{
+								Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].path = 5;
+								Memory.creeps[Memory.rooms[room_name].sources[i].creeps.builder[b]].dtrip = false;
+							}
 						}
 					}
 				}
@@ -392,7 +416,6 @@ var builder =
 					delete options.energyStructures;
 					console.log(spawn.spawnCreep(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable), name, options));
 					console.log(room_name + ' ' + role + ' ' + Game.rooms[room_name].energyAvailable);
-					console.log(JSON.stringify(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable)));
 					break;
 				}
 				case ERR_NOT_OWNER:
