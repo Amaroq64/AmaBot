@@ -278,7 +278,7 @@ var body =
 
 	hattacker: function(energy, attack = 0)
 	{
-		//A self-healing attacker can soak tower damage.
+		//A self-healing attacker can soak some damage.
 		let body = [];
 		let move_part = [];
 		let tbody = [[MOVE, ATTACK, HEAL], [MOVE, RANGED_ATTACK, HEAL], [MOVE, WORK, HEAL]][attack];
@@ -322,16 +322,45 @@ var body =
 		return body;
 	},
 
-	custodian: function(energy)
+	custodian: function(energy, boosted = true)
 	{
-		let body = new Array(10).fill(MOVE).concat(new Array(15).fill(CARRY));	//This leaves room for 25 WORK and can also move well enough before it's boosted.
-		energy -= 1250;
-		while (energy >= 100 && body.length < 50)	//The ideal custodian quickly harvests both sources, then tends to the rest of the room. MOVE will be T1 boosted, WORK will be T2 boosted, and CARRY will be T3 boosted.
+		//This leaves room for 15 more parts. It can move halfway decently before it's boosted.
+		let body = new Array(10).fill(WORK).concat(new Array(10).fill(MOVE).concat(new Array(15).fill(CARRY)));
+		energy -= 2250;
+
+		let additional, cost, method;
+		if (boosted)
 		{
-			body.unshift(WORK);
+			additional = CARRY;
+			cost = 50;
+			method = 'push';
+		}
+		else
+		{
+			additional = WORK;
+			cost = 100;
+			method = 'unshift';
+		}
+
+		while (energy >= cost && body.length < 50)	//The ideal custodian quickly harvests both sources, then tends to the rest of the room. If these parts are T1 boosted, we'll use more CARRY instead of more WORK.
+		{
+			body[method](additional);
+			energy -= cost;
 		}
 
 		return body;
+	},
+
+	handler: function(energy)
+	{
+		let body = new Array(15).fill(MOVE).concat(new Array(30).fill(CARRY));	//A material handler has a large carrying capacity. A multiple of 1500 is nice for stocking labs, especially once it's boosted.
+		energy -= 2250;
+
+		if (energy >= 250)	//It will need to maintain the roads and containers in its stamp.
+		{
+			body.unshift(WORK, WORK, MOVE);
+			energy -= 250;
+		}
 	},
 
 	paver: function(energy)
