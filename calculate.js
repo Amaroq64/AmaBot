@@ -631,6 +631,10 @@ var calculate =
 					{
 						labs: Memory.rooms[room_name].sources[i].labs
 					});
+
+					//We need a mine flipper on this as well.
+					temppath = temppath.slice(-1)[0];
+					Memory.rooms[room_name].path[temppath.x][temppath.y].flipper.mine[i].labs = Memory.rooms[room_name].path[temppath.x][temppath.y].flipper.lreturn[i].labs;
 				}
 
 				//We need to do the path through the lab stamp as well.
@@ -657,7 +661,7 @@ var calculate =
 				temppath = Memory.rooms[room_name].mine.epath;
 				calculate.writethispath(room_name, calculate.cleanthispath(temppath), 'epath', false, false, temppath,
 				{
-					lreturn: Memory.rooms[room_name].mine.ereturn,
+					ereturn: Memory.rooms[room_name].mine.ereturn,
 					efat: Memory.rooms[room_name].mine.efat
 				});
 				//Back from the stamp to the spawn.
@@ -1360,6 +1364,21 @@ var calculate =
 		return e;
 	},
 
+	extensionsfilled: function(room_name, s)
+	{
+		let extension_positions = calculate.getExtensions(room_name);
+		for (let e = 0, textension, extensions = Memory.rooms[room_name].sources[s].buildings.extensions; e < extensions.length; e++)
+		{
+			textension = Game.getObjectById(extension_positions[extensions[e].x][extensions[e].y]);
+			if (textension.store.getFreeCapacity(RESOURCE_ENERGY))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	},
+
 	findouterstone: function(room_name, x_start, y_start, existing_stone = false)	//Find contiguous outer perimiter of a natural wall formation.
 	{
 		if (existing_stone && existing_stone[x_start] && existing_stone[x_start][y_start])
@@ -1478,7 +1497,10 @@ var calculate =
 		}
 		else if (typeof type !== 'array')
 		{
-			console.log('Invalid tile type.')
+			if (type !== -1)
+			{
+				console.log('Invalid tile type.')
+			}
 			return false;	//Error.
 		}
 
