@@ -4,7 +4,7 @@ var control =
 	hybrid: require('role.hybrid'),
 	extractor: require('role.extractor'),
 	upgrader: require('role.upgrader'),
-	//transport: require('role.transport'),
+	transport: require('role.transport'),
 
 	//These draw upon and modify our transport role.
 	mtransport: require('role.mtransport'),
@@ -22,13 +22,31 @@ var control =
 
 	run: function()
 	{
-		for (let room_name in Memory.rooms)	//Enumerate rooms. This only contains rooms where we have a spawner, so we don't have to worry about being agnostic of neutral rooms.
+		for (let room_name in Memory.rooms)	//Enumerate rooms. This only contains rooms we own in Memory, so we don't have to worry about being agnostic of neutral rooms.
 		{
 			//We're going to be operating on our extensions every tick, so let's make sure they're in memory.
 			if (!control.calculate.extensions[room_name])
 			{
 				//console.log("Getting extensions.");
 				control.calculate.getExtensions(room_name);
+			}
+
+			//Initialize the containers, pickups, and construction sites if necessary.
+			if (!control.transport.room_containers[room_name])
+			{
+				control.transport.room_containers[room_name] = [];
+			}
+			if (!control.transport.room_energy[room_name])
+			{
+				control.transport.room_energy[room_name] = [];
+			}
+			if (!control.transport.room_ruins[room_name])
+			{
+				control.transport.room_ruins[room_name] = [];
+			}
+			if (!control.builder.sites[room_name])
+			{
+				control.builder.sites[room_name] = [];
 			}
 
 			for (let creep_type in Memory.rooms[room_name].creeps)	//Enumerate creep roles assigned to this room.
@@ -66,6 +84,15 @@ var control =
 					}
 				}
 			}
+
+			//We're going to track our containers, pickups, and construction sites once per tick. Reset them here in preparation for the next tick.
+			control.transport.room_containers[room_name].length = 0;
+			control.transport.room_energy[room_name].length = 0;
+			control.transport.room_ruins[room_name].length = 0;
+			control.transport.energy_tested[room_name] = false;
+			control.transport.ruins_tested[room_name] = false;
+			control.builder.sites[room_name].length = 0;
+			control.builder.sites_tested[room_name] = false;
 		}
 	},
 
@@ -389,14 +416,18 @@ var control =
 						tempdir = flipper[control.paths[creep.memory.path]];
 						break;
 					case 'custodian':
-						//custodians don't need to worry about complex path jumping. When they are moving between source and lab stamp, they just loop to and from it.
-						if (creep.memory.path === 12)
+						//custodians need to get from mine to labs, and then from lreturn to mine again.
+						if (creep.memory.path === 0)
+						{
+							creep.memory.path = 12;
+						}
+						else if (creep.memory.path === 12)
 						{
 							creep.memory.path = 13;
 						}
 						else if (creep.memory.path === 13)
 						{
-							creep.memory.path = 12;
+							creep.memory.path = 0;
 						}
 						/*else if (creep.memory.path === 14)	//If the custodian goes down the main path from the spawn, it is probably using the handler role to traverse that path.
 						{
@@ -406,7 +437,22 @@ var control =
 						//If we're switching to a completely new path, we need to override our previous direction change.
 						tempdir = flipper[control.paths[creep.memory.path]];
 						break;
+					case 'lbuilder':
+						//lbuilders just need to go between the source and the labs.
+						if (creep.memory.path === 12 || creep.memory.path === 0)
+						{
+							creep.memory.path = 13;
+						}
+						else if (creep.memory.path === 13)
+						{
+							creep.memory.path = 12;
+						}
+
+						//If we're switching to a completely new path, we need to override our previous direction change.
+						tempdir = flipper[control.paths[creep.memory.path]];
+						break;
 					case 'handler':
+						console.log('Testing handler.');
 						//handlers don't need to worry about complex path jumping. They just loop to and from the mineral miner.
 						if (creep.memory.path === 14)
 						{
@@ -453,206 +499,9 @@ var control =
 		return status;
 	},
 
-	move_old: function(creep, role, source = false)
-	{
-		let status;
-
-		if(creep.spawning)
-		{
-			return;
-		}
-		else if(creep.memory.movenow.length != 0)	//If the creep has immediate move orders, follow them.
-		{
-			status = creep.moveByPath(creep.memory.movenow)
-			if(status == OK || status == ERR_TIRED)
-			{
-				//console.log(creep.name + ": Using stored move.");
-			}
-			else if (status == ERR_NOT_FOUND)	//We've presumably completed our move orders. Switch back to normal movement.
-			{
-				Memory.creeps[creep.name].movenow = [];
-				console.log(creep.name + ": Switching to normal pathing.");
-				return control.move(creep, role, source);
-			}
-			else
-			{
-				//console.log(creep.name + " stored move status " + status + ".");
-			}
-			return;
-		}
-		else	//Otherwise, follow its routine path.
-		{
-			let room_name = creep.room.name
-			let path = [];
-			//console.log(role + " " + creep.name);
-
-			switch (role)
-			{
-				case "harvester":
-				{
-					path = Memory.rooms[creep.room.name].sources[source].mine.concat(Memory.rooms[creep.room.name].sources[source].mfat);
-					break;
-				}
-
-				case "builder":
-				{
-					//These keep winding up outside our room.
-					if (Memory.rooms[creep.room.name] === undefined)
-					{
-						return true;
-					}
-					else
-					{
-						//Move back into the room.
-						if (creep.pos.x == 0)
-						{
-							creep.move(RIGHT);
-							return true;
-						}
-						else if (creep.pos.x == 49)
-						{
-							creep.move(LEFT);
-							return true;
-						}
-						else if (creep.pos.y == 0)
-						{
-							creep.move(BOTTOM);
-							return true;
-						}
-						else if (creep.pos.y == 49)
-						{
-							creep.move(TOP);
-							return true;
-						}
-
-						if(Memory.creeps[creep.name].dtrip)	//We're going to the defense.
-						{
-							path = [Memory.rooms[creep.room.name].sources[source].defpaths[Memory.rooms[room_name].defense.need].slice(0, -1), Memory.rooms[creep.room.name].sources[source].dreturn[0]][+ Memory.creeps[creep.name].return];
-						}
-					}
-				}
-				case "mtransport":
-				{
-					if (!Memory.creeps[creep.name].dtrip && Memory.creeps[creep.name].utrip)	//We're going to the upgrader.
-					{
-						path = [Memory.rooms[creep.room.name].sources[source].upgrade, Memory.rooms[creep.room.name].sources[source].ureturn][+ Memory.creeps[creep.name].return];
-					}
-					else if (!Memory.creeps[creep.name].dtrip)	//We're going to the source.
-					{
-						path = [Memory.rooms[creep.room.name].sources[source].mine, Memory.rooms[creep.room.name].sources[source].mreturn][+ Memory.creeps[creep.name].return];
-					}
-					break;
-				}
-
-				/*case "mtransport":
-				{
-					path = [Memory.rooms[creep.room.name].sources[source].mine, Memory.rooms[creep.room.name].sources[source].mreturn][+ Memory.creeps[creep.name].return];
-					break;
-				}*/
-
-				case "utransport":
-				{
-					path = [Memory.rooms[creep.room.name].sources[source].upgrade, Memory.rooms[creep.room.name].sources[source].ureturn][+ Memory.creeps[creep.name].return];
-					break;
-				}
-
-				case "upgrader":
-				{
-					path = Memory.rooms[room_name].upgrade;
-					break;
-				}
-
-				case "dbuilder":
-				{
-					//These keep winding up outside our room.
-					if (Memory.rooms[creep.room.name] === undefined)
-					{
-						return true;
-					}
-					else
-					{
-						//Move back into the room.
-						if (creep.pos.x == 0)
-						{
-							creep.move(RIGHT);
-							return true;
-						}
-						else if (creep.pos.x == 49)
-						{
-							creep.move(LEFT);
-							return true;
-						}
-						else if (creep.pos.y == 0)
-						{
-							creep.move(BOTTOM);
-							return true;
-						}
-						else if (creep.pos.y == 49)
-						{
-							creep.move(TOP);
-							return true;
-						}
-
-						path = [Memory.rooms[creep.room.name].defense.patrol[Memory.rooms[room_name].defense.need],
-								Memory.rooms[creep.room.name].defense.preturn[Memory.rooms[room_name].defense.need]][+ Memory.creeps[creep.name].return];
-					}
-				}
-			}
-
-			//If we're at the end of our path, we swich to the other one.
-			if (creep.pos.isEqualTo(Game.rooms[room_name].getPositionAt(path.slice(-1)[0].x, path.slice(-1)[0].y)))
-			{
-				Memory.creeps[creep.name].return = !Memory.creeps[creep.name].return;
-				//creep.say(["Going.", "Returning."][+ Memory.creeps[creep.name].return]);
-				return control.move(creep, role, source);
-			}
-
-			status = creep.moveByPath(path);
-
-			switch (status)
-			{
-				case ERR_NOT_FOUND:
-				{
-					console.log(creep.pos.x + ", " + creep.pos.y + " - " + creep.name + ": " + " - Path Not Found.");
-					//console.log("Utrip: " + creep.memory.utrip + ". Dtrip: " + creep.memory.dtrip + ". Return: " + creep.memory.return + ".");
-					
-					let tpath = [];
-					for (p = 0; p < path.length; p++)
-					{
-						tpath.push(Game.rooms[room_name].getPositionAt(path[p].x, path[p].y));
-					}
-					Memory.creeps[creep.name].movenow = creep.pos.findPathTo(creep.pos.findClosestByPath(tpath));
-
-					/*let pathstr = "";
-					for (let p = 0; p < path.length; p++)
-					{
-						if (p > 0)
-						{
-							pathstr += " ";
-						}
-						pathstr += "(" + path[p].x + ", " + path[p].y + ", " + path[p].direction + ")";
-						if(p > 1 && p % 22 == 0)
-						{
-							pathstr +="\n";
-						}
-					}
-					console.log(pathstr);*/
-					//console.log(JSON.stringify(path));
-					//creep.room.visual.poly(path, {stroke: "blue", lineStyle: "dashed"});
-					break;
-				}
-				case ERR_INVALID_ARGS:
-				{
-					console.log(creep.name + ": " + role + " Invalid Path.");
-					break;
-				}
-			}
-			//console.log(JSON.stringify(path));
-			return status;
-		}
-	},
-
 	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn', 'epath', 'ereturn']
 };
+
+control.paths[-1] = -1;	//This -1 propety allows us to make calculate.findtile() fail gracefully without outputting an error when the failure was intended.
 
 module.exports = control;
