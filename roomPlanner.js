@@ -2,6 +2,8 @@ var calculate = require('calculate');
 
 var roomPlanner =
 {
+	flags: 0,	//Track the number of flags so we only iterate them if they change.
+
 	run: function(room_name = false, test = false)
 	{
 		if (!room_name)
@@ -99,12 +101,13 @@ var roomPlanner =
 				break;
 			case 7:
 				//Keep these at 0 while we're still developing the roles.
-				roomideal.custodian = 0;
+				roomideal.custodian = 1;
 				roomideal.extractor = 0;
 				roomideal.handler = 0;
 			case 6:
-				roomideal.custodian = 0;
+				roomideal.custodian = 1;
 			case 8:
+				roomideal.custodian = 1;
 				require('defender').checkDefense(room_name);
 				Memory.rooms[room_name].goals.labs = CONTROLLER_STRUCTURES.lab[Game.rooms[room_name].controller.level];
 		}
@@ -204,20 +207,6 @@ var roomPlanner =
 				roomPlanner.run(room_name);
 			}
 
-			if (Game.rooms[room_name].controller.level > 1)
-			{
-				//Can we build extensions?
-				if (Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: { structureType: STRUCTURE_EXTENSION }}).length
-					< Memory.rooms[room_name].sources.reduce(calculate.sourcereducer.idealextensions, 0))
-				{
-					//console.log("We're building extensions.");
-					require('builder').buildExtensions(room_name);
-
-					//Clear the extensions cache.
-					calculate.extensions[room_name] = undefined;
-				}
-			}
-
 			//Are we missing our upgrade container?
 			let tcontainer;
 			if (Memory.rooms[room_name].ideal.upgradecontainer && !Game.getObjectById(Memory.rooms[room_name].buildings.upgradecontainer.id))
@@ -290,7 +279,7 @@ var roomPlanner =
 			{
 				//Since we're at war, has any of the enemy creeps come in?
 				//Due to our current arrangement, we're mostly interested in safeguarding the rooms behind our bulwark room.
-				if (room_name === 'E49S14')
+				/*if (room_name === 'E49S14')
 				{
 					let checkallies = require('empire').checkallies;
 					let enemies = Game.rooms[room_name].find(FIND_HOSTILE_CREEPS, {filter: checkallies});
@@ -301,6 +290,20 @@ var roomPlanner =
 						{
 							Game.rooms[room_name].controller.activateSafeMode();
 						}
+					}
+				}*/
+
+				if (Game.rooms[room_name].controller.level > 1)
+				{
+					//Can we build extensions?
+					if (Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: { structureType: STRUCTURE_EXTENSION }}).length
+						< Memory.rooms[room_name].sources.reduce(calculate.sourcereducer.idealextensions, 0))
+					{
+						//console.log("We're building extensions.");
+						require('builder').buildExtensions(room_name);
+
+						//Clear the extensions cache.
+						calculate.extensions[room_name] = undefined;
 					}
 				}
 
@@ -474,139 +477,57 @@ var roomPlanner =
 			}
 		}
 
-		//Are there flags?
-		let myflags = {Attack: [], Claims: [], Reserves: [], Signs: [], Transfer: [], Pave: [], Rescue: []};
-		for (let flag in Game.flags)
+		let currentflags = Object.keys(Game.flags).length;
+		if (currentflags !== roomPlanner.flags)	//Only iterate our flags if the number of flags has changed.
 		{
-			//We currently aren't doing anything with Road flags.
-			//Safe and Join flags are handled elsewhere.
+			//Are there flags?
+			let myflags = {Attack: [], Claims: [], Reserves: [], Signs: [], Transfer: [], Pave: [], Rescue: []};
+			for (let flag in Game.flags)
+			{
+				//We currently aren't doing anything with Road flags.
+				//Safe and Join flags are handled elsewhere.
+				for (let type in myflags)
+				{
+					if (flag.indexOf(type) != -1)
+					{
+						myflags[type].push(Game.flags[flag]);
+						Game.flags[flag].remove();
+						continue;
+					}
+				}
+			}
+
 			for (let type in myflags)
 			{
-				if (flag.indexOf(type) != -1)
+				if(myflags[type].length != 0)
 				{
-					myflags[type].push(Game.flags[flag]);
-					Game.flags[flag].remove();
-					continue;
-				}
-			}
-			/*if (flag.indexOf("Attack") != -1)
-			{
-				myflags.Attack.push(Game.flags[flag]);
-				Game.flags[flag].remove();
-			}
-			else if (flag.indexOf("Spawn") != -1)
-			{
-				myflags.Spawn.push(Game.flags[flag]);
-				Game.flags[flag].remove();
-			}
-			else if (flag.indexOf("Reserve") != -1)
-			{
-				myflags.Reserve.push(Game.flags[flag]);
-				Game.flags[flag].remove();
-			}
-			else if (flag.indexOf("Sign") != -1)
-			{
-				myflags.Sign.push(Game.flags[flag]);
-				Game.flags[flag].remove();
-			}
-			else if (flag.indexOf("Transfer") != -1)
-			{
-				myflags.Transfer.push(Game.flags[flag]);
-				Game.flags[flag].remove();
-			}*/
-		}
-
-		for (let type in myflags)
-		{
-			if(myflags[type].length != 0)
-			{
-				if (!Array.isArray(Memory[type.toLowerCase()]))
-				{
-					Memory[type.toLowerCase()] = myflags[type];
-				}
-				else
-				{
-					for (let c = 0; c < myflags[type].length; c++)
+					if (!Array.isArray(Memory[type.toLowerCase()]))
 					{
-						Memory[type.toLowerCase()].push({name: myflags[type][c].name, pos: myflags[type][c].pos});
-						require('claim').init(Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1], type.toLowerCase());
-						
-						if (myflags[type][c].name.indexOf('_heal') !== -1)
+						Memory[type.toLowerCase()] = myflags[type];
+					}
+					else
+					{
+						for (let c = 0; c < myflags[type].length; c++)
 						{
-							Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1].heal = true;
-						}
-						if (myflags[type][c].name.indexOf('_guard') !== -1)
-						{
-							Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1].guard = true;
+							Memory[type.toLowerCase()].push({name: myflags[type][c].name, pos: myflags[type][c].pos});
+							require('claim').init(Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1], type.toLowerCase());
+							
+							if (myflags[type][c].name.indexOf('_heal') !== -1)
+							{
+								Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1].heal = true;
+							}
+							if (myflags[type][c].name.indexOf('_guard') !== -1)
+							{
+								Memory[type.toLowerCase()][Memory[type.toLowerCase()].length - 1].guard = true;
+							}
 						}
 					}
 				}
 			}
+
+			//Now update the number of flags.
+			roomPlanner.flags = currentflags;
 		}
-		/*if(myflags.Attack.length != 0)
-		{
-			if (!Array.isArray(Memory.attack))
-			{
-				Memory.attack = myflags.Attack;
-			}
-			else
-			{
-				for (let c = 0; c < myflags.Attack.length; c++)
-				{
-					Memory.attack.push({name: myflags.Attack[c].name, pos: myflags.Attack[c].pos});
-					require('claim').init(Memory.attack[Memory.attack.length - 1], "attack");
-				}
-			}
-			
-		}
-		/*if(myflags.Spawn.length != 0)
-		{
-			if (!Array.isArray(Memory.claims))
-			{
-				Memory.claims = myflags.Spawn;
-			}
-			else
-			{
-				for (let c = 0; c < myflags.Spawn.length; c++)
-				{
-					Memory.claims.push({name: myflags.Spawn[c].name, pos: myflags.Spawn[c].pos});
-					require('claim').init(Memory.claims[Memory.claims.length - 1], "claims");
-				}
-			}
-			
-		}
-		if(myflags.Reserve.length != 0)
-		{
-			if (!Array.isArray(Memory.reserves))
-			{
-				Memory.reserves = myflags.Reserve;
-			}
-			else
-			{
-				for (let c = 0; c < myflags.Reserve.length; c++)
-				{
-					Memory.claims.push({name: myflags.Reserve[c].name, pos: myflags.Reserve[c].pos});
-					require('claim').init(Memory.reserves[Memory.reserves.length - 1], "reserves");
-				}
-			}
-			
-		}
-		if(myflags.Sign.length != 0)
-		{
-			if (!Array.isArray(Memory.signs))
-			{
-				Memory.signs = myflags.Sign;
-			}
-			else
-			{
-				for (let c = 0; c < myflags.Sign.length; c++)
-				{
-					Memory.signs.push({name: myflags.Sign[c].name, pos: myflags.Sign[c].pos});
-					require('claim').init(Memory.signs[Memory.signs.length - 1], "signs");
-				}
-			}
-			
-		}*/
 
 		return true;	//We made it this far without any errors.
 	},
