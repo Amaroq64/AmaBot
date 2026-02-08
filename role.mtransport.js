@@ -56,7 +56,7 @@ var roleMTransport =
 		}
 
 		//Run normal transport stuff if we've got no extensions to deposit to.
-		roleMTransport.transport.withdrawRuins(creep) || roleMTransport.transport.withdraw(creep);
+		roleMTransport.transport.withdraw(creep) || roleMTransport.transport.withdrawRuins(creep);
 
 		return true;
 	}
