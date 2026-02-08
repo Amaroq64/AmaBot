@@ -1,24 +1,45 @@
 var roleTransport =
 {
-	room_containers: undefined,
-	room_energy: undefined,
-	room_ruins: undefined,
+	room_containers: {},
+	room_energy: {},
+	room_ruins: {},
+	energy_tested: {},
+	ruins_tested: {},
 
 	withdraw: function(creep)
 	{
 		//We can only pick up once per tick.
-
 		//If we're by our target container, withdraw from it.
-		//let tpos = creep.room.getPositionAt(creep.memory.target.x, creep.memory.target.y);
-		let room_containers = creep.room.find(FIND_STRUCTURES,
-		{
-			filter: function(structure)
-			{
-				return (structure.structureType === STRUCTURE_CONTAINER /*|| (creep.memory.useall && (structure.structureType === STRUCTURE_STORAGE || structure.structureType === STRUCTURE_TERMINAL))*/ );
-			}
-		});
 
-		let room_energy = creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
+		//Since there are very few containers we will need to consider, we will just get them explicitly.
+		let room_containers = roleTransport.room_containers[creep.room.name];
+		if (room_containers.length === 0)	//Populate the containers for the first time this tick.
+		{
+			//The old code that used a find to get all containers would magically allow dbuilders to withdraw from a container placed by their resting point.
+			//Now that we are specifying containers, they won't magically withdraw from defensive containers anymore.
+
+			let u_container = Game.getObjectById(Memory.rooms[creep.room.name].buildings.upgradecontainer.id);
+			if (u_container)
+			{
+				room_containers.push(u_container);
+			}
+
+			for (let s = 0, s_container; s < Memory.rooms[creep.room.name].sources.length; s++)
+			{
+				//If we have a hybrid, avoid getting the same container twice. Although probably nothing bad would happen if we did.
+				if (Memory.rooms[creep.room.name].sources[s].buildings.miningcontainer.id !== Memory.rooms[creep.room.name].buildings.upgradecontainer.id && (s_container = Game.getObjectById(Memory.rooms[creep.room.name].sources[s].buildings.miningcontainer.id)))
+				{
+					room_containers.push(s_container);
+				}
+			}
+		}
+
+		let room_energy = roleTransport.room_energy[creep.room.name];
+		if (!roleTransport.energy_tested[creep.room.name])	//Populate the dropped energy for the first time this tick.
+		{
+			room_energy = creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
+			roleTransport.energy_tested[creep.room.name] = true;
+		}
 
 		for (let e = 0; e < room_containers.length; e++)
 		{
@@ -38,9 +59,8 @@ var roleTransport =
 						return true;	//We got our energy. Move on.
 					}
 				}
-				//If it's an mtransport, we withdraw unconditionally.
-				//If it's a builder, we withdraw when there's construction sites.
-				//Else we only withdraw if energy is full. This is achieved through short-circuit comparison.
+
+				//We were theorizing about withdrawing only on certain conditions, but we're not going to do that. Just withdraw no matter what.
 				if(/*(creep.name.indexOf("Mtransport") != -1 || (creep.name.indexOf("Mtransport") == -1 && creep.room.energyAvailable == creep.room.energyCapacityAvailable)
 					|| (creep.name.indexOf("Builder") != -1 && creep.room.find(FIND_CONSTRUCTION_SITES).length > 0))
 					&&*/ creep.withdraw(room_containers[e], RESOURCE_ENERGY) == OK)
@@ -70,7 +90,13 @@ var roleTransport =
 
 	withdrawRuins: function(creep)
 	{
-		let room_ruins = creep.room.find(FIND_RUINS).concat(creep.room.find(FIND_TOMBSTONES).concat(creep.room.find(FIND_DROPPED_RESOURCES, {filter: function(resource) {return resource.resourceType == RESOURCE_ENERGY;}})));
+		let room_ruins = roleTransport.room_ruins[creep.room.name];
+		if (!roleTransport.ruins_tested[creep.room.name])	//Populate the dropped resources for the first time this tick.
+		{
+			room_ruins = creep.room.find(FIND_RUINS).concat(creep.room.find(FIND_TOMBSTONES).concat(creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}})));
+			roleTransport.ruins_tested[creep.room.name] = true;
+		}
+
 		for (let r = 0; r < room_ruins.length; r++)
 		{
 			if (creep.pos.inRangeTo(room_ruins[r].pos, 1) && (creep.pickup(room_ruins[r]) == OK || creep.withdraw(room_ruins[r], RESOURCE_ENERGY) == OK))
