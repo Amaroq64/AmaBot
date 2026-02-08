@@ -2,14 +2,21 @@ var roleBuilder =
 {
 	transport: require('role.transport'),
 
+	sites: {},
+	sites_tested: {},
+
 	construct: function(creep)
 	{
-		let sites;
+		let sites = roleBuilder.sites[creep.room.name];
 		let test = false;	//We're not directly returning this function to determine whether we move. So it's a check for success now.
 
-		sites = creep.room.find(FIND_CONSTRUCTION_SITES);	//Get all construction sites.
+		if (!roleBuilder.sites_tested[creep.room.name])	//Populate the construction sites the first time this tick.
+		{
+			sites = creep.room.find(FIND_CONSTRUCTION_SITES);	//Get all construction sites.
+			roleBuilder.sites_tested[creep.room.name] = true;
+		}
 
-		if (sites.length == 0 && creep.room.lookForAt(LOOK_STRUCTURES, creep.pos).length == 0) //There's no sites in the room.
+		if (sites.length === 0 && creep.room.lookForAt(LOOK_STRUCTURES, creep.pos).length === 0) //There's no sites in the room.
 		{
 			return false;
 		}
@@ -51,7 +58,7 @@ var roleBuilder =
 				return true;	//We've performed our repair action for this tick.
 			}
 		}
-		
+
 		return false;	//If we made it this far, there was nothing to repair.
 	},
 
@@ -64,7 +71,7 @@ var roleBuilder =
 		{
 			creep.room.createConstructionSite(creep.pos, STRUCTURE_ROAD);
 		}
-		
+
 		//Flip, but only if we're not stuck under fatigue.
 		if (roleBuilder.flip(creep))
 		{
