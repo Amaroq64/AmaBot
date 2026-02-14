@@ -275,7 +275,7 @@ var empire =
 		return (Memory.allies && Memory.allies.indexOf(creep.owner.username) !== -1);
 	},
 
-	allies: ['kotyara', 'suyu', 'dodzai', 'Pwk', 'WoodenRobot', 'Belthazor', 'Screepburner', 'Maxrocket', 'kirk']
+	allies: []
 };
 
 module.exports = empire;
