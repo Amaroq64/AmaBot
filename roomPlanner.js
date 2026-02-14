@@ -316,7 +316,7 @@ var roomPlanner =
 					}
 				}
 
-				//Are we missing our store?
+				//Are we missing our storage?
 				if (!Game.getObjectById(Memory.rooms[room_name].buildings.store.id))
 				{
 					if (Game.rooms[room_name].storage)
@@ -433,6 +433,12 @@ var roomPlanner =
 					else
 					{
 						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mine.miner.x, Memory.rooms[room_name].mine.miner.y, STRUCTURE_CONTAINER);
+
+						//If we have introduced custodians, but don't currently have one, spawn one to build this container. If it's not meant to be there, it'll set this back to 0 when it's done.
+						if (Memory.rooms[room_name].ideal.custodian === 0)
+						{
+							Memory.rooms[room_name].ideal.custodian = 1;
+						}
 					}
 				}
 
@@ -3252,11 +3258,11 @@ var roomPlanner =
 			}
 
 			//For observing the results during testing.
-			if (!Memory.mineTest)
+			/*if (!Memory.mineTest)
 			{
 				Memory.mineTest = {};
 			}
-			Memory.mineTest[room_name] = final_choice;
+			Memory.mineTest[room_name] = final_choice;*/
 
 			//Assign the results.
 			Memory.rooms[room_name].mine =
