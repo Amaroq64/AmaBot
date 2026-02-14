@@ -415,7 +415,8 @@ var builder =
 					//So try again without the restraint on energy sources.
 					delete options.energyStructures;
 					console.log(spawn.spawnCreep(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable), name, options));
-					console.log(room_name + ' ' + role + ' ' + Game.rooms[room_name].energyAvailable);
+					console.log(room_name + ' ' + role + ' ' + Game.rooms[room_name].energyAvailable + ' / ' +
+						calculate.bodyCost(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable)));
 					break;
 				}
 				case ERR_NOT_OWNER:
@@ -489,6 +490,7 @@ var builder =
 
 		return true;
 	},
+
 	deleteExtensions: function()
 	{
 		for (let room_name in Memory.rooms)
@@ -499,6 +501,30 @@ var builder =
 				sites[e].remove();
 			}
 		}
+	},
+
+	buildLabRoads: function(room_name)
+	{
+		//Place the road from our spawn through the lab stamp.
+		let room = Game.rooms[room_name];
+		for (let i = 0, stamp_roads = calculate.recreatePath(room_name, 'epath', Memory.rooms[room_name].mine.ereturn[1].x, Memory.rooms[room_name].mine.ereturn[1].y); i < stamp_roads.length; i++)
+		{
+			//console.log(stamp_roads[i].x + ', ' + stamp_roads[i].y);
+			room.createConstructionSite(stamp_roads[i].x, stamp_roads[i].y, STRUCTURE_ROAD);
+		}
+
+		//Place the road from our sources into the lab stamp.
+		for (let s = 0; s < Memory.rooms[room_name].sources.length; s++)
+		{
+			for (let i = 0, stamp_roads = calculate.recreatePath(room_name, 'labs', Memory.rooms[room_name].sources[s].lreturn[1].x, Memory.rooms[room_name].sources[s].lreturn[1].y,
+				s, calculate.direction_opposite[Memory.rooms[room_name].sources[s].lreturn[1].direction]); i < stamp_roads.length; i++)
+			{
+				//console.log('s' + s + ': ' + stamp_roads[i].x + ', ' + stamp_roads[i].y);
+				room.createConstructionSite(stamp_roads[i].x, stamp_roads[i].y, STRUCTURE_ROAD);
+			}
+		}
+
+		return true;
 	},
 
 	newSpawn: function(room_name = false, a = 0)
@@ -532,9 +558,7 @@ var builder =
 		}
 		console.log('Spawn named ' + name);
 		return name;
-	},
-
-	metAnyGoal: false
+	}
 };
 
 builder.anticipate.checkCreeps = function(room_name)
