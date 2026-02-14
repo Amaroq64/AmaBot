@@ -55,7 +55,7 @@ var control =
 				{
 					let creep = Game.creeps[Memory.rooms[room_name].creeps[creep_type][n]];
 					//Run the role method for this creep. It does its thing, then decides whether we move or not.
-					//Assumes we have a method for every creep role we could find here.
+					//Assumes we have a run method for every creep role we could find here.
 					if (!creep.spawning)
 					{
 						if (control[creep_type].run(creep))
