@@ -1370,7 +1370,7 @@ var calculate =
 		for (let e = 0, textension, extensions = Memory.rooms[room_name].sources[s].buildings.extensions; e < extensions.length; e++)
 		{
 			textension = Game.getObjectById(extension_positions[extensions[e].x][extensions[e].y]);
-			if (textension.store.getFreeCapacity(RESOURCE_ENERGY))
+			if (textension && textension.store.getFreeCapacity(RESOURCE_ENERGY))
 			{
 				return false;
 			}
@@ -1543,6 +1543,63 @@ var calculate =
 		}
 	},
 
+	recreatePath: function(room_name, type, x_start, y_start, s = null, direction_start = null, exit = null)	//Reconstruct the original path steps by iterating where our deflection tiles tell us to go.
+	{
+		let roompath = Memory.rooms[room_name].path;
+		let path = [];
+
+		//Get the initial direction if we didn't specify it.
+		if (!direction_start && roompath[x_start] && roompath[x_start][y_start] && roompath[x_start][y_start][type])
+		{
+			if (s === null)
+			{
+				direction_start = roompath[x_start][y_start][type];
+			}
+			else if (roompath[x_start][y_start][type][s])
+			{
+				direction_start = roompath[x_start][y_start][type][s];
+			}
+			else
+			{
+				return false;
+			}
+		}
+		else if (!direction_start)
+		{
+			return false;
+		}
+
+		//Now recreate the path.
+		for (let x = x_start, y = y_start, direction = direction_start, dx = calculate.dxdy[direction_start].dx, dy = calculate.dxdy[direction].dy, tile, count = 0; count < 200; x += dx, y += dy, count++)
+		{
+			path.push({x: x, y: y});	//We don't need the direction stuff, just the locations of the steps.
+
+			//Do we have a tile of the correct type?
+			//Assign within comparison.
+			if (roompath[x] && (tile = roompath[x][y]) && tile[type])
+			{
+				//If there's a source, we'll be getting the source-bound path. Otherwise, it's a room-wide path.
+				if (s === null)
+				{
+					direction = calculate.dxdy[tile[type]];
+				}
+				else if (tile[type][s])
+				{
+					direction = calculate.dxdy[tile[type][s]];
+				}
+
+				dx = direction.dx;
+				dy = direction.dy;
+			}
+			else if (tile && tile.flipper && ((s === null && tile.flipper[type]) || (s !== null && tile.flipper[type] && tile.flipper[type][s])))	//If it's our path's flipper, this is the last step in the path.
+			{
+				break;
+			}
+		}
+
+		return path;
+	},
+
 	isPathClear: function(room_name, path, direction = null, x1, y1, x2 = null, y2 = null)
 	{
 		//We're traversing an inter-room path[x][y] object to make sure there's no structures in its way.
@@ -1655,6 +1712,7 @@ var calculate =
 
 	newpath: function(room_name, action_type, action_number, x = false, y = false, x2 = false, y2 = false, room_name2 = false, direction = false)	//room_name2 and direction unworking or unimplemented.
 	{
+		//Recreate the interroom path going through a room.
 		if (typeof room_name === 'string' && typeof action_type === 'string' && typeof action_number === 'number')
 		{
 			if (typeof x !== 'number' && typeof y !== 'number' && typeof x2 !== 'number' && typeof y2 !== 'number')
@@ -1796,11 +1854,20 @@ var calculate =
 		return i;
 	},
 
+	direction_opposite: [null, 5, 6, 7, 8, 1, 2, 3, 4],
+
 	orientation:
 	{
 		"-1": {"-1": 8, 0: 7, 1: 6},
 		  0 : {"-1": 1,       1: 5},
 		  1 : {"-1": 2, 0: 3, 1: 4}
+	},
+
+	orientation_opposite:
+	{
+		"-1": {"-1": 4, 0: 3, 1: 2},
+		  0 : {"-1": 5,       1: 1},
+		  1 : {"-1": 6, 0: 7, 1: 8}
 	},
 
 	dxdy:
@@ -1814,7 +1881,9 @@ var calculate =
 		{dx: -1, dy:  1},
 		{dx: -1, dy:  0},
 		{dx: -1, dy: -1}
-	]
+	],
+
+	dxdy_opposite: null
 };
 
 calculate.findouterstone.innercheck = function(x, y, found, temp_search, terrain)
