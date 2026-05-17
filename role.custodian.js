@@ -64,7 +64,14 @@ var roleCustodian =
 					{
 						//If the room is missing energy, we'll fill extensions.
 						creep.memory.mission = 3;
-						creep.memory.path = 3;	//This should help us visit more extensions.
+						if (Array.isArray(Memory.rooms[creep.room.name].sources[creep.memory.s].creeps.hybrid))
+						{
+							creep.memory.path = 0	//If there's a hybrid assigned to this source, then there's no upgrade path.
+						}
+						else
+						{
+							creep.memory.path = 3;	//This should help us visit more extensions.
+						}
 						creep.memory.d_path = -1;	//Prevent reversion back to 0 while it's making normal rounds.
 						creep.memory.lmission.unshift(creep.memory.mission);	//Always remember our latest non-selecting, non-waiting mission.
 						return roleCustodian.missions[creep.memory.mission](creep);
@@ -179,7 +186,7 @@ var roleCustodian =
 								if (harv.pos.x === Memory.rooms[creep.room.name].sources[creep.memory.s].mfat[0].x && harv.pos.y === Memory.rooms[creep.room.name].sources[creep.memory.s].mfat[0].y)
 								{
 									harv.move(harv.pos.getDirectionTo(creep.pos.x, creep.pos.y));
-									creep.say('Please.');
+									creep.say('Please.', true);
 									creep.memory.please = true;
 								}
 							}
@@ -209,7 +216,7 @@ var roleCustodian =
 						//If we asked the harvester to move, it can have its spot back now.
 						if (creep.memory.please)
 						{
-							creep.say('Thank you.');
+							creep.say('Thank you.', true);
 							creep.memory.please = undefined;
 						}
 
@@ -375,7 +382,7 @@ var roleCustodian =
 								upg.memory.direction = creep.memory.direction;
 								upg.move(upg.pos.getDirectionTo(creep.pos.x, creep.pos.y));
 								creep.move(creep.memory.direction);
-								creep.say('Please.');
+								creep.say('Please.', true);
 								creep.memory.please = true;
 							}
 						}
@@ -428,7 +435,7 @@ var roleCustodian =
 				//If we asked the upgrader to move, it can have its spot back now.
 				if (creep.memory.please)
 				{
-					creep.say('Thank you.');
+					creep.say('Thank you.', true);
 					creep.memory.please = undefined;
 				}
 
