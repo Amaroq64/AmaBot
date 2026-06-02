@@ -199,7 +199,7 @@ var builder =
 			{
 				case 'custodian':
 				{
-					let labs = require('labs');
+					//let labs = require('labs');
 					let sites = Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES, {filter: require('role.custodian').buildfilter});
 					let chosen_direction;
 					if (sites.length)
@@ -213,7 +213,7 @@ var builder =
 					//labs.request(name, [RESOURCE_ZYNTHIUM_OXIDE, RESOURCE_UTRIUM_ALKALIDE, RESOURCE_CATALYZED_KEANIUM_ACID]);
 					options.memory.mission = require('role.custodian').missions.length - 1;	//It needs to select a mission. By default we start with getting boosted.
 					options.memory.harv = body[role](Game.rooms[room_name].energyAvailable).reduce(calculate.reduceManyWork, 0) * 2;	//Its harvesting capacity.
-					options.memory.t = 0;
+					options.memory.t = 0;	//What tier boosts it has.
 					options.memory.lmission = [options.memory.mission];	//It should track what missions it has already performed.
 					options.memory.direction = false;
 					//options.memory.ldirection = false;	//If it makes a pit stop, it needs to go back where it came from.
@@ -223,6 +223,21 @@ var builder =
 					options.memory.d_s = 0;	//Sometimes it needs to switch to another source.
 					options.memory.target = {x: null, y: null};	//Not sure if we need this.
 					direction = [chosen_direction];	//We're going to the labs first.
+					break;
+				}
+				case 'handler':
+				{
+					options.memory.mission = require('role.handler').missions.length - 1;	//It needs to select a mission. By default we start with getting boosted.
+					options.memory.from = [];
+					options.memory.to = [];
+					options.memory.t = 0;	//What tier boosts it has.
+					options.memory.lmission = [options.memory.mission];	//It should track what missions it has already performed.
+					options.memory.direction = false;
+					options.memory.path = 15;
+					/*if ()
+					{
+						
+					}*/
 					break;
 				}
 				case 'harvester':
