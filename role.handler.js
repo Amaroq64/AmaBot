@@ -51,11 +51,40 @@ var roleHandler =
 		{
 			switch (typeof creep.memory.from)
 			{
-				case 'object':	//We have an [x][y] set of positions.
+				let target;
+				case 'string':	//We either have a structureType or a structure id.
+					if ((target = Game.getObjectById(creep.memory.from)))	//Assign within comparison.
+					{
+						//It's an id.
+					}
+					else if (roleHandler.types.has(creep.memory.from))
+					{
+						//It's a structure type.
+					}
 				
 					break;
+				case 'object':	//We probably have an [x][y] set of positions. We probably only do this for labs.
+					if (creep.store.getFreeCapacity())
+					{
+						for (let x = -1, xt, yt; x < 2; x++)
+						{
+							xt = creep.pos.x + x;
+							for (let y = -1; y < 2; y++)
+							{
+								yt = creep.pos.y + y;
 
-				case 'string':	//We either have a structureType or a structure id.
+								if (creep.memory.from[xt] && (target = creep.memory.from[xt][yt]) && (target = Game.getObjectById(target)))	//Assign within comparison.
+								{
+									//We would only remove minerals from a lab.
+									if (target.store[target.mineralType] && creep.withdraw(target, target.mineralType) === OK)	//Assign within comparison.
+									{
+										//If we withdrew this tick, then we're done.
+										return true;
+									}
+								}
+							}
+						}
+					}
 			}
 		},
 
@@ -188,6 +217,8 @@ var roleHandler =
 	{
 		return roleHandler.missions[creep.memory.mission](creep);	//This creep will decide its own movement.
 	},
+
+	types: new Set([STRUCTURE_SPAWN, STRUCTURE_STORAGE, STRUCTURE_TERMINAL, STRUCTURE_LAB, STRUCTURE_FACTORY, STRUCTURE_NUKER, STRUCTURE_CONTAINER, STRUCTURE_POWER_SPAWN]),
 
 	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn', 'epath', 'ereturn']
 };

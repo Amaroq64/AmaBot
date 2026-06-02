@@ -228,8 +228,9 @@ var builder =
 				case 'handler':
 				{
 					options.memory.mission = require('role.handler').missions.length - 1;	//It needs to select a mission. By default we start with getting boosted.
-					options.memory.from = [];
-					options.memory.to = [];
+					options.memory.from = null;
+					options.memory.to = null;
+					options.memory.what = null;
 					options.memory.t = 0;	//What tier boosts it has.
 					options.memory.lmission = [options.memory.mission];	//It should track what missions it has already performed.
 					options.memory.direction = false;
