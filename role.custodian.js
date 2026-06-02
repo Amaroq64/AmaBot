@@ -113,7 +113,7 @@ var roleCustodian =
 						return roleCustodian.missions[creep.memory.mission](creep);
 					}
 				}
-				else if (creep.memory.t && creep.ticksToLive <= 1000)
+				else if (creep.memory.t && creep.ticksToLive <= 100)
 				{
 					//If our time is almost up, we should unboost.
 					creep.memory.mission = roleCustodian.missions.length - 2;
@@ -526,6 +526,8 @@ var roleCustodian =
 		},*/
 
 		//The third-to-last index mission is to build the lab stamp. If our boosting mission detects that the stamp is incomplete, it'll assign this mission.
+		//This is too buggy to be worth it. If it doesn't enter the lab stamp while building, it won't behave correctly on the way back.
+		//Luckily this is only a holdover until the material handler is complete.
 		function(creep)
 		{
 			console.log('Building lab stamp. Path: ' + creep.memory.path + ' ' + creep.memory.d_path + ' Source: ' + creep.memory.s + ' ' + creep.memory.d_s);
@@ -625,17 +627,8 @@ var roleCustodian =
 				{
 					//If we would run out of energy by building this tick, we can start heading back.
 					//if (creep.build(chosen) === OK && creep.carry.energy === 1)	//If we're testing on PTR.
-					if (creep.build(chosen) === OK && chosen.progressTotal - chosen.progress >= (creep.memory.harv / 2) * 5 && creep.carry.energy <= creep.memory.harv * 5)	//Custodians don't get build boosts.
+					if (creep.build(chosen) === OK && chosen.progressTotal - chosen.progress >= (creep.memory.harv / 2) * 5 && creep.carry.energy <= (creep.memory.harv / 2) * 5)	//Custodians don't get build boosts.
 					{
-						if (creep.memory.path === 14)
-						{
-							creep.memory.path = 15;
-						}
-						else if (creep.memory.path === 12)
-						{
-							creep.memory.path = 13;
-						}
-
 						//Swap to the other source.
 						if (creep.memory.d_s < Memory.rooms[creep.room.name].sources.length - 1)
 						{
@@ -647,6 +640,18 @@ var roleCustodian =
 							//creep.memory.s = 0;
 							creep.memory.d_s = 0;
 						}
+
+						//Switch to the return path early if we can.
+						if (creep.memory.path === 12 && calculate.findtile(creep.room.name, creep.pos.x, creep.pos.y, require('control').paths[13], creep.memory.d_s))
+						{
+							console.log("Switching to the other source's return path early.");
+							creep.memory.path = 13;
+						}
+						else
+						{
+							creep.memory.d_s = creep.memory.s;	//If we haven't reached it yet, then we're not ready to switch.
+						}
+
 						creep.memory.d_path = 0;
 						roleCustodian.pathjump(creep);
 					}
@@ -681,6 +686,28 @@ var roleCustodian =
 				
 
 				return status;
+			}
+			else if (!creep.carry.energy && calculate.findtile(creep.room.name, creep.pos.x, creep.pos.y, require('control').paths[13], creep.memory.s < Memory.rooms[creep.room.name].sources.length - 1 ? creep.memory.s + 1 : 0))
+			{
+				//If we used up our energy, we still need to go into the lab stamp before we can switch.
+				console.log('Entering the lab stamp to switch sources.');
+				creep.memory.d_path = 13;
+
+				//Swap to the other source.
+				if (creep.memory.d_s < Memory.rooms[creep.room.name].sources.length - 1)
+				{
+					//creep.memory.s++;
+					creep.memory.d_s++;
+				}
+				else
+				{
+					//creep.memory.s = 0;
+					creep.memory.d_s = 0;
+				}
+
+				//We should be ready to jump now.
+				roleCustodian.pathjump(creep);
+				return roleCustodian.move(creep, 'custodian', creep.memory.s);
 			}
 			else if (Memory.rooms[creep.room.name].path[creep.pos.x]	//We are either out of sources or out of energy, but we haven't yet gotten onto the return path or the mine path. We might be stuck at the end of the lab stamp.
 				&& Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y] && Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y].flipper && Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y].flipper.epath)
@@ -742,8 +769,9 @@ var roleCustodian =
 			else	//All other cases have failed. We are winding up here when it needs to switch to another source but it didn't make it into the lab stamp yet.
 			{
 				console.log('Nothing to do.');
-				if (creep.memory.s === creep.memory.d_s && creep.memory.path !== 10)	//If we failed to find a way because we're not on the labs path, then switch sources one time, since we were unable to do so.
+				if (creep.memory.s === creep.memory.d_s && creep.memory.path !== 12 && creep.memory.path !== 13)	//If we failed to find a way because we're not on the labs path, then switch sources one time, since we were unable to do so.
 				{
+					console.log('Switching to another source.');
 					if (creep.memory.d_s < Memory.rooms[creep.room.name].sources.length - 1)
 					{
 						//creep.memory.s++;
@@ -756,14 +784,54 @@ var roleCustodian =
 					}
 					return roleCustodian.move(creep, 'mtransport', creep.memory.s);
 				}
-				else if (creep.memory.s !== creep.memory.d_s)
+				else if (creep.memory.s !== creep.memory.d_s)	//We've recorded our intent to switch sources. Now try to capture a valid path.
 				{
 					console.log("Falling back to the source we're currently on.");
-					creep.memory.d_path = 12;
 					creep.memory.d_s = creep.memory.s;
+
+					//Move along whichever path we're using.
+					roleCustodian.pathjump(creep);
+					if (creep.memory.path === 12 || creep.memory.path === 13)
+					{
+						//console.log('Path ' + creep.memory.path + '.');
+						status = roleCustodian.move(creep, 'custodian', creep.memory.s);
+						if (creep.memory.path === 13)
+						{
+							creep.memory.d_path = creep.memory.path;
+						}
+					}
+					else if (creep.memory.path === 14 || creep.memory.path === 15)
+					{
+						//console.log('Path ' + creep.memory.path + '.');
+						status = roleCustodian.move(creep, 'handler');
+						if (creep.memory.path === 15)
+						{
+							creep.memory.d_path = creep.memory.path;
+						}
+					}
 				}
 				else
 				{
+					console.log('Completely failed.');
+					//Swap to the other source.
+					if (creep.memory.d_s < Memory.rooms[creep.room.name].sources.length - 1)
+					{
+						//creep.memory.s++;
+						creep.memory.d_s++;
+					}
+					else
+					{
+						//creep.memory.s = 0;
+						creep.memory.d_s = 0;
+					}
+					if (creep.memory.path === 0 && Memory.rooms[creep.room.name].path[creep.pos.x]	//If the creep doesn't even leave the source before building, we need to catch this behavior.
+						&& Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y] && Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y].flipper && Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y].flipper.lreturn
+						&& Memory.rooms[creep.room.name].path[creep.pos.x][creep.pos.y].flipper.lreturn[creep.memory.s])
+					{
+						console.log('Moving from the source into the lab stamp.');
+						creep.memory.path = 13;
+						return roleCustodian.move(creep, 'custodian', creep.memory.s);
+					}
 					return false;
 				}
 			}
@@ -809,7 +877,8 @@ var roleCustodian =
 				&& Game.getObjectById(Memory.rooms[creep.room.name].mineral.cid) && Game.getObjectById(Memory.rooms[creep.room.name].mineral.eid)	//the container, and the extractor.
 				&& (Game.rooms[creep.room.name].controller.level < 7 || Game.getObjectById(Memory.rooms[creep.room.name].buildings.factory.id))	//The factory, if the room is high enough.
 				&& (Game.rooms[creep.room.name].controller.level < 8
-				|| (Game.getObjectById(Memory.rooms[creep.room.name].spawns[2].id) && Game.getObjectById(Memory.rooms[creep.room.name].buildings.nuker.id))))	//The third spawn and the nuker, if the room is high enough.
+				|| (Game.getObjectById(Memory.rooms[creep.room.name].spawns[2].id) && Game.getObjectById(Memory.rooms[creep.room.name].buildings.nuker.id)	//The third spawn and the nuker, if the room is high enough.
+				&& Game.getObjectById(Memory.rooms[creep.room.name].buildings.pspawn.id))))	//The power spawn, if the room is high enough.
 			{
 				for (let l = 0; l < Memory.rooms[creep.room.name].goals.labs; l++)
 				{
@@ -976,13 +1045,13 @@ var roleCustodian =
 	clearfilter: function(site)
 	{
 		return site.structureType === STRUCTURE_LAB || site.structureType === STRUCTURE_EXTRACTOR || site.structureType === STRUCTURE_STORAGE
-			|| site.structureType === STRUCTURE_TERMINAL || site.structureType === STRUCTURE_FACTORY || site.structureType === STRUCTURE_NUKER || site.structureType === STRUCTURE_LINK || site.structureType === STRUCTURE_POWER_SPAWN;
+			|| site.structureType === STRUCTURE_TERMINAL || site.structureType === STRUCTURE_FACTORY || site.structureType === STRUCTURE_NUKER || site.structureType === STRUCTURE_POWER_SPAWN;
 	},
 
 	buildfilter: function(site)
 	{
 		return site.structureType === STRUCTURE_LAB || site.structureType === STRUCTURE_EXTRACTOR || site.structureType === STRUCTURE_SPAWN || site.structureType === STRUCTURE_STORAGE || site.structureType === STRUCTURE_CONTAINER
-			|| site.structureType === STRUCTURE_TERMINAL || site.structureType === STRUCTURE_FACTORY || site.structureType === STRUCTURE_NUKER || site.structureType === STRUCTURE_LINK || site.structureType === STRUCTURE_POWER_SPAWN;
+			|| site.structureType === STRUCTURE_TERMINAL || site.structureType === STRUCTURE_FACTORY || site.structureType === STRUCTURE_NUKER || site.structureType === STRUCTURE_POWER_SPAWN;
 	}
 };
 
