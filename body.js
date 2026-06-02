@@ -149,7 +149,7 @@ var body =
 			{
 				let countwork = 0;
 				let flipwork = false;
-				while (energy >= [250, 200][+flipwork] && countwork < 10)	//Since a container can hold 2000, we should hold 1000. A T1 boost would make it match.
+				while (energy >= [250, 200][+flipwork] && countwork < 8)	//Since a link can hold 800, we should hold 800.
 				{
 					if (flipwork)	//We have half work now, so on odd numbers, don't add a move.
 					{
@@ -163,6 +163,12 @@ var body =
 					}
 					countwork++;
 					flipwork = !flipwork;
+				}
+
+				if (energy >= 200)
+				{
+					body.unshift(WORK, WORK);
+					energy -= 200;
 				}
 			}
 			else
@@ -361,6 +367,16 @@ var body =
 			body.unshift(WORK, WORK, MOVE);
 			energy -= 250;
 		}
+	},
+
+	extractor: function(energy)
+	{
+		if (energy > 5000)
+		{
+			energy = 5000;
+		}
+
+		return new Array(Math.floor(energy / 100)).fill(WORK);	//The ideal extractor is a 50 WORK orb.
 	},
 
 	paver: function(energy)
