@@ -40,7 +40,7 @@ var init =
 					sources: [],
 					mineral: null,
 					mine: null,
-					react: {},
+					react: {on: false},
 					creeps: {upgrader: [], dbuilder: [], custodian: [], handler: [], extractor: []},	//We don't need an upgrade builder because the source builders patrol to it.
 					buildings: {upgradecontainer: null},
 					ideal: {},
