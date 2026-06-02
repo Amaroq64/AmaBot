@@ -1553,11 +1553,33 @@ var calculate =
 		{
 			if (s === null)
 			{
-				direction_start = roompath[x_start][y_start][type];
+				if (exit === null)
+				{
+					direction_start = roompath[x_start][y_start][type];				//Normal source bound paths.
+				}
+				else if (typeof exit === 'number' || typeof exit === 'string')
+				{
+					direction_start = roompath[x_start][y_start][type][exit];		//Source bound paths associated with an exit.
+				}
+				else
+				{
+					return false;
+				}
 			}
 			else if (roompath[x_start][y_start][type][s])
 			{
-				direction_start = roompath[x_start][y_start][type][s];
+				if (exit === null)
+				{
+					direction_start = roompath[x_start][y_start][type][s];			//Room-wide paths.
+				}
+				else if (typeof exit === 'number' || typeof exit === 'string')
+				{
+					direction_start = roompath[x_start][y_start][type][s][exit];	//Room-wide paths associated with an exit.
+				}
+				else
+				{
+					return false;
+				}
 			}
 			else
 			{
@@ -1570,9 +1592,15 @@ var calculate =
 		}
 
 		//Now recreate the path.
-		for (let x = x_start, y = y_start, direction = direction_start, dx = calculate.dxdy[direction_start].dx, dy = calculate.dxdy[direction].dy, tile, count = 0; count < 200; x += dx, y += dy, count++)
+		for (let x = x_start, y = y_start, direction = direction_start, dx = calculate.dxdy[direction_start].dx, dy = calculate.dxdy[direction].dy, tile, count = 0; count < 400; x += dx, y += dy, count++)
 		{
 			path.push({x: x, y: y});	//We don't need the direction stuff, just the locations of the steps.
+
+			if (x < 0 || x > 49 || y < 0 || y > 49)
+			{
+				console.log(type + ' out of bounds.');
+				break;
+			}
 
 			//Do we have a tile of the correct type?
 			//Assign within comparison.
@@ -1581,23 +1609,244 @@ var calculate =
 				//If there's a source, we'll be getting the source-bound path. Otherwise, it's a room-wide path.
 				if (s === null)
 				{
-					direction = calculate.dxdy[tile[type]];
+					if (exit === null)
+					{
+						direction = calculate.dxdy[tile[type]];
+					}
+					else if (typeof exit === 'number' || typeof exit === 'string')
+					{
+						direction = calculate.dxdy[tile[type][exit]];
+					}
 				}
 				else if (tile[type][s])
 				{
-					direction = calculate.dxdy[tile[type][s]];
+					if (exit === null)
+					{
+						direction = calculate.dxdy[tile[type][s]];
+					}
+					else if (typeof exit === 'number' || typeof exit === 'string')
+					{
+						direction = calculate.dxdy[tile[type][s][exit]];
+					}
+				}
+				if (s !== null && tile.flipper && tile.flipper[type] && tile.flipper[type][s])
+				{
+					break;	//Some return paths need a separate flipper check.
 				}
 
-				dx = direction.dx;
-				dy = direction.dy;
+				if (direction)
+				{
+					dx = direction.dx;
+					dy = direction.dy;
+				}
 			}
-			else if (tile && tile.flipper && ((s === null && tile.flipper[type]) || (s !== null && tile.flipper[type] && tile.flipper[type][s])))	//If it's our path's flipper, this is the last step in the path.
+			else if (tile && tile.flipper)	//If it's our path's flipper, this is the last step in the path.
 			{
-				break;
+				if (exit === null)
+				{
+					if (tile.flipper[type] && (s === null || tile.flipper[type][s]))
+					{
+						break;
+					}
+				}
+				else	//If it's an exit bound path's flipper, additional checks may be necessary.
+				{
+					if (tile.flipper[type] && (s === null || tile.flipper[type][s]))	//This makes this commented-out block redundant. Kept as a reference.
+					{
+						break;
+						/*if (s === null)	//The patrol and exitpath flipper's mere existence is probably enough to prove they have reached the end. This could have unintended side effects for the return paths if they cross the wrong flipper.
+						{
+							break;
+						}
+						else if (tile.flipper[type][s])	//Defpaths are source and exit bound, but their flipper only references the source.
+						{
+							break;
+						}*/
+					}
+				}
 			}
 		}
 
 		return path;
+	},
+
+	recreateAllPaths: function(room_name)
+	{
+		let room_in_memory = Memory.rooms[room_name];
+		let path_tiles = {};
+
+		//First, the source-bound paths.
+		for (let t = 0, sources_in_memory = room_in_memory.sources, path_in_memory, path_steps, types = ['mine', 'mreturn', 'upgrade', 'ureturn', 'labs', 'lreturn']; t < types.length; t++)
+		{
+			for (s = 0; s < sources_in_memory.length; s++)
+			{
+				path_in_memory = sources_in_memory[s][types[t]];
+
+				//Rooms with a hybrid will be missing one or more source's upgrade paths.
+				if (path_in_memory[0])
+				{
+					if (types[t] === 'defpaths' || types[t] === 'dreturn')
+					{
+						console.log('Running ' + types[t] + '.');
+					}
+					path_steps = calculate.recreatePath(room_name, types[t], path_in_memory[0].x, path_in_memory[0].y, s);
+
+					//Once we have the steps, write them to path_tiles.
+					for (let p = 0; p < path_steps.length; p++)
+					{
+						calculate.mark_found(path_steps[p].x, path_steps[p].y, path_tiles);
+					}
+				}
+			}
+		}
+
+		//Now, the upgrader room-bound path. Mind the spelling. The room-wide upgrade path is called 'upgrader'.
+		for (let p = 0, path_steps = calculate.recreatePath(room_name, 'upgrader', room_in_memory.upgrade[0].x, room_in_memory.upgrade[0].y); p < path_steps.length; p++)
+		{
+			calculate.mark_found(path_steps[p].x, path_steps[p].y, path_tiles);
+		}
+
+
+		//Now the room's mine-bound paths.
+		for (let t = 0, mine_in_memory = room_in_memory.mine, types = ['epath', 'ereturn']; t < types.length; t++)
+		{
+			for (let p = 0, path_steps = calculate.recreatePath(room_name, types[t], mine_in_memory[types[t]][0].x, mine_in_memory[types[t]][0].y); p < path_steps.length; p++)
+			{
+				calculate.mark_found(path_steps[p].x, path_steps[p].y, path_tiles);
+			}
+		}
+
+		//Now the room's source and exit bound defpaths.
+		for (let t = 0, sources_in_memory = room_in_memory.sources, defense_in_memory, path_steps, types = ['defpaths', 'dreturn']; t < types.length; t++)
+		{
+			for (let s = 0; s < sources_in_memory.length; s++)
+			{
+				for (let e = 0, exit_in_memory = sources_in_memory[s][types[t]]; e < exit_in_memory.length; e++)
+				{
+					defense_in_memory = sources_in_memory[s][types[t]][e];
+
+					//Safe exits don't get a defpath.
+					if (defense_in_memory)
+					{
+						path_steps = calculate.recreatePath(room_name, types[t], defense_in_memory[0].x, defense_in_memory[0].y, s, null, e);
+
+						//Once we have the steps, write them to path_tiles.
+						for (let p = 0; p < path_steps.length; p++)
+						{
+							calculate.mark_found(path_steps[p].x, path_steps[p].y, path_tiles);
+						}
+					}
+				}
+			}
+		}
+
+		//Now the defense patrol paths.
+		for (let t = 0, defense_in_memory, exit_in_memory, path_steps, types = ['patrol', 'preturn']; t < types.length; t++)
+		{
+			defense_in_memory = room_in_memory.defense[types[t]];
+			for (let e = 0; e < defense_in_memory.length; e++)
+			{
+				exit_in_memory = defense_in_memory[e];
+
+				//Safe exits don't get a patrol path.
+				if (exit_in_memory)
+				{
+					path_steps = calculate.recreatePath(room_name, types[t], exit_in_memory[0].x, exit_in_memory[0].y, null, null, e);
+
+					//Once we have the steps, write them to path_tiles.
+					for (let p = 0; p < path_steps.length; p++)
+					{
+						calculate.mark_found(path_steps[p].x, path_steps[p].y, path_tiles);
+					}
+				}
+			}
+		}
+
+		//Now the room's exit paths.
+		for (let t = 0, exit_in_memory, path_steps, types = ['exitpaths', 'exitreturn']; t < types.length; t++)
+		{
+			exit_in_memory = room_in_memory[types[t]];
+			for (let exit in exit_in_memory)
+			{
+				path_steps = calculate.recreatePath(room_name, types[t], exit_in_memory[exit][0].x, exit_in_memory[exit][0].y, null, null, exit);
+
+				//Once we have the steps, write them to path_tiles.
+				for (let p = 0; p < path_steps.length; p++)
+				{
+					calculate.mark_found(path_steps[p].x, path_steps[p].y, path_tiles);
+				}
+			}
+		}
+
+		return path_tiles;
+	},
+
+	locateAllStructures: function(room_name)
+	{
+		let structure_tiles = {};
+		let room_in_memory = Memory.rooms[room_name];
+
+		//First, the spawns.
+		for (let s = 0, spawns = room_in_memory.spawns; s < spawns.length; s++)
+		{
+			calculate.mark_found(spawns[s].x, spawns[s].y, structure_tiles);
+		}
+
+		//Now the room-bound buildings.
+		for (let building in room_in_memory.buildings)
+		{
+			calculate.mark_found(room_in_memory.buildings[building].x, room_in_memory.buildings[building].y, structure_tiles);
+		}
+
+		//Now the labs.
+		for (let l = 0, labs_in_memory = room_in_memory.mine.labs; l < labs_in_memory.length; l++)
+		{
+			calculate.mark_found(labs_in_memory[l].x, labs_in_memory[l].y, structure_tiles);
+		}
+
+		//Now the mineral mining container.
+		calculate.mark_found(room_in_memory.mine.miner.x, room_in_memory.mine.miner.y, structure_tiles);
+
+		//Now the source-bound structures.
+		for (let i = 0; i < room_in_memory.sources.length; i++)
+		{
+			let buildings_in_memory = room_in_memory.sources[i].buildings;
+
+			//The source's harvest container.
+			calculate.mark_found(buildings_in_memory.miningcontainer.x, buildings_in_memory.miningcontainer.y, structure_tiles);
+
+			//The source's extensions.
+			for (let e = 0, extensions_in_memory = buildings_in_memory.extensions; e < extensions_in_memory.length; e++)
+			{
+				calculate.mark_found(extensions_in_memory[e].x, extensions_in_memory[e].y, structure_tiles);
+			}
+
+			//The source's link.
+			if (buildings_in_memory.link)
+			{
+				calculate.mark_found(buildings_in_memory.link.x, buildings_in_memory.link.y, structure_tiles);
+			}
+		}
+
+		//Now the towers, walls, and ramparts. Every rampart is listed in the walls list. What makes it a rampart is also having an entry in the ramparts list.
+		for (let t = 0, types = ['towers', 'walls']; t < types.length; t++)
+		{
+			for (let d = 0, defense_in_memory = room_in_memory.defense[types[t]]; d < defense_in_memory.length; d++)
+			{
+				calculate.mark_found(defense_in_memory[d].x, defense_in_memory[d].y, structure_tiles);
+			}
+		}
+
+		//Now the defense links.
+		for (let d = 0, dlinks_in_memory = room_in_memory.defense.links; d < dlinks_in_memory.length; d++)
+		{
+			if (dlinks_in_memory[d])
+			{
+				calculate.mark_found(dlinks_in_memory[d].x, dlinks_in_memory[d].y, structure_tiles);
+			}
+		}
+
+		return structure_tiles;
 	},
 
 	isPathClear: function(room_name, path, direction = null, x1, y1, x2 = null, y2 = null)
