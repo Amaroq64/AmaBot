@@ -34,12 +34,12 @@ var roleTransport =
 			}
 		}
 
-		let room_energy = roleTransport.room_energy[creep.room.name];
 		if (!roleTransport.energy_tested[creep.room.name])	//Populate the dropped energy for the first time this tick.
 		{
-			room_energy = creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
+			roleTransport.room_energy[creep.room.name] = creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}});
 			roleTransport.energy_tested[creep.room.name] = true;
 		}
+		let room_energy = roleTransport.room_energy[creep.room.name];
 
 		for (let e = 0; e < room_containers.length; e++)
 		{
@@ -90,12 +90,12 @@ var roleTransport =
 
 	withdrawRuins: function(creep)
 	{
-		let room_ruins = roleTransport.room_ruins[creep.room.name];
 		if (!roleTransport.ruins_tested[creep.room.name])	//Populate the dropped resources for the first time this tick.
 		{
-			room_ruins = creep.room.find(FIND_RUINS).concat(creep.room.find(FIND_TOMBSTONES).concat(creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}})));
+			roleTransport.room_ruins[creep.room.name] = creep.room.find(FIND_RUINS).concat(creep.room.find(FIND_TOMBSTONES, {filter: function(tstone) {return tstone.store[RESOURCE_ENERGY];}}).concat(creep.room.find(FIND_DROPPED_RESOURCES, {filter: {resourceType: RESOURCE_ENERGY}})));
 			roleTransport.ruins_tested[creep.room.name] = true;
 		}
+		let room_ruins = roleTransport.room_ruins[creep.room.name];
 
 		for (let r = 0; r < room_ruins.length; r++)
 		{
@@ -147,11 +147,15 @@ var roleTransport =
 
 			if(creep.transfer(room_targets[0], RESOURCE_ENERGY) === OK)
 			{
-				//console.log(creep.name + " is depositing at " + room_targets[0].pos.x + ", " + room_targets[0].pos.y + ".");
+				//We deposited into the dbuilder.
+			}
+			else if (creep.memory.dtrip && creep.pos.isNearTo(Memory.rooms[creep.room.name].defense.links[creep.memory.need].x, Memory.rooms[creep.room.name].defense.links[creep.memory.need].y))	//If we're going to the dbuilder, try depositing into a link.
+			{
+				creep.transfer(Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id), RESOURCE_ENERGY);
 			}
 			else if (creep.transfer(creep.room.lookForAt(LOOK_STRUCTURES, tpos)[0], RESOURCE_ENERGY) !== OK)	//Try to deposit into a structure.
 			{
-				room_targets = creep.room.lookForAt(LOOK_CREEPS, tpos) //Try to deposit into a creep.
+				room_targets = creep.room.lookForAt(LOOK_CREEPS, tpos); //Try to deposit into a creep.
 				creep.transfer(room_targets[0], RESOURCE_ENERGY);
 				//console.log("Depositing into a creep.");
 			}

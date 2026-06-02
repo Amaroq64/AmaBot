@@ -279,12 +279,18 @@ var roleDBuilder =
 		if (creep.carry.energy == 0)
 		{
 			//console.log("Withdrawing from ruins.");
-			roleDBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
+			let withdraw_ruins = roleDBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
 
 			//This is where we're waiting to be given energy.
 			let tpos = creep.room.getPositionAt(creep.memory.dtarget.x, creep.memory.dtarget.y);
 			if (creep.pos.isEqualTo(tpos.x, tpos.y))
 			{
+				//Withdraw from a link if possible.
+				if (withdraw_ruins !== OK)
+				{
+					creep.withdraw(Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id), RESOURCE_ENERGY);
+				}
+
 				//Does a creep (other than a builder) want to move towards us?
 				let nearby_creeps = creep.pos.findInRange(FIND_MY_CREEPS);
 				for (let cr = 0; cr < nearby_creeps.length; cr++)
