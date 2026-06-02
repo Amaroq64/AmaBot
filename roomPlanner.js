@@ -92,6 +92,11 @@ var roomPlanner =
 				break;
 			case 2:
 				Memory.rooms[room_name].init = undefined;
+			case 5:
+				if (Game.rooms[room_name].controller.level === 5)
+				{
+					roomPlanner.links.set(room_name);
+				}
 			default:
 				roomideal.dbuilder = 1;	//we can build walls now.
 				require('defender').checkDefense(room_name);
@@ -110,6 +115,10 @@ var roomPlanner =
 				roomideal.custodian = 1;
 				require('defender').checkDefense(room_name);
 				Memory.rooms[room_name].goals.labs = CONTROLLER_STRUCTURES.lab[Game.rooms[room_name].controller.level];
+				if (Game.rooms[room_name].controller.level === 8)
+				{
+					roomPlanner.powerSpawn.set(room_name);
+				}
 		}
 
 		roomideal.upgradecontainer = 1; //The fatty needs a container to sit on.
@@ -316,6 +325,48 @@ var roomPlanner =
 					}
 				}
 
+				//Are we missing any of our links?
+				for (let i = 0, sources_in_room = Memory.rooms[room_name].sources; i < sources_in_room.length && sources_in_room[i].buildings.link; i ++)
+				{
+					if (!Game.getObjectById(sources_in_room[i].buildings.link.id))
+					{
+						let link = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter:
+							function(structure)
+							{
+								return structure.structureType === STRUCTURE_LINK && structure.pos.x === sources_in_room[i].buildings.link.x && structure.pos.y === sources_in_room[i].buildings.link.y;
+							}});
+
+						if (link.length)
+						{
+							sources_in_room[i].buildings.link.id = link[0].id;
+						}
+						else
+						{
+							Game.rooms[room_name].createConstructionSite(sources_in_room[i].buildings.link.x, sources_in_room[i].buildings.link.y, STRUCTURE_LINK);
+						}
+					}
+				}
+				for (let d = 0, dlinks_in_memory = Memory.rooms[room_name].defense.links; dlinks_in_memory && d < dlinks_in_memory.length; d++)
+				{
+					if (dlinks_in_memory[d] && !Game.getObjectById(dlinks_in_memory[d].id))
+					{
+						let link = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter:
+							function(structure)
+							{
+								return structure.structureType === STRUCTURE_LINK && structure.pos.x === dlinks_in_memory[d].x && structure.pos.y === dlinks_in_memory[d].y;
+							}});
+
+						if (link.length)
+						{
+							dlinks_in_memory[d].id = link[0].id;
+						}
+						else
+						{
+							Game.rooms[room_name].createConstructionSite(dlinks_in_memory[d].x, dlinks_in_memory[d].y, STRUCTURE_LINK);
+						}
+					}
+				}
+
 				//Are we missing our storage?
 				if (!Game.getObjectById(Memory.rooms[room_name].buildings.store.id))
 				{
@@ -424,11 +475,11 @@ var roomPlanner =
 				//Are we missing the mineral mining container?
 				if (!Game.getObjectById(Memory.rooms[room_name].mineral.cid))
 				{
-					let extractor = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: function(contain)
+					let econtainer = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: function(contain)
 						{return contain.structureType === STRUCTURE_CONTAINER && contain.pos.x === Memory.rooms[room_name].mine.miner.x && contain.pos.y === Memory.rooms[room_name].mine.miner.y}});
-					if (extractor.length)
+					if (econtainer.length)
 					{
-						Memory.rooms[room_name].mineral.cid = extractor[0].id;
+						Memory.rooms[room_name].mineral.cid = econtainer[0].id;
 					}
 					else
 					{
@@ -454,6 +505,21 @@ var roomPlanner =
 					else
 					{
 						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mine.miner.x, Memory.rooms[room_name].mine.miner.y, STRUCTURE_CONTAINER);
+					}
+				}
+
+				//Are we missing the power spawn.
+				if (!Game.getObjectById(Memory.rooms[room_name].buildings.pspawn.id))
+				{
+					let pspawn = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_POWER_SPAWN}});
+
+					if (pspawn.length)
+					{
+						Memory.rooms[room_name].buildings.pspawn.id = pspawn[0].id;
+					}
+					else
+					{
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.pspawn.x, Memory.rooms[room_name].buildings.pspawn.y, STRUCTURE_POWER_SPAWN);
 					}
 				}
 			}
@@ -3073,6 +3139,18 @@ var roomPlanner =
 					direction: calculate.orientation[mine_pos.x - final_choice.final_path[final_choice.final_path.length - 1].x][mine_pos.y - final_choice.final_path[final_choice.final_path.length - 1].y]}
 			}
 
+			//Place another container to collect unboosts, touching both source labs. The closest to the stationary miner so we don't have to tow it as far.
+			let bcontainer;
+			for (let b = apos_i, tpos; b >= 0; b--)
+			{
+				tpos = new RoomPosition(final_choice.final_path[b].x, final_choice.final_path[b].y, room_name);
+				if (tpos.isNearTo(final_choice.labs[0].x, final_choice.labs[0].y) && tpos.isNearTo(final_choice.labs[1].x, final_choice.labs[1].y))
+				{
+					bcontainer = {id: null, x: tpos.x, y: tpos.y};
+					break;
+				}
+			}
+
 			//Once everything else is done, let's place a factory and a nuke as well.
 			let fact_pos;
 			let nuke_pos;
@@ -3283,6 +3361,7 @@ var roomPlanner =
 
 			//Structures will be stored in their intended places.
 			Memory.rooms[room_name].spawns[2] = {id: null, x: final_choice.spawn_pos.x, y: final_choice.spawn_pos.y};
+			Memory.rooms[room_name].buildings.boostcontainer = bcontainer;
 			Memory.rooms[room_name].buildings.store = {id: null, x: final_choice.store_pos.x, y: final_choice.store_pos.y};
 			Memory.rooms[room_name].buildings.terminal = {id: null, x: final_choice.term_pos.x, y: final_choice.term_pos.y};
 			Memory.rooms[room_name].buildings.factory = {id: null, x: final_choice.fact_pos.x, y: final_choice.fact_pos.y};
@@ -3309,6 +3388,303 @@ var roomPlanner =
 		calculate.cleanpaths(room_name, 'labs');
 		calculate.deleteoldpaths(room_name, 'labs');
 		return true;
+	},
+
+	links:
+	{
+		set: function(room_name, test = null)
+		{
+			let chosen = {source: [], defense: []};
+			let terrain = new Room.Terrain(room_name);
+
+			//First block all paths and structures in the room.
+			let blocked_roads = calculate.recreateAllPaths(room_name);
+
+			let blocked_tiles = {};
+			for (let x in blocked_roads)
+			{
+				for (let y in blocked_roads[x])
+				{
+					calculate.mark_found(x, y, blocked_tiles);
+				}
+			}
+
+			let blocked_structures = calculate.locateAllStructures(room_name);
+			for (let x in blocked_structures)
+			{
+				for (let y in blocked_structures[x])
+				{
+					calculate.mark_found(x, y, blocked_tiles);
+				}
+			}
+
+			//Now select locations for our links.
+			//First the source links.
+			let sources_in_room = Memory.rooms[room_name].sources;
+			for (let i = 0, candidates = new Array(sources_in_room.length), candidates_xy = {}, match; i < sources_in_room.length; i++)
+			{
+				candidates[i] = [];
+				for (let x = -1, tx; !match && x < 2; x++)
+				{
+					tx = sources_in_room[i].mfat[0].x + x;
+					for (let y = -1, ty; y < 2; y++)
+					{
+						ty = sources_in_room[i].mfat[0].y + y;
+						if (terrain.get(tx, ty) !== TERRAIN_MASK_WALL && (!blocked_tiles[tx] || !blocked_tiles[tx][ty]))
+						{
+							candidates[i].push({x: tx, y: ty});	//The x = 0 and y = 0 should already be skipped because they are blocked in blocked_tiles.
+							if (!candidates_xy[tx] || typeof candidates_xy[tx][ty] !== 'number')
+							{
+								calculate.mark_found(tx, ty, candidates_xy, i);	//Only mark this if it hasn't been marked before. This makes the matching possible later.
+							}
+						}
+					}
+				}
+
+				//Once the candidates are listed, select one.
+				match = false;
+
+				//First of all, can we combine two links into one?
+				for (let ca = 0; ca < candidates[i].length && !match; ca++)
+				{
+					if (candidates_xy[candidates[i][ca].x] && typeof candidates_xy[candidates[i][ca].x][candidates[i][ca].y] === 'number' && candidates_xy[candidates[i][ca].x][candidates[i][ca].y] !== i)
+					{
+						//Override both of them then.
+						chosen.source[i] = chosen.source[candidates_xy[candidates[i][ca].x][candidates[i][ca].y]] = candidates[i][ca];
+						match = true;
+					}
+				}
+
+				//Pick the closest spot to our defenses, to slightly reduce the cooldown.
+				let defense_in_memory = Memory.rooms[room_name].sources[i].defpaths;
+
+				//First, get the defenses. (The dbuilder's resting positions.)
+				//Doing this more than once should be unnecessary, since the defense doesn't change from source to source.
+				let defenses = [];
+				for (let d = 0; d < defense_in_memory.length; d++)
+				{
+					if (defense_in_memory[d])
+					{
+						defenses.push({x: defense_in_memory[d][1].x, y: defense_in_memory[d][1].y});
+					}
+				}
+
+				if (!match)
+				{
+
+					//Now test each candidate against these defense positions. Prioritize average closest distance.
+					let averages = [];
+					for (let ca = 0, distances, total, cpos; ca < candidates[i].length; ca++)
+					{
+						distances = 0;
+						total = 0;
+						cpos = new RoomPosition(candidates[i][ca].x, candidates[i][ca].y, room_name);
+
+						//Get the distance to each defense.
+						for (d = 0; d < defenses.length; d++)
+						{
+							distances++;
+							total += cpos.getRangeTo(defenses[d].x, defenses[d].y);
+						}
+
+						//Now get the average.
+						averages.push(total / distances);
+					}
+
+					//Now choose the one with the lowest average. The candidates and their averages are at matching indexes.
+					let lowest_index;
+					for (let a = 0, lowest_value = Infinity; a < candidates[i].length; a++)
+					{
+						if (averages[a] < lowest_value)
+						{
+							lowest_value = averages[a];
+							lowest_index = a;	//If there's more than one equal, then who cares.
+						}
+					}
+
+					//We should now have our chosen link location.
+					chosen.source[i] = candidates[i][lowest_index];
+				}
+
+				//If we've chosen our last source link, then do the defense links now using already obtained data.
+				if (i === sources_in_room.length - 1)
+				{
+					for (d = 0, dcandidates = new Array(defenses.length); d < defenses.length; d++)
+					{
+						dcandidates[d] = [];
+						for (let x = -1, tx; x < 2; x++)
+						{
+							tx = defenses[d].x + x;
+							for (let y = -1, ty; y < 2; y++)
+							{
+								ty = defenses[d].y + y;
+								if (terrain.get(tx, ty) !== TERRAIN_MASK_WALL && (!blocked_tiles[tx] || !blocked_tiles[tx][ty]))
+								{
+									dcandidates[d].push({x: tx, y: ty});	//The x = 0 and y = 0 should already be skipped because they are blocked in blocked_tiles.
+								}
+							}
+						}
+
+						//Now test each candidate against these source positions. Prioritize average closest distance.
+						averages = [];
+						for (let ca = 0, distances, total, cpos; ca < dcandidates[d].length; ca++)
+						{
+							distances = 0;
+							total = 0;
+							cpos = new RoomPosition(dcandidates[d][ca].x, dcandidates[d][ca].y, room_name);
+
+							//Get the distance to each source.
+							for (s = 0; s < chosen.source.length; s++)
+							{
+								distances++;
+								total += cpos.getRangeTo(chosen.source[s].x, chosen.source[s].y);
+							}
+
+							//Now get the average.
+							averages.push(total / distances);
+						}
+
+						//Now choose the one with the lowest average. The dcandidates and their averages are at matching indexes.
+						let lowest_index;
+						for (let a = 0, lowest_value = Infinity; a < dcandidates[d].length; a++)
+						{
+							if (averages[a] < lowest_value)
+							{
+								lowest_value = averages[a];
+								lowest_index = a;	//If there's more than one equal, then who cares.
+							}
+						}
+
+						//We should now have our chosen link location.
+						chosen.defense[d] = dcandidates[d][lowest_index];
+					}
+				}
+			}
+
+			//Add an id property.
+			for (let type in chosen)
+			{
+				for (let c = 0; c < chosen[type].length; c++)
+				{
+					chosen[type][c] = {id: null, x: chosen[type][c].x, y: chosen[type][c].y};
+				}
+			}
+
+			//We should have everything now. Save the links.
+			if (test)
+			{
+				return JSON.stringify(chosen);
+			}
+			else
+			{
+				for (let i = 0; i < sources_in_room.length; i++)
+				{
+					sources_in_room[i].buildings.link = chosen.source[i];
+				}
+
+				//Any arbitrary property of defense will do, as long as it tells us which defenses are safe.
+				let defenses_in_room = Memory.rooms[room_name].defense;
+				defenses_in_room.links = new Array(defenses_in_room.safe.length);
+				for (let d = 0, td = 0; d < defenses_in_room.safe.length; d++)
+				{
+					if (!defenses_in_room.safe[d])
+					{
+						defenses_in_room.links[d] = chosen.defense[td++];
+					}
+				}
+
+				return true;
+			}
+		},
+
+		unset: function(room_name)
+		{
+			for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
+			{
+				Memory.rooms[room_name].sources[i].buildings.link = undefined;
+				console.log(Memory.rooms[room_name].sources[i].buildings.link);
+			}
+			Memory.rooms[room_name].defense.links = undefined;
+			console.log(Memory.rooms[room_name].defense.links);
+
+			return true;
+		}
+	},
+
+	powerSpawn:
+	{
+		set: function(room_name)
+		{
+			let terrain = new Room.Terrain(room_name);
+
+			//First block all paths and structures in the room.
+			let blocked_roads = calculate.recreateAllPaths(room_name);
+
+			let blocked_tiles = {};
+			for (let x in blocked_roads)
+			{
+				for (let y in blocked_roads[x])
+				{
+					calculate.mark_found(x, y, blocked_tiles);
+				}
+			}
+
+			let blocked_structures = calculate.locateAllStructures(room_name);
+			for (let x in blocked_structures)
+			{
+				for (let y in blocked_structures[x])
+				{
+					calculate.mark_found(x, y, blocked_tiles);
+				}
+			}
+
+			//Iterate from the lab stamp back to the main spawns.
+			let l = 0;
+			let from_labs = calculate.recreatePath(room_name, 'ereturn', Memory.rooms[room_name].mine.ereturn[0].x, Memory.rooms[room_name].mine.ereturn[0].y);
+			let tpos = new RoomPosition(Memory.rooms[room_name].buildings.terminal.x, Memory.rooms[room_name].buildings.terminal.y, room_name);
+			let candidates;
+
+			//First find the terminal. We only want to find a spot somewhere after we found it.
+			for (; l < from_labs.length; l++)
+			{
+				if (tpos.isNearTo(from_labs[l].x, from_labs[l].y))
+				{
+					break;
+				}
+			}
+
+			//Now find a spot.
+			for (; l < from_labs.length; l++)
+			{
+				candidates = [];
+				for (let x = -1, tx; x < 2; x++)
+				{
+					tx = from_labs[l].x + x;
+					for (let y = -1, ty; y < 2; y++)
+					{
+						ty = from_labs[l].y + y;
+
+						if (terrain.get(tx, ty) !== TERRAIN_MASK_WALL && (!blocked_tiles[tx] || !blocked_tiles[tx][ty]))
+						{
+							
+							candidates.push({x: tx, y: ty});
+						}
+					}
+				}
+
+				if (candidates.length)
+				{
+					break;
+				}
+			}
+
+			//If there's more than one candidate, pick the one closest to the terminal.
+			candidates = calculate.true_closest(tpos, candidates)[0];
+
+			//Now save the power spawn position.
+			Memory.rooms[room_name].buildings.pspawn = {id: null, x: candidates.x, y: candidates.y}
+			return true;
+		}
 	},
 
 	init_complete(room_name, test = false)
