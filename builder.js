@@ -25,7 +25,7 @@ var builder =
 				if (((Memory.rooms[room_name].sources[i].ideal.mtransport && Memory.rooms[room_name].sources[i].creeps.mtransport.length === 0)
 					|| (Memory.rooms[room_name].sources[i].ideal.harvester && Memory.rooms[room_name].sources[i].creeps.harvester.length === 0)
 					|| (Memory.rooms[room_name].sources[i].ideal.hybrid && Memory.rooms[room_name].sources[i].creeps.hybrid.length === 0))
-					&& (Game.rooms[room_name].energyAvailable >= 550 || Game.rooms[room_name].find(FIND_MY_CREEPS).length <= 1))	//If we have nothing, we have a true emergency.
+					&& (Game.rooms[room_name].energyAvailable >= 550 || Game.rooms[room_name].energyCapacityAvailable <= 550 || Game.rooms[room_name].find(FIND_MY_CREEPS).length <= 3))	//If we have nothing, we have a true emergency.
 					//Now that we're calculating maximum energy based on completed structures, we shouldn't need to emergency on a missing extension.
 					//|| myextensions.length < CONTROLLER_STRUCTURES.extension[Game.rooms[room_name].controller.level])
 				{
@@ -197,6 +197,13 @@ var builder =
 			let direction;
 			switch(role)
 			{
+				case 'scout':
+				{
+					options.memory.direction = false;
+					options.memory.next = room_name;
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.upgradedir];	//It needs an arbitrary direction to emerge from the spawn.
+					break;
+				}
 				case 'custodian':
 				{
 					//let labs = require('labs');
@@ -321,6 +328,15 @@ var builder =
 					//options.memory.movenow.pop();
 					break;
 				}
+				case 'ebuilder':
+				{
+					options.memory.target =
+					{
+						x: Memory.rooms[room_name].sources[need].mine.slice(-1)[0].x,
+						y: Memory.rooms[room_name].sources[need].mine.slice(-1)[0].y
+					};
+					break;
+				}
 				case 'dbuilder':
 				{
 					//We should go to a different defense every time we spawn.
@@ -416,9 +432,12 @@ var builder =
 				{
 					if (need !== '')
 					{
-						Memory.rooms[room_name].sources[need].creeps[role].push(name);
+						if (Array.isArray(Memory.rooms[room_name].sources[need].creeps[role]))
+						{
+							Memory.rooms[room_name].sources[need].creeps[role].push(name);
+						}
 					}
-					else
+					else if (Array.isArray(Memory.rooms[room_name].creeps[role]))
 					{
 						Memory.rooms[room_name].creeps[role].push(name);
 					}
