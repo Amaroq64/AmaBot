@@ -8,21 +8,21 @@ var roleExtractor =
 			//If it's not there yet, then it must be pulled. Our handler is probably dedicated to this.
 			if(creep.harvest(Game.getObjectById(Memory.rooms[creep.room.name].mineral.id)) === ERR_NOT_IN_RANGE && Memory.rooms[creep.room.name].creeps.handler.length)
 			{
-				let puller = [];
-				for (let p = 0, pcreep; p < Memory.rooms[creep.room.name].creeps.puller.length; p++)
+				let handler = [];
+				for (let p = 0, pcreep; p < Memory.rooms[creep.room.name].creeps.handler.length; p++)
 				{
-					pcreep = Game.creeps[Memory.rooms[creep.room.name].creeps.puller[p]];
+					pcreep = Game.creeps[Memory.rooms[creep.room.name].creeps.handler[p]];
 					if (!pcreep.spawning)
 					{
-						puller.push(pcreep);
+						handler.push(pcreep);
 					}
 				}
 
-				puller = creep.pos.findInRange(puller, 1);
+				handler = creep.pos.findInRange(handler, 1);
 
-				if (puller.length)
+				if (handler.length)
 				{
-					creep.move(puller[0]);
+					creep.move(handler[0]);
 				}
 			}
 		}
