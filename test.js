@@ -309,90 +309,188 @@ var test =
 				wallsTest(Memory.rooms);
 			}
 
-			if (labs && Memory.mineTest)
+			if (labs)
 			{
-				if (!global.setupMining)
+				if (Memory.mineTest)
 				{
-					global.setupMining = require('roomPlanner').setupMining;
+					if (!global.setupMining)
+					{
+						global.setupMining = require('roomPlanner').setupMining;
+					}
+
+					let calculate = require('calculate');
+					test.paint.stamp_type = ['mine_pos', 'hand_pos', 'spawn_pos', 'store_pos', 'term_pos'];
+
+					for (let room_name in Memory.mineTest)
+					{
+						if (!Memory.mineTest[room_name])
+						{
+							continue;
+						}
+
+						//Display the mine path.
+						test.paint.minepath(room_name);
+
+						//Draw the labs.
+						let labs = Memory.mineTest[room_name].labs;
+						for (let la = 0; la < 10; la++)
+						{
+							let color;
+							if (la < 2)
+							{
+								color = 'darkred';
+							}
+							else
+							{
+								color = 'darkblue';
+							}
+
+							new RoomVisual(room_name).circle(labs[la].x, labs[la].y, {fill: color, radius: 0.5});
+						}
+
+						//Draw the other stamp coordinates.
+						for (let ty = 0; ty < test.paint.stamp_type.length; ty++)
+						{
+							if (Memory.mineTest[room_name][test.paint.stamp_type[ty]])
+							{
+								if (ty < 2)
+								{
+									new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[2], radius: 0.30, opacity: 1});
+									new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[ty], radius: 0.25, opacity: 1});
+								}
+								else
+								{
+									let stamp_color = test.paint.stamp_color;
+									switch(test.paint.stamp_type[ty])
+									{
+										case 'store_pos':
+											new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.3, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.5, 0.6, 1.2, {fill: stamp_color[2], opacity: 1});
+											new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.25, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.35, 0.5, 0.9, {fill: stamp_color[4], opacity: 1});
+											break;
+										case 'term_pos':
+											new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.5, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.5, 1, 1, {fill: stamp_color[2], opacity: 1});
+											new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.4, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.4, 0.8, 0.8, {fill: stamp_color[4], opacity: 1});
+											break;
+										case 'spawn_pos':
+											new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: stamp_color[2], radius: 0.5, opacity: 1});
+											new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: stamp_color[4], radius: 0.4, opacity: 1});
+									}
+								}
+							}
+						}
+
+						//Draw the directions out from the spawn.
+						for (let sd = 0; sd < Memory.mineTest[room_name].spawn_dir.length; sd++)
+						{
+							if (Memory.mineTest[room_name].spawn_dir[sd])
+							{
+								Game.rooms[room_name].visual.poly([{x: Memory.mineTest[room_name].spawn_pos.x, y: Memory.mineTest[room_name].spawn_pos.y,
+									dx: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, dy: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy, direction: Memory.mineTest[room_name].spawn_dir[sd]},
+								{x: Memory.mineTest[room_name].spawn_pos.x + calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, y: Memory.mineTest[room_name].spawn_pos.y + calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy,
+									dx: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, dy: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy, direction: Memory.mineTest[room_name].spawn_dir[sd]}],
+									{stroke: 'white', lineStyle: "dashed"});
+							}
+						}
+					}
 				}
-
-				let calculate = require('calculate');
-
-				for (let room_name in Memory.mineTest)
+				else
 				{
-					if (!Memory.mineTest[room_name])
-					{
-						continue;
-					}
+					let calculate = require('calculate');
+					test.paint.stamp_type = ['miner', 'handler', 'spawns', 'store', 'terminal', 'factory', 'nuker'];
 
-					//Display the mine path.
-					test.paint.minepath(room_name);
-
-					//Draw the labs.
-					let labs = Memory.mineTest[room_name].labs;
-					for (let la = 0; la < 10; la++)
+					for (let room_name in Memory.rooms)
 					{
-						let color;
-						if (la < 2)
+						//Draw the labs.
+						let labs = Memory.rooms[room_name].mine.labs;
+						for (let la = 0; la < 10; la++)
 						{
-							color = 'darkred';
-						}
-						else
-						{
-							color = 'darkblue';
+							let color;
+							if (la < 2)
+							{
+								color = 'darkred';
+							}
+							else
+							{
+								color = 'darkblue';
+							}
+
+							new RoomVisual(room_name).circle(labs[la].x, labs[la].y, {fill: color, radius: 0.5});
 						}
 
-						new RoomVisual(room_name).circle(labs[la].x, labs[la].y, {fill: color, radius: 0.5});
-					}
-
-					test.paint.stamp_type = ['mine_pos', 'hand_pos', 'spawn_pos', 'store_pos', 'term_pos']
-					//Draw the other stamp coordinates.
-					for (let ty = 0; ty < test.paint.stamp_type.length; ty++)
-					{
-						if (Memory.mineTest[room_name][test.paint.stamp_type[ty]])
+						//Draw the other stamp coordinates.
+						for (let ty = 0; ty < test.paint.stamp_type.length; ty++)
 						{
 							if (ty < 2)
 							{
-								new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[2], radius: 0.30, opacity: 1});
-								new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[ty], radius: 0.25, opacity: 1});
+								new RoomVisual(room_name).circle(Memory.rooms[room_name].mine[test.paint.stamp_type[ty]].x, Memory.rooms[room_name].mine[test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[2], radius: 0.30, opacity: 1});
+								new RoomVisual(room_name).circle(Memory.rooms[room_name].mine[test.paint.stamp_type[ty]].x, Memory.rooms[room_name].mine[test.paint.stamp_type[ty]].y, {fill: test.paint.stamp_color[ty], radius: 0.25, opacity: 1});
 							}
-							else
+							else if ((ty === 2 && typeof Memory.rooms[room_name][test.paint.stamp_type[ty]][2] === 'object') || Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]])
 							{
 								let stamp_color = test.paint.stamp_color;
 								switch(test.paint.stamp_type[ty])
 								{
-									case 'store_pos':
-										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.3, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.5, 0.6, 1.2, {fill: stamp_color[2], opacity: 1});
-										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.25, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.35, 0.5, 0.9, {fill: stamp_color[4], opacity: 1});
+									case 'store':
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.3, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.5, 0.6, 1.2,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.25, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.35, 0.5, 0.9,
+											{fill: stamp_color[4], opacity: 1});
 										break;
-									case 'term_pos':
-										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.5, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.5, 1, 1, {fill: stamp_color[2], opacity: 1});
-										new RoomVisual(room_name).rect(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x - 0.4, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y - 0.4, 0.8, 0.8, {fill: stamp_color[4], opacity: 1});
+									case 'terminal':
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.5, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.5, 1, 1,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.4, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.4, 0.8, 0.8,
+											{fill: stamp_color[4], opacity: 1});
 										break;
-									case 'spawn_pos':
-										new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: stamp_color[2], radius: 0.5, opacity: 1});
-										new RoomVisual(room_name).circle(Memory.mineTest[room_name][test.paint.stamp_type[ty]].x, Memory.mineTest[room_name][test.paint.stamp_type[ty]].y, {fill: stamp_color[4], radius: 0.4, opacity: 1});
+									case 'factory':
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.4, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.7, 0.2, 1.4,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x + 0.2, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.7, 0.2, 1.4,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.7, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.4, 1.4, 0.2,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.7, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y + 0.2, 1.4, 0.2,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.5, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.5, 1, 1,
+											{fill: stamp_color[2], opacity: 1});
+										new RoomVisual(room_name).rect(Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.30, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.30, 0.6, 0.6,
+											{fill: stamp_color[4], opacity: 1});
+										break;
+									case 'nuker':
+										new RoomVisual(room_name).poly(
+											[
+												[Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.4, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y + 0.5],
+												[Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x + 0.4, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y + 0.5],
+												[Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y - 0.5],
+												[Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].x - 0.4, Memory.rooms[room_name].buildings[test.paint.stamp_type[ty]].y + 0.5]
+											], {fill: stamp_color[4], stroke: stamp_color[2], strokeWidth: 0.08, opacity: 1});
+										break;
+									case 'spawns':
+										new RoomVisual(room_name).circle(Memory.rooms[room_name][test.paint.stamp_type[ty]][2].x, Memory.rooms[room_name][test.paint.stamp_type[ty]][2].y,
+											{fill: stamp_color[2], radius: 0.5, opacity: 1});
+										new RoomVisual(room_name).circle(Memory.rooms[room_name][test.paint.stamp_type[ty]][2].x, Memory.rooms[room_name][test.paint.stamp_type[ty]][2].y,
+											{fill: stamp_color[4], radius: 0.4, opacity: 1});
 								}
 							}
 						}
-					}
 
-					//Draw the directions out from the spawn.
-					for (let sd = 0; sd < Memory.mineTest[room_name].spawn_dir.length; sd++)
-					{
-						if (Memory.mineTest[room_name].spawn_dir[sd])
+						//Draw the directions out from the spawn.
+						for (let sd = 0; sd < Memory.rooms[room_name].spawns[2].dir.mine.length; sd++)
 						{
-							Game.rooms[room_name].visual.poly([{x: Memory.mineTest[room_name].spawn_pos.x, y: Memory.mineTest[room_name].spawn_pos.y,
-								dx: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, dy: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy, direction: Memory.mineTest[room_name].spawn_dir[sd]},
-							{x: Memory.mineTest[room_name].spawn_pos.x + calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, y: Memory.mineTest[room_name].spawn_pos.y + calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy,
-								dx: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dx, dy: calculate.dxdy[Memory.mineTest[room_name].spawn_dir[sd]].dy, direction: Memory.mineTest[room_name].spawn_dir[sd]}],
-								{stroke: 'white', lineStyle: "dashed"});
+							if (Memory.rooms[room_name].spawns[2].dir.mine[sd])
+							{
+								Game.rooms[room_name].visual.poly([{x: Memory.rooms[room_name].spawns[2].x, y: Memory.rooms[room_name].spawns[2].y,
+									dx: calculate.dxdy[Memory.rooms[room_name].spawns[2].dir.mine[sd]].dx, dy: calculate.dxdy[Memory.rooms[room_name].spawns[2].dir.mine[sd]].dy, direction: Memory.rooms[room_name].spawns[2].dir.mine[sd]},
+								{x: Memory.rooms[room_name].spawns[2].x + calculate.dxdy[Memory.rooms[room_name].spawns[2].dir.mine[sd]].dx, y: Memory.rooms[room_name].spawns[2].y + calculate.dxdy[Memory.rooms[room_name].spawns[2].dir.mine[sd]].dy,
+									dx: calculate.dxdy[Memory.rooms[room_name].spawns[2].dir.mine[sd]].dx, dy: calculate.dxdy[Memory.rooms[room_name].spawns[2].dir.mine[sd]].dy, direction: Memory.rooms[room_name].spawns[2].dir.mine[sd]}],
+									{stroke: 'white', lineStyle: 'dashed'});
+							}
 						}
 					}
 				}
 			}
 
-			if ((test.spawnmark.spawntest = spawntest) && Memory.spawnTest)
+			if (Memory.spawnTest && (test.spawnmark.spawntest = spawntest))
 			{
 				if (!global.spawnmark)
 				{
