@@ -18,10 +18,10 @@ var body =
 			body.push(WORK, WORK);
 			energy -= 200;
 		}
-		while (energy >= 50 && body.length < 50)
+		while (energy >= 100 && body.length < 50)
 		{
-			body.push(MOVE);
-			energy -= 50;
+			body.push(MOVE, CARRY);
+			energy -= 100;
 		}
 		
 		return body;
@@ -170,6 +170,10 @@ var body =
 					body.unshift(WORK, WORK);
 					energy -= 200;
 				}
+				if (energy >= 50)
+				{
+					body.push(MOVE);
+				}
 			}
 			else
 			{
@@ -200,14 +204,12 @@ var body =
 		}
 		if (!fatbuilder && !minimumbuilder && energy >= 150 && body.length < 49)
 		{
-			body.push(MOVE);
-			body.push(WORK);
+			body.push(MOVE, WORK);
 			energy -= 150;
 		}
 		else if (!fatbuilder && !minimumbuilder && energy >= 100 && body.length < 49)
 		{
-			body.push(MOVE);
-			body.push(CARRY);
+			body.push(MOVE, CARRY);
 			energy -= 100;
 		}
 		/*else if (energy >= 50)
@@ -473,5 +475,6 @@ body.hdattacker = function (energy, attack = 2)
 {
 	return body.hattacker(energy, attack);
 };
+body.ebuilder = body.builder;
 
 module.exports = body;
