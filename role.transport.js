@@ -51,7 +51,7 @@ var roleTransport =
 				//If we're by a full source container, we need to not leave thousands of energy on the ground.
 				for (let ee = 0; ee < room_energy.length; ee++)
 				{
-					if (creep.pos.inRangeTo(room_energy[ee].pos, 1) && room_energy[ee].amount > room_containers[e].store.getUsedCapacity(RESOURCE_ENERGY))
+					if (creep.pos.inRangeTo(room_energy[ee].pos, 1) && (!room_containers[e].store || room_energy[ee].amount > room_containers[e].store.getUsedCapacity(RESOURCE_ENERGY)))
 					{
 						creep.pickup(room_energy[ee]);
 						//console.log("We picked up energy off the ground.");
@@ -149,7 +149,7 @@ var roleTransport =
 			{
 				//We deposited into the dbuilder.
 			}
-			else if (creep.memory.dtrip && creep.pos.isNearTo(Memory.rooms[creep.room.name].defense.links[creep.memory.need].x, Memory.rooms[creep.room.name].defense.links[creep.memory.need].y))	//If we're going to the dbuilder, try depositing into a link.
+			else if (creep.memory.dtrip && Memory.rooms[creep.room.name].defense.links && creep.pos.isNearTo(Memory.rooms[creep.room.name].defense.links[creep.memory.need].x, Memory.rooms[creep.room.name].defense.links[creep.memory.need].y))	//If we're going to the dbuilder, try depositing into a link.
 			{
 				creep.transfer(Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id), RESOURCE_ENERGY);
 			}
