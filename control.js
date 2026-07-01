@@ -1,5 +1,9 @@
 var control =
 {
+	attacker: require('role.attacker'),
+
+	scout: require('role.scout'),
+
 	harvester: require('role.harvester'),
 	hybrid: require('role.hybrid'),
 	extractor: require('role.extractor'),
@@ -11,6 +15,7 @@ var control =
 	utransport: require('role.utransport'),
 
 	builder: require('role.builder'),
+	ebuilder: require('role.ebuilder'),
 	dbuilder: require('role.dbuilder'),
 
 	custodian: require('role.custodian'),
@@ -106,9 +111,9 @@ var control =
 		{
 			return true;
 		}
-		else if(creep.memory.movenow.length != 0)	//If the creep has immediate move orders, follow them.
+		else if(creep.memory.movenow.length !== 0)	//If the creep has immediate move orders, follow them.
 		{
-			if (creep.pos.x == creep.memory.movenow[0].x && creep.pos.y == creep.memory.movenow[0].y)
+			if (creep.pos.x === creep.memory.movenow[0].x && creep.pos.y === creep.memory.movenow[0].y)
 			{
 				creep.memory.direction = creep.memory.movenow.shift().direction;
 			}
@@ -466,6 +471,11 @@ var control =
 						//If we're switching to a completely new path, we need to override our previous direction change.
 						tempdir = flipper[control.paths[creep.memory.path]];
 						break;
+					/*case 'extractor':	//This is not needed because the flipper tile already has an efat direction on it.
+						//The handler just needs to know which way to tow the extractor. It won't be switching paths.
+						//If we're switching to a completely new path, we need to override our previous direction change.
+						tempdir = flipper[control.paths[16]];
+						break;*/
 					case 'harvester':
 					case 'hybrid':
 						//If we're switching to a completely new path, we need to override our previous direction change.
@@ -499,7 +509,7 @@ var control =
 		return status;
 	},
 
-	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn', 'epath', 'ereturn']
+	paths: ['mine', 'mreturn', 'upgrade', 'ureturn', 'defpaths', 'dreturn', 'patrol', 'preturn', 'exitpath', 'exitreturn', 'mfat', 'upgrader', 'labs', 'lreturn', 'epath', 'ereturn', 'efat']
 };
 
 control.paths[-1] = -1;	//This -1 propety allows us to make calculate.findtile() fail gracefully without outputting an error when the failure was intended.
