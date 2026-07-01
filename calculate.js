@@ -171,7 +171,7 @@ var calculate =
 			tstep1.dx = tstep1.x - tstep2.x;
 			tstep1.dy = tstep1.y - tstep2.y;
 
-			tstep1.direction = calculate.dxdy_to_direction(tstep1.dx, tstep1.dy);
+			tstep1.direction = calculate.orientation[tstep1.dx][tstep1.dy];
 		}
 
 		//A moveByPath() path normally excludes its own start point.
@@ -187,7 +187,7 @@ var calculate =
 
 			path2[path2.length - 1].x = path2[path2.length - 2].x + path2[path2.length - 1].dx;
 			path2[path2.length - 1].y = path2[path2.length - 2].y + path2[path2.length - 1].dy;
-			path2[path2.length - 1].direction = calculate.dxdy_to_direction(path2[path2.length - 1].dx, path2[path2.length - 1].dy);
+			path2[path2.length - 1].direction = calculate.orientation[path2[path2.length - 1].dx][path2[path2.length - 1].dy];
 		}
 
 		return path2;
@@ -266,45 +266,6 @@ var calculate =
 		//We're returning the array of chosen positions.
 		//Whether there's one shortest or multiple of equal shortness, the receiving code must decide what to do with it then.
 		return closestchosen;
-	},
-
-	dxdy_to_direction: function(dx, dy)
-	{
-		switch(dx)
-		{
-			case -1:	//We went left,
-				switch(dy)
-				{
-					case -1:	//and up.
-						return 8;
-					case 0:		//and middle.
-						return 7;
-					case 1:		//and down.
-						return 6;
-				}
-				break;
-
-			case 0:		//We went middle.
-				switch(dy)
-				{
-					case -1:	//and up.
-						return 1;
-					case 1:		//and down.
-						return 5;
-				}
-				break;
-
-			case 1:		//We went right.
-				switch(dy)
-				{
-					case -1:	//and up.
-						return 2;
-					case 0:		//and middle.
-						return 3;
-					case 1:		//and down.
-						return 4;
-				}
-		}
 	},
 
 	cleanpaths: function(room_name, type)	//We are renaming some of these paths slightly different, so pay attention.
@@ -1213,9 +1174,9 @@ var calculate =
 		}
 
 		let energy = Game.rooms[room_name].energyAvailable;
-		let spawn = Game.getObjectById(Memory.rooms[room_name].spawns[2].id);
+		let spawn = Memory.rooms[room_name].spawns[2];
 
-		if (spawn)
+		if (spawn && (spawn = Game.getObjectById(Memory.rooms[room_name].spawns[2].id)))
 		{
 			energy -= spawn.store.getUsedCapacity(RESOURCE_ENERGY);
 		}
@@ -1838,11 +1799,14 @@ var calculate =
 		}
 
 		//Now the defense links.
-		for (let d = 0, dlinks_in_memory = room_in_memory.defense.links; d < dlinks_in_memory.length; d++)
+		if (room_in_memory.defense.links)
 		{
-			if (dlinks_in_memory[d])
+			for (let d = 0, dlinks_in_memory = room_in_memory.defense.links; d < dlinks_in_memory.length; d++)
 			{
-				calculate.mark_found(dlinks_in_memory[d].x, dlinks_in_memory[d].y, structure_tiles);
+				if (dlinks_in_memory[d])
+				{
+					calculate.mark_found(dlinks_in_memory[d].x, dlinks_in_memory[d].y, structure_tiles);
+				}
 			}
 		}
 
