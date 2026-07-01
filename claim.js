@@ -1006,31 +1006,19 @@ var claim =
 										creep = Game.creeps[Memory.claims[a].creeps[role][c]];
 										switch (role)
 										{
+											//Prepare the creep to be transferred.
 											case "harvester":
+												creep.memory.direction = false;
+												creep.memory.path = 10;
+												creep.memory.target = {x: Memory.rooms[creep.room.name].sources[c].mfat.slice(-1)[0].x, y: Memory.rooms[creep.room.name].sources[c].mfat.slice(-1)[0].y};
+												Memory.rooms[creep.room.name].sources[c].creeps[role].push(Memory.claims[a].creeps[role][c]);
+												break;
 											case "builder":
 											{
 												//Prepare the creep to be transferred.
-												if (role === 'harvester')
-												{
-													creep.memory.direction = false;
-													creep.memory.path = 10;
-													creep.memory.target = {x: Memory.rooms[creep.room.name].sources[c].mfat.slice(-1)[0].x, y: Memory.rooms[creep.room.name].sources[c].mfat.slice(-1)[0].y};
-												}
-												else
-												{
-													creep.memory.direction = false;
-													creep.memory.path = 0;
-													creep.memory.target = {};
-													creep.memory.target.x = Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].x;
-													creep.memory.target.y = Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].y;
-													creep.memory.dtarget = {};
-													creep.memory.utrip = false;
-													creep.memory.dtrip = false;
-													creep.memory.destination = false;
-													creep.memory.need = 0;
-												}
-
-												Memory.rooms[creep.room.name].sources[c].creeps[role].push(Memory.claims[a].creeps[role][c]);
+												//Make it an ebuilder.
+												creep.memory.target = {x: Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].x, y: Memory.rooms[creep.room.name].sources[c].mine.slice(-1)[0].y};
+												Memory.rooms[creep.room.name].sources[c].creeps.ebuilder.push(Memory.claims[a].creeps[role][c]);
 												break;
 											}
 											case "claimer":
