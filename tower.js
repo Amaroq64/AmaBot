@@ -25,11 +25,7 @@ var tower =
 			if (enemies.length > 0)
 			{
 				//console.log("Enemy Detected.");
-				for (let t = 0; t < towers.length; t++)
-				{
-					towers[t].attack(enemies[0]);
-				}
-
+				
 				for (let r = 0; r < ramparts.length; r++)
 				{
 					//console.log("Iterating Rampart.");
@@ -40,7 +36,33 @@ var tower =
 					}
 				}
 
-				fired = true;
+				if (towers.length)
+				{
+					for (let t = 0; t < towers.length; t++)
+					{
+						towers[t].attack(enemies[0]);
+					}
+
+					fired = true;
+
+					let main_spawn = Game.getObjectById(Memory.rooms[room_name].spawns[0].id);
+					if (main_spawn.hits < main_spawn.hitsMax && !Game.rooms[room_name].controller.safeMode)
+					{
+						Game.rooms[room_name].controller.activateSafeMode();
+					}
+				}
+				else if (!Game.rooms[room_name].controller.safeMode)
+				{
+					//If an enemy enters a room with no towers, we'll safe mode it. But only if it's a threat.
+					for (let e = 0; e < enemies.length; e++)
+					{
+						if (enemies[e].getActiveBodyparts(ATTACK) || enemies[e].getActiveBodyparts(RANGED_ATTACK) || enemies[e].getActiveBodyparts(WORK))
+						{
+							Game.rooms[room_name].controller.activateSafeMode();
+							break;
+						}
+					}
+				}
 			}
 			/*else if(allies.length > 0)
 			{
@@ -78,13 +100,13 @@ var tower =
 			{
 				filter: function(wall)
 				{
-					if (wall.hits < wall.hitsMax && wall.structureType == STRUCTURE_WALL)
+					if (wall.hits < wall.hitsMax && wall.structureType === STRUCTURE_WALL)
 					{
 						//If this is a farwall, we don't count it for highest hp.
 						let foundfar = false;
 						for (let fw = 0; fw < Memory.rooms[room_name].defense.farwalls.length; fw++)
 						{
-							if (wall.pos.x == Memory.rooms[room_name].defense.farwalls[fw].x && wall.pos.y == Memory.rooms[room_name].defense.farwalls[fw].y)
+							if (wall.pos.x === Memory.rooms[room_name].defense.farwalls[fw].x && wall.pos.y === Memory.rooms[room_name].defense.farwalls[fw].y)
 							{
 								foundfar = true;
 							}
@@ -106,6 +128,7 @@ var tower =
 			}
 			else
 			{
+				mosthp = 0;
 				for (let w = 0; w < walls.length; w++)
 				{
 					if (walls[w].hits > mosthp)
@@ -121,11 +144,19 @@ var tower =
 			let choice;
 			for (let f = 0; f < Memory.rooms[room_name].defense.farwalls.length; f++)
 			{
-				//Should be only a wall here. But we'll have to make sure.
+				//Should be only a wall here, but we have to make sure.
 				let tobj = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, Memory.rooms[room_name].defense.farwalls[f].x, Memory.rooms[room_name].defense.farwalls[f].y);
-				if (tobj.length != 0)
+				for (let to = tobj.length - 1; to >= 0; to--)
 				{
-					//console.log(JSON.stringify(tobj));
+					if (tobj[to].structureType !== STRUCTURE_WALL && tobj[to].structureType !== STRUCTURE_RAMPART)
+					{
+						tobj.splice(to, 1);
+					}
+				}
+
+				//Now take what we have left.
+				if (tobj.length !== 0)
+				{
 					farwalls.push(tobj[0]);
 				}
 			}
@@ -138,7 +169,7 @@ var tower =
 					choice = farwalls[w];
 				}
 			}
-			
+
 			//By now we should have our target.
 			if (choice)
 			{
@@ -180,7 +211,7 @@ var tower =
 
 	allowallies: empire.allowallies,
 
-	attack: function(tower, target)
+	/*attack: function(tower, target)
 	{
 		
 	},
@@ -193,9 +224,9 @@ var tower =
 	heal: function(tower, target)
 	{
 		
-	}
+	}*/
 };
 
-tower.monitor
+//tower.monitor
 
 module.exports = tower;
