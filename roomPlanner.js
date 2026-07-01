@@ -43,7 +43,7 @@ var roomPlanner =
 
 		for (let i = 0; i < Memory.rooms[room_name].sources.length; i++)
 		{
-			sourceideal.push({miner: undefined, hybrid: undefined, upgrader: undefined});
+			sourceideal.push({miner: undefined, hybrid: undefined, ebuilder: undefined, upgrader: undefined});
 
 			if (Memory.rooms[room_name].sources[i].creeps.hybrid)
 			{
@@ -129,6 +129,10 @@ var roomPlanner =
 			{
 				sourceideal[i].harvester = 1;
 				sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
+				if (Game.rooms[room_name].controller.level <= 8)
+				{
+					sourceideal[i].ebuilder = 1;						//This builds our extensions faster.
+				}
 				sourceideal[i].utransport = transports[i].upgrader;	//This is an alias.
 				delete Memory.rooms[room_name].sources[i].creeps.hybrid;
 			}
@@ -136,9 +140,13 @@ var roomPlanner =
 			{
 				sourceideal[i].hybrid = 1;
 				sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
+				if (Game.rooms[room_name].controller.level <= 8)
+				{
+					sourceideal[i].ebuilder = 1;						//This builds our extensions faster.
+				}
 				delete Memory.rooms[room_name].sources[i].creeps.harvester;
 			}
-			sourceideal[i].builder = 1;	//We don't need an upgrade builder because the source builders patrol to it.
+			sourceideal[i].builder = 1;	//Preserve the order that the builder is built. We'll set this to 0 later.
 			sourceideal[i].miningcontainer = 1; //The fatty needs a container to sit on.
 			sourceideal[i].extensions = 0;	//Initialize this so we can count it later.
 			Memory.rooms[room_name].sources[i].ideal.extensions = 0;
@@ -169,6 +177,10 @@ var roomPlanner =
 					delete Memory.rooms[room_name].sources[i].ideal[role];
 				}
 			}
+			if (Game.rooms[room_name].controller.level <= 8)
+			{
+				Memory.rooms[room_name].sources[i].ideal.builder = 0;	//At every level, we rush the building of the extensions. When it's done, the ebuilders will hand control back to the builders.
+			}
 		}
 
 		//What is our next goal? When we meet one goal, we may set a different goal.
@@ -185,11 +197,11 @@ var roomPlanner =
 		if (Game.rooms[room_name].controller.level > 1)
 		{
 			//Determine the number of extensions.
-			let flipper = 0	//Cycling instead of toggling lets us be agnostic of how many sources are in the room.
+			let flipper = 0;	//Cycling instead of toggling lets us be agnostic of how many sources are in the room.
 			for (let i = 0; i < CONTROLLER_STRUCTURES.extension[Game.rooms[room_name].controller.level]; i++)
 			{
-				Memory.rooms[room_name].sources[flipper].ideal.extensions++
-				flipper++
+				Memory.rooms[room_name].sources[flipper].ideal.extensions++;
+				flipper++;
 				if (flipper == Memory.rooms[room_name].sources.length)
 				{
 					flipper = 0;
@@ -216,11 +228,13 @@ var roomPlanner =
 				roomPlanner.run(room_name);
 			}
 
+			let tpos;
+
 			//Are we missing our upgrade container?
 			let tcontainer;
 			if (Memory.rooms[room_name].ideal.upgradecontainer && !Game.getObjectById(Memory.rooms[room_name].buildings.upgradecontainer.id))
 			{
-				let tpos = Memory.rooms[room_name].upgrade.slice(-1)[0];
+				tpos = Memory.rooms[room_name].upgrade.slice(-1)[0];
 				tpos = Game.rooms[room_name].getPositionAt(tpos.x, tpos.y);
 				tcontainer = Game.rooms[room_name].lookForAt(LOOK_CONSTRUCTION_SITES, tpos);
 				if (tcontainer.length === 0)
@@ -286,21 +300,17 @@ var roomPlanner =
 			//Do some basic checks every once in a while.
 			if (Game.time % 100 === 0)
 			{
-				//Since we're at war, has any of the enemy creeps come in?
-				//Due to our current arrangement, we're mostly interested in safeguarding the rooms behind our bulwark room.
-				/*if (room_name === 'E49S14')
+				//Don't get notified when our scouts die.
+				if (Memory.rooms[room_name].creeps.scout && Memory.rooms[room_name].creeps.scout.length)
 				{
-					let checkallies = require('empire').checkallies;
-					let enemies = Game.rooms[room_name].find(FIND_HOSTILE_CREEPS, {filter: checkallies});
-
-					for (let e = 0; e < enemies.length; e++)
+					for (let s = 0, scout = Memory.rooms[room_name].creeps.scout; s < scout.length; s++)
 					{
-						if (enemies[e].owner.username !== 'Invader')
+						if (Game.creeps[scout[s]])
 						{
-							Game.rooms[room_name].controller.activateSafeMode();
+							Game.creeps[scout[s]].notifyWhenAttacked(false);
 						}
 					}
-				}*/
+				}
 
 				if (Game.rooms[room_name].controller.level > 1)
 				{
@@ -422,7 +432,7 @@ var roomPlanner =
 				}
 
 				//Are we missing any of our labs?
-				for (la = 0; la < Memory.rooms[room_name].goals.labs; la++)
+				for (let la = 0; la < Memory.rooms[room_name].goals.labs; la++)
 				{
 					if (!Game.getObjectById(Memory.rooms[room_name].mine.labs[la].id))
 					{
@@ -441,7 +451,7 @@ var roomPlanner =
 				}
 
 				//Are we missing any of our spawns?
-				for (sa = 0; sa < CONTROLLER_STRUCTURES.spawn[Game.rooms[room_name].controller.level]; sa++)
+				for (let sa = 0; sa < CONTROLLER_STRUCTURES.spawn[Game.rooms[room_name].controller.level]; sa++)
 				{
 					if (!Game.getObjectById(Memory.rooms[room_name].spawns[sa].id))
 					{
@@ -473,7 +483,7 @@ var roomPlanner =
 				}
 
 				//Are we missing the mineral mining container?
-				if (!Game.getObjectById(Memory.rooms[room_name].mineral.cid))
+				if (Game.rooms[room_name].controller.level >= 7 && !Game.getObjectById(Memory.rooms[room_name].mineral.cid))
 				{
 					let econtainer = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: function(contain)
 						{return contain.structureType === STRUCTURE_CONTAINER && contain.pos.x === Memory.rooms[room_name].mine.miner.x && contain.pos.y === Memory.rooms[room_name].mine.miner.y}});
@@ -494,22 +504,22 @@ var roomPlanner =
 				}
 
 				//Are we missing the lab boosting container?
-				if (!Game.getObjectById(Memory.rooms[room_name].mineral.cid))
+				if (Game.rooms[room_name].controller.level >= 7 && !Game.getObjectById(Memory.rooms[room_name].buildings.boostcontainer.id))
 				{
 					let labcon = Game.rooms[room_name].find(FIND_STRUCTURES, {filter: function(contain)
-						{return contain.structureType === STRUCTURE_CONTAINER && contain.pos.x === Memory.rooms[room_name].mine.miner.x && contain.pos.y === Memory.rooms[room_name].mine.miner.y}});
+						{return contain.structureType === STRUCTURE_CONTAINER && contain.pos.x === Memory.rooms[room_name].buildings.boostcontainer.x && contain.pos.y === Memory.rooms[room_name].buildings.boostcontainer.y}});
 					if (labcon.length)
 					{
-						Memory.rooms[room_name].mineral.cid = labcon[0].id;
+						Memory.rooms[room_name].buildings.boostcontainer.id = labcon[0].id;
 					}
 					else
 					{
-						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].mine.miner.x, Memory.rooms[room_name].mine.miner.y, STRUCTURE_CONTAINER);
+						Game.rooms[room_name].createConstructionSite(Memory.rooms[room_name].buildings.boostcontainer.x, Memory.rooms[room_name].buildings.boostcontainer.y, STRUCTURE_CONTAINER);
 					}
 				}
 
 				//Are we missing the power spawn.
-				if (!Game.getObjectById(Memory.rooms[room_name].buildings.pspawn.id))
+				if (Memory.rooms[room_name].buildings.pspawn && !Game.getObjectById(Memory.rooms[room_name].buildings.pspawn.id))
 				{
 					let pspawn = Game.rooms[room_name].find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_POWER_SPAWN}});
 
@@ -524,7 +534,7 @@ var roomPlanner =
 				}
 			}
 
-			if ((Game.time % 100 === 0 || Memory.rooms[room_name].defense.update) && Game.rooms[room_name].controller.level > 1)	//Let's only check every once in a while. No rush here.
+			if (Game.rooms[room_name].controller.level > 1 && (Game.time % 100 === 0 || Memory.rooms[room_name].defense.update))	//Let's only check every once in a while. No rush here.
 			{
 				//Are we missing any of our walls, or do we need to finalize any finished ones?
 				if (!require('defender').checkDefense(room_name))
@@ -657,7 +667,7 @@ var roomPlanner =
 		Memory.rooms[room_name].defense = defense;
 		return true;	//We made it this far without any errors.
 	},
-	
+
 	setupMining: function(room_name = false)
 	{
 		if (!room_name)
@@ -831,7 +841,7 @@ var roomPlanner =
 					else if (line[2 + (2 * t)] && line[2 + (1 * t)])	//Check our border lines.
 					{
 						//A horizontal 3x5 orients -1 or 1 along the x axis.
-						console.log('h3 Found a 3x5. ' + tempx + ' ' + (tempy + t) + '. Direction: [' + direction + '][0]. Orientation: ' + calculate.orientation[direction][0] + '. ' + (2 + (1 * t)) + ' ' + (2 + (2 * t)));
+						//console.log('h3 Found a 3x5. ' + tempx + ' ' + (tempy + t) + '. Direction: [' + direction + '][0]. Orientation: ' + calculate.orientation[direction][0] + '. ' + (2 + (1 * t)) + ' ' + (2 + (2 * t)));
 						tested_true.push({type: 3, n: null, o: calculate.orientation[direction][0], x: tempx, y: tempy + t})	//Our border lines have matched.
 					}
 				}
@@ -875,7 +885,7 @@ var roomPlanner =
 					else if (line[2 + (2 * t)] && line[2 + (1 * t)])	//Check our border lines.
 					{
 						//A vertical 3x5 orients -1 or 1 along the y axis.
-						console.log('v3 Found a 3x5. ' + (tempx + t) + ' ' + tempy + '. Direction: [0][' + direction + ']. Orientation: ' + calculate.orientation[0][direction] + '. ' + (2 + (1 * t)) + ' ' + (2 + (2 * t)));
+						//console.log('v3 Found a 3x5. ' + (tempx + t) + ' ' + tempy + '. Direction: [0][' + direction + ']. Orientation: ' + calculate.orientation[0][direction] + '. ' + (2 + (1 * t)) + ' ' + (2 + (2 * t)));
 						tested_true.push({type: 3, n: null, o: calculate.orientation[0][direction], x: tempx + t, y: tempy});	//Our border lines have matched.
 					}
 				}
@@ -930,7 +940,7 @@ var roomPlanner =
 			if (good_stamp)	//If it passed the test, record it.
 			{
 				//For our 4x4, its orientation will always be diagonal. Testing adjacents will just test from different starting x/y's.
-				console.log('Found a 4x4.');
+				//console.log('Found a 4x4.');
 				tested_true.push({type: 4, n: null, o: calculate.orientation[increment.x][increment.y], x: tempx, y: tempy});
 				return true;
 			}
@@ -1329,19 +1339,19 @@ var roomPlanner =
 				//Is it closer to the mineral? Is the path shorter in general? Or maybe both?
 				if (tested_true[td].chosen_apath.length < closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length) < shortest_count)
 				{
-					console.log('Both. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
+					//console.log('Both. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
 					both_chosen = [tested_true[td]];
 					closest_count = tested_true[td].chosen_apath.length;
 					shortest_count = tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length;
 				}
 				else if (tested_true[td].chosen_apath.length === closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length) === shortest_count)
 				{
-					console.log('Both. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
+					//console.log('Both. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
 					both_chosen.push(tested_true[td]);
 				}
 				else if (tested_true[td].chosen_apath.length < closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length <= shortest_count && tested_true[td].type === 3))
 				{
-					console.log('Closest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
+					//console.log('Closest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
 					closest_chosen = [tested_true[td]];
 					closest_count = tested_true[td].chosen_apath.length;
 
@@ -1353,12 +1363,12 @@ var roomPlanner =
 				}
 				else if (tested_true[td].chosen_apath.length === closest_count && (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length <= shortest_count && tested_true[td].type === 3))
 				{
-					console.log('Closest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
+					//console.log('Closest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
 					closest_chosen.push(tested_true[td]);
 				}
 				else if (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length < shortest_count)
 				{
-					console.log('Shortest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
+					//console.log('Shortest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
 					shortest_chosen = [tested_true[td]];
 					shortest_count = tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length;
 
@@ -1367,7 +1377,7 @@ var roomPlanner =
 				}
 				else if (tested_true[td].chosen_bpath.length + tested_true[td].chosen_apath.length === shortest_count)
 				{
-					console.log('Shortest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
+					//console.log('Shortest. ' + tested_true[td].x + ' ' + tested_true[td].y + ' ' + tested_true[td].o + ' ' + tested_true[td].type);
 					shortest_chosen.push(tested_true[td]);
 				}
 			}
@@ -1392,7 +1402,7 @@ var roomPlanner =
 					else if ((both_chosen[td].chosen_bpath.length + both_chosen[td].chosen_apath.length) === shortest_count)
 					{
 						//Rather than deciding these arbitrarily, let's choose the one slightly closer to a source.
-						console.log('Getting closer to a source rather than deciding arbitrarily. ' + both_chosen.length);
+						//console.log('Getting closer to a source rather than deciding arbitrarily. ' + both_chosen.length);
 						let temp_source = [];
 						for (i = 0; i < Memory.rooms[room_name].sources.length; i++)
 						{
@@ -1439,7 +1449,7 @@ var roomPlanner =
 					else if ((closest_chosen[td].chosen_bpath.length + closest_chosen[td].chosen_apath.length) === shortest_count)
 					{
 						//Rather than deciding these arbitrarily, let's choose the one slightly closer to a source.
-						console.log('Getting closer to a source rather than deciding arbitrarily. ' + closest_chosen.length);
+						//console.log('Getting closer to a source rather than deciding arbitrarily. ' + closest_chosen.length);
 						let temp_source = [];
 						for (i = 0; i < Memory.rooms[room_name].sources.length; i++)
 						{
@@ -1951,10 +1961,160 @@ var roomPlanner =
 								store_pos = {x: store_pos.x, y: store_pos.y};
 							}
 						}
+						else
+						{
+							console.log('No double positions. Separating into single positions.');
+
+							//If there are no double positions, then we must go with what's left. The spawn must touch the miner's position, and the store must touch the handler's position.
+							if (!single_positions_mine.length)
+							{
+								//If our search around the handler didn't find anything touching the miner, search around the miner instead.
+								for (let x = -1; x < 2; x++)
+								{
+									let tempx = mine_pos.x + x;
+
+									for (let y = -1; y < 2; y++)
+									{
+										let tempy = mine_pos.y + y;
+										let temp_pos_live = new RoomPosition(tempx, tempy, room_name);
+
+										near_mine = temp_pos_live.isNearTo(mine_pos);
+										//near_hand = temp_pos_live.isNearTo(mine_pos)
+
+										if (near_mine && !(tempx === mine_pos.x && tempy === mine_pos.y) && !(tempx === hand_pos.x && tempy === hand_pos.y)	//Don't reuse a chosen position.
+											&& terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use the path or labs. Don't touch an exit tile.
+										{
+											single_positions_mine.push({x: tempx, y: tempy});
+										}
+									}
+								}
+
+								if (!single_positions_mine.length)
+								{
+									console.log('No position touching apos for the spawn.');
+
+									//We'll have to put the spawn before bpos.
+									for (dp = bpos_i; dp >= 0; dp--)
+									{
+										for (let x = -1; x < 2; x++)
+										{
+											let tempx = final_choice.final_path[dp].x + x;
+
+											for (let y = -1; y < 2; y++)
+											{
+												let tempy = final_choice.final_path[dp].y + y;
+
+												if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use the path or labs. Don't touch an exit tile.
+												{
+													single_positions_mine.push({x: tempx, y: tempy});
+												}
+											}
+										}
+
+										if (single_positions_mine.length >= 1)
+										{
+											break;
+										}
+									}
+								}
+							}
+
+							if (!single_positions_hand.length)
+							{
+								console.log('No position touching apos for the store.');
+
+								//We'll have to put both the store and the terminal before bpos.
+								for (dp = bpos_i; dp >= 0; dp--)
+								{
+									for (let x = -1; x < 2; x++)
+									{
+										let tempx = final_choice.final_path[dp].x + x;
+
+										for (let y = -1; y < 2; y++)
+										{
+											let tempy = final_choice.final_path[dp].y + y;
+
+											if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use the path or labs. Don't touch an exit tile.
+											{
+												single_positions_hand.push({x: tempx, y: tempy});
+											}
+										}
+									}
+
+									if (single_positions_hand.length >= 1)
+									{
+										break;
+									}
+								}
+							}
+
+							//Rather than deciding these arbitrarily, let's put them slightly closer to the main spawn.
+							spawn_pos = calculate.true_closest(spawn.pos, single_positions_mine,
+								{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+									costCallback: function(roomName, costMatrix)
+									{
+										return tempcostmatrix;
+									}
+								})[0];
+							spawn_pos = {x: spawn_pos.x, y: spawn_pos.y};
+							store_pos = calculate.true_closest(spawn.pos, single_positions_hand,
+								{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+									costCallback: function(roomName, costMatrix)
+									{
+										return tempcostmatrix;
+									}
+								})[0];
+							store_pos = {x: store_pos.x, y: store_pos.y};
+
+							//Now place the terminal.
+							for (dp = bpos_i, searching = true; searching && dp >= 0; dp--)
+							{
+								for (let x = -1; searching && x < 2; x++)
+								{
+									let tempx = final_choice.final_path[dp].x + x;
+
+									for (let y = -1; searching && y < 2; y++)
+									{
+										let tempy = final_choice.final_path[dp].y + y;
+
+										if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL && tempcostmatrix.get(tempx, tempy) === 0 && !calculate.check_xy(tempx, tempy, exitxy))	//Don't use the path or labs. Don't touch an exit tile.
+										{
+											double_positions.push({x: tempx, y: tempy});
+											if (double_positions.length >= 2)
+											{
+												searching = false;
+											}
+										}
+									}
+								}
+							}
+
+							//Rather than deciding these arbitrarily, let's put the terminal slightly closer to the main spawn.
+							term_pos = calculate.true_closest(spawn.pos, double_positions,
+								{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1,
+									costCallback: function(roomName, costMatrix)
+									{
+										return tempcostmatrix;
+									}
+								})[0];
+							term_pos = {x: term_pos.x, y: term_pos.y};
+						}
 
 						//Since we have mine_pos, hand_pos, and spawn_pos, let's point the spawn to them.
-						spawn_dir.push(calculate.orientation[hand_pos.x - spawn_pos.x][hand_pos.y - spawn_pos.y]);
-						spawn_dir.push(calculate.orientation[mine_pos.x - spawn_pos.x][mine_pos.y - spawn_pos.y]);
+						if (Math.abs(hand_pos.x - spawn_pos.x) <= 1 && Math.abs(hand_pos.y - spawn_pos.y) <= 1)	//If we couldn't put the spawn by the handler, then we'll point it to the miner.
+						{
+							spawn_dir.push(calculate.orientation[hand_pos.x - spawn_pos.x][hand_pos.y - spawn_pos.y]);
+						}
+
+						if (Math.abs(mine_pos.x - spawn_pos.x) > 1 || Math.abs(mine_pos.y - spawn_pos.y) > 1)
+						{
+							//If we couldn't put the spawn by the miner, it'll need to point onto its path.
+							console.log('TODO: If we couldn\'t put the spawn by the miner, it\'ll need to point onto its path.')
+						}
+						else
+						{
+							spawn_dir.push(calculate.orientation[mine_pos.x - spawn_pos.x][mine_pos.y - spawn_pos.y]);
+						}
 					}
 					else
 					{
