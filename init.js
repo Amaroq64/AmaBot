@@ -58,7 +58,7 @@ var init =
 				//Since this room is new, find its energy sources.
 				let sources = Game.rooms[room_name].find(FIND_SOURCES);
 				let mineral = Game.rooms[room_name].find(FIND_MINERALS)[0];
-				let len = sources.length
+				let len = sources.length;
 
 				//Record the found sources.
 				//Strip everything but id and position.
@@ -66,7 +66,7 @@ var init =
 				for (let i = 0; i < len; i++)
 				{
 					//Current entities start at zero. Ideal entity amounts will be populated by roomPlanner.
-					Memory.rooms[room_name].sources[i] = {id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], hybrid: [], mtransport: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
+					Memory.rooms[room_name].sources[i] = {id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], hybrid: [], mtransport: [], ebuilder: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
 				}
 
 				//Move sources to end of array until the closest one is [0].
@@ -269,7 +269,7 @@ var init =
 								costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
 
 								//Hook in our blocked spawn positions.
-								for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+								for (let sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
 								{
 									costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
 								}
@@ -382,7 +382,7 @@ var init =
 									costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255); //Make sure to go around the upgrading fatty.
 
 									//Hook in our blocked spawn positions.
-									for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+									for (let sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
 									{
 										costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
 									}
@@ -406,7 +406,7 @@ var init =
 					temp[i].mine[0].dx = temp[i].mreturn[temp[i].mreturn.length - 2].x - tempPos2.x;
 					temp[i].mine[0].dy = temp[i].mreturn[temp[i].mreturn.length - 2].y - tempPos2.y;
 
-					for (let last_try = false, try_again = true, upath_xy, tempx, tempy; try_again; )	//If we crossed our second spawn position, we need to recreate this path.
+					for (let test = 0, last_try = false, try_again = true, upath_xy, tempx, tempy; try_again && test < 20; test++)	//If we crossed our second spawn position, we need to recreate this path.
 					{
 						upath_xy = {};
 
@@ -502,9 +502,16 @@ var init =
 											costMatrix.set(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, 255);
 										}
 
+										//Avoid going over the fatty positions.
+										costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255);
+										for (i2 = 0; i2 <= i; i2++)
+										{
+											costMatrix.set(temp[i2].mfat[0].x, temp[i2].mfat[0].y, 255);
+										}
+
 										return costMatrix;
 									}
-								})
+								});
 							temp[i].upgrade.unshift({x: temp[i].mine[temp[i].mine.length - 1].x, y: temp[i].mine[temp[i].mine.length - 1].y,
 								dx: temp[i].mine[temp[i].mine.length - 1].x - temp[i].upgrade[0].x, dy: temp[i].mine[temp[i].mine.length - 1].y - temp[i].upgrade[0].y,
 								direction: Game.rooms[room_name].getPositionAt(temp[i].mine[temp[i].mine.length - 1].x, temp[i].mine[temp[i].mine.length - 1].y).getDirectionTo(temp[i].upgrade[0].x, temp[i].upgrade[0].y)});
@@ -543,6 +550,7 @@ var init =
 												direction: calculate.orientation[tempx - Game.spawns[spawn].pos.x][tempy - Game.spawns[spawn].pos.y]}];
 
 											init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_step, Memory.rooms[room_name].spawns[1]);
+											//console.log('emerge: ' + JSON.stringify(temp_step) + '. marked: ' + JSON.stringify(Memory.rooms[room_name].spawns.marked) + '. blocked: ' + JSON.stringify(Memory.rooms[room_name].spawns.blocked));
 
 											//While we're here, did the second spawn position get generated?
 											if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
@@ -661,7 +669,7 @@ var init =
 											}
 
 											//Hook in our blocked spawn positions.
-											for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+											for (let sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
 											{
 												costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
 											}
@@ -670,6 +678,13 @@ var init =
 											if (Memory.rooms[room_name].spawns[1].x || Memory.rooms[room_name].spawns[1].y)
 											{
 												costMatrix.set(Memory.rooms[room_name].spawns[1].x, Memory.rooms[room_name].spawns[1].y, 255);
+											}
+
+											//Avoid going over the fatty positions.
+											costMatrix.set(Memory.rooms[room_name].upgrade.slice(-1)[0].x, Memory.rooms[room_name].upgrade.slice(-1)[0].y, 255);
+											for (i2 = 0; i2 <= i; i2++)
+											{
+												costMatrix.set(temp[i2].mfat[0].x, temp[i2].mfat[0].y, 255);
 											}
 
 											return costMatrix;
@@ -796,7 +811,7 @@ var init =
 							}
 
 							//Hook in our blocked spawn positions.
-							for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+							for (let sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
 							{
 								costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
 							}
@@ -916,7 +931,7 @@ var init =
 								}
 
 								//Hook in our blocked spawn positions.
-								for (sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
+								for (let sb = 0; sb < Memory.rooms[room_name].spawns.blocked.length; sb++)
 								{
 									costMatrix.set(Memory.rooms[room_name].spawns.blocked[sb].x, Memory.rooms[room_name].spawns.blocked[sb].y, 255);
 								}
@@ -965,8 +980,8 @@ var init =
 				let temp_adjacent;
 				while (!Memory.rooms[room_name].spawns[1].x || !Memory.rooms[room_name].spawns[1].y)
 				{
-					//Rather than deciding these arbitrarily, let's put them slightly closer to source[0], since it's closer to the spawn.
-					temp_adjacent = calculate.true_closest(Game.spawns[spawn].pos, spawn_adjacent,
+					//Rather than deciding these arbitrarily, let's put them slightly closer to source[0], since that source is closer to the spawn.
+					temp_adjacent = calculate.true_closest(new RoomPosition(Memory.rooms[room_name].sources[0].pos.x, Memory.rooms[room_name].sources[0].pos.y, room_name), spawn_adjacent,
 						{plainCost: 2, swampCost: 3, ignoreRoads: true, ignoreDestructibleStructures: true, ignoreCreeps: true, maxRooms: 1})[0];
 
 					//Remove the one we're using.
@@ -975,11 +990,12 @@ var init =
 						if (temp_adjacent.x === spawn_adjacent[sa].x && temp_adjacent.y === spawn_adjacent[sa].y)
 						{
 							spawn_adjacent.splice(sa, 1);
+							break;
 						}
 					}
 
 					//Make it a path.
-					temp_adjacent = temp_adjacent.findPathTo(Memory.rooms[room_name].sources[0].pos.x, Memory.rooms[room_name].sources[0].pos.y);
+					temp_adjacent = Game.spawns[spawn].pos.findPathTo(temp_adjacent.x, temp_adjacent.y);
 
 					//Now mark it.
 					init.run.spawn.block(Memory.rooms[room_name].spawns.marked, Memory.rooms[room_name].spawns.blocked, Memory.rooms[room_name].spawns[0], temp_adjacent, Memory.rooms[room_name].spawns[1]);
@@ -1469,6 +1485,13 @@ var init =
 			Memory.rooms[room_name] = undefined;
 		}
 
+		return true;
+	},
+
+	cleanMemory: function()
+	{
+		RawMemory._parsed = {};
+		Memory = undefined;
 		return true;
 	},
 
