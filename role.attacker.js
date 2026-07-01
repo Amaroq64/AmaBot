@@ -1,36 +1,23 @@
 var roleAttacker =
 {
-	melee:
+	run: function(creep)
 	{
-		run: function(creep)
-		{
-			
-		}
-	},
+		let enemies = Game.rooms[creep.room.name].find(FIND_HOSTILE_CREEPS, {filter: roleAttacker.checkallies});
+		enemies = creep.pos.findClosestByPath(enemies);
 
-	ranged:
-	{
-		run: function(creep)
+		if (creep.attack(enemies) === ERR_NOT_IN_RANGE)
 		{
-			
+			creep.moveTo(enemies, {reusePath: creep.pos.getRangeTo(enemies[0])});
 		}
-	}
+		else
+		{
+			creep.move(enemies);
+		}
 
-	healer:
-	{
-		run: function(creep)
-		{
-			
-		}
-	}
-
-	dismantler:
-	{
-		run: function(creep)
-		{
-			
-		}
+		return false;	//This creep just chases enemies.
 	}
 };
+
+roleAttacker.checkallies = require('empire').checkallies;
 
 module.exports = roleAttacker;
