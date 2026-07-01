@@ -24,7 +24,7 @@ module.exports.loop = function()
 			for (let role in Memory.rooms[room_name].creeps)
 			{
 				//Clean up any dead creeps.
-				for (let c = 0; c < Memory.rooms[room_name].creeps[role].length; c++)
+				for (let c = Memory.rooms[room_name].creeps[role].length - 1; c >= 0 ; c--)
 				{
 					if (!Game.creeps[Memory.rooms[room_name].creeps[role][c]])
 					{
@@ -38,7 +38,7 @@ module.exports.loop = function()
 				for (let role in Memory.rooms[room_name].sources[i].creeps)
 				{
 					//Clean up any dead creeps.
-					for (let c = 0; c < Memory.rooms[room_name].sources[i].creeps[role].length; c++)
+					for (let c = Memory.rooms[room_name].sources[i].creeps[role].length - 1; c >= 0; c--)
 					{
 						if (!Game.creeps[Memory.rooms[room_name].sources[i].creeps[role][c]])
 						{
@@ -109,10 +109,11 @@ module.exports.loop = function()
 			}
 		}
 	}
-	/*else
+	else
 	{
 		//We're just starting on this shard.
-	}*/
+		require('init').run();
+	}
 
 	//Generate a pixel.
 	if (Game.cpu.bucket >= PIXEL_CPU_COST)
