@@ -32,7 +32,7 @@ var defender =
 		{
 			//Instead of the source itself, we need to get the end of the mining path, since that's the junction point for many other paths.
 			sourcepos.push(Game.rooms[room_name].getPositionAt(Memory.rooms[room_name].sources[i].mine.slice(-1)[0].x, Memory.rooms[room_name].sources[i].mine.slice(-1)[0].y));
-			console.log(JSON.stringify(sourcepos[i]));
+			//console.log(JSON.stringify(sourcepos[i]));
 		}
 
 		//Get position objects for each step in our patrol paths.
@@ -539,6 +539,12 @@ var defender =
 
 					return true;	//We made it this far without any errors.
 				}
+				else if (stage === 2 && !Memory.rooms[room_name].defense.checkagain)
+				{
+					console.log('It\'s complete.');
+					Memory.rooms[room_name].defense.knownwalls = undefined;
+					return true;
+				}
 			}
 		}
 	},
@@ -582,11 +588,60 @@ var defender =
 		//They are already stored in defense.walls/ramparts.
 		let existing_walls = Memory.rooms[room_name].defense.walls;
 		let existing_ramparts = Memory.rooms[room_name].defense.ramparts;
+		let far_walls = Memory.rooms[room_name].defense.farwalls;
 
 		let wall_positions = {};
 		let rampart_positions = {};
+		let farwall_positions = {};
+
+		let defense_in_memory = Memory.rooms[room_name].defense;
+		let lowest = {id: defense_in_memory.lowwall, value: Infinity};
 
 		let tempwall;
+
+		//Where are the farwalls?
+		for (let f = 0; f < far_walls.length; f++)
+		{
+			tempwall = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, far_walls[f].x, far_walls[f].y);
+			if (tempwall.length > 0 && (!farwall_positions[far_walls[f].x] || !farwall_positions[far_walls[f].x][far_walls[f].y]))
+			{
+				if (!farwall_positions[far_walls[f].x])
+				{
+					farwall_positions[far_walls[f].x] = {};
+				}
+
+				for (let tw = 0; tw < tempwall.length; tw++)
+				{
+					if (tempwall[tw].structureType === STRUCTURE_WALL || tempwall[tw].structureType === STRUCTURE_RAMPART)
+					{
+						farwall_positions[far_walls[f].x][far_walls[f].y] =	tempwall[tw].id;	//There should be a wall or a rampart here.
+						break;
+					}
+				}
+			}
+		}
+
+		//Count any rampart not on the defense as a farwall. (This just excludes it from being considered the lowest.)
+		for (let r = 3; r < existing_ramparts.length; r++)
+		{
+			tempwall = Game.rooms[room_name].lookForAt(LOOK_STRUCTURES, existing_ramparts[r].x, existing_ramparts[r].y);
+			if (tempwall.length > 0 && (!farwall_positions[existing_ramparts[r].x] || !farwall_positions[existing_ramparts[r].x][existing_ramparts[r].y]))
+			{
+				if (!farwall_positions[existing_ramparts[r].x])
+				{
+					farwall_positions[existing_ramparts[r].x] = {};
+				}
+
+				for (let tw = 0; tw < tempwall.length; tw++)
+				{
+					if (tempwall[tw].structureType === STRUCTURE_RAMPART)
+					{
+						farwall_positions[existing_ramparts[r].x][existing_ramparts[r].y] =	tempwall[tw].id;	//There should only be a rampart here.
+						break;
+					}
+				}
+			}
+		}
 
 		//Get ramparts first.
 		for (let r = 0; r < existing_ramparts.length; r++)
@@ -604,6 +659,14 @@ var defender =
 					if (tempwall[tw].structureType === STRUCTURE_RAMPART)
 					{
 						rampart_positions[existing_ramparts[r].x][existing_ramparts[r].y] = tempwall[tw].id;	//There should only be a rampart here.
+
+						//While we're here, if it's the lowest hp defense, record it. (But only if it's not a farwall.)
+						if (tempwall[tw].hits < lowest.value && (!farwall_positions[existing_ramparts[r].x] || farwall_positions[existing_ramparts[r].x][existing_ramparts[r].y]))
+						{
+							lowest.id = tempwall[tw].id;
+							lowest.value = tempwall[tw].hits;
+						}
+
 						break;
 					}
 				}
@@ -626,6 +689,14 @@ var defender =
 					if (tempwall[tw].structureType === STRUCTURE_WALL)
 					{
 						wall_positions[existing_walls[w].x][existing_walls[w].y] =	tempwall[tw].id;	//There should only be a wall here.
+
+						//While we're here, if it's the lowest hp defense, record it. (But only if it's not a farwall.)
+						if (tempwall[tw].hits < lowest.value && (!farwall_positions[existing_walls[w].x] || farwall_positions[existing_walls[w].x][existing_walls[w].y]))
+						{
+							lowest.id = tempwall[tw].id;
+							lowest.value = tempwall[tw].hits;
+						}
+
 						break;
 					}
 				}
@@ -634,6 +705,15 @@ var defender =
 
 		defender.walls[room_name] = wall_positions;
 		defender.ramparts[room_name] = rampart_positions;
+
+		//Now record our new breakpoint.
+		defense_in_memory.lowwall = lowest.id;
+		defense_in_memory.highmil = Math.floor(lowest.value / 1000000) + 1;
+		if (defense_in_memory.highmil > 300)
+		{
+			defense_in_memory.highmil = 300;
+		}
+
 		return {walls: wall_positions, ramparts: rampart_positions};
 	},
 
