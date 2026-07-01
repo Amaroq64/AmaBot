@@ -72,15 +72,17 @@ var roleDBuilder =
 							//If we found one nearby, go to it, then come back from it.
 							if (Memory.creeps[creep.name].movenow.length === 0 && Memory.creeps[creep.name].path != 4)
 							{
-								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(sites[c].pos, {range: 3})
+								Memory.creeps[creep.name].movenow = creep.pos.findPathTo(sites[c].pos, {range: 3, maxRooms: 1})
 								Memory.creeps[creep.name].movenow = Memory.creeps[creep.name].movenow
 									.concat(creep.room.findPath(creep.room.getPositionAt(Memory.creeps[creep.name].movenow.slice(-1)[0].x, Memory.creeps[creep.name].movenow.slice(-1)[0].y), creep.pos));
-								//console.log(JSON.stringify(Memory.creeps[creep.name].movenow));
 								let tdirection = Memory.creeps[creep.name].movenow[0].direction;
 								Memory.creeps[creep.name].movenow = require('calculate').cleanthispath(Memory.creeps[creep.name].movenow, Memory.creeps[creep.name].movenow[0].direction);
-								//	.concat({x: creep.pos.x, y: creep.pos.y, direction: creep.memory.direction}), Memory.creeps[creep.name].movenow[0]);
-								//Memory.creeps[creep.name].movenow.push({x: creep.pos.x, y: creep.pos.y, direction: creep.memory.direction});
-								//console.log(JSON.stringify(Memory.creeps[creep.name].movenow));
+								if (Memory.creeps[creep.name].movenow.slice(-1)[0].direction !== Memory.creeps[creep.name].direction)
+								{
+									//let resume_dxdy = require('calculate').dxdy[Memory.creeps[creep.name].direction];
+									//Make sure we get back on our previous path.
+									Memory.creeps[creep.name].movenow.push({x: creep.pos.x, y: creep.pos.y, direction: Memory.creeps[creep.name].direction});
+								}
 								Memory.creeps[creep.name].direction = tdirection;
 								break;
 							}
@@ -114,36 +116,31 @@ var roleDBuilder =
 		//Get repairable structures in range of the repairer.
 		let rstructures = [];
 		let temprstructure;
+
+		//How many unsafe exits do we have?
+		let count = 0;
+		for (let dp = 0; Memory.rooms[creep.room.name].patrol && dp < Memory.rooms[creep.room.name].patrol.length; dp++)
+		{
+			if (Memory.rooms[creep.room.name].patrol)
+			{
+				count++;
+			}
+		}
+
 		for (let x = -3; x < 4; x++)
 		{
 			for (let y = -3; y < 4; y++)
 			{
 				//Assign within comparison.
 				if (defender.walls[creep.room.name] && defender.walls[creep.room.name][creep.pos.x + x] && defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y]
-					&& (temprstructure = Game.getObjectById(defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y])))
+					&& (temprstructure = Game.getObjectById(defender.walls[creep.room.name][creep.pos.x + x][creep.pos.y + y])) && (count > 1 || temprstructure.hits < Memory.rooms[creep.room.name].defense.highmil * 1000000))
 				{
 					rstructures.push(temprstructure);
 				}
 				else if(defender.ramparts[creep.room.name] && defender.ramparts[creep.room.name][creep.pos.x + x] && defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y]
-					&& (temprstructure = Game.getObjectById(defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y])))
+					&& (temprstructure = Game.getObjectById(defender.ramparts[creep.room.name][creep.pos.x + x][creep.pos.y + y])) && (count > 1 || temprstructure.hits < Memory.rooms[creep.room.name].defense.highmil * 1000000))
 				{
 					rstructures.push(temprstructure);
-				}
-				if (rstructures.length && rstructures[rstructures.length - 1].hits >= Memory.rooms[creep.room.name].defense.highmil * 1000000)
-				{
-					//We should only be picky if we have a single exit to defend. If we detect more than that, don't be picky.
-					let count = 0;
-					for (let dp = 0; Memory.rooms[creep.room.name].patrol && dp < Memory.rooms[creep.room.name].patrol.length; dp++)
-					{
-						if (Memory.rooms[creep.room.name].patrol)
-						{
-							count++;
-						}
-					}
-					if (count > 1)
-					{
-						rstructures.pop();	//Remove any that are above our current breakpoint to ensure balanced repairing.
-					}
 				}
 			}
 		}
@@ -171,11 +168,11 @@ var roleDBuilder =
 			{
 				Memory.rooms[creep.room.name].defense.lastrp = chosen.id;
 
-				//If we reached a new highest millionth, record it.
-				if (new_hits > (Memory.rooms[creep.room.name].defense.highmil * 1000000))
+				//If we reached a new highest millionth, record it. This is handled by defender.getwalls() now. It records the millionth above the lowest instead.
+				/*if (new_hits > (Memory.rooms[creep.room.name].defense.highmil * 1000000))
 				{
 					Memory.rooms[creep.room.name].defense.highmil++;
-				}
+				}*/
 			}
 			return true;	//We've performed our repair action for this tick.
 		}
@@ -288,7 +285,11 @@ var roleDBuilder =
 				//Withdraw from a link if possible.
 				if (withdraw_ruins !== OK)
 				{
-					creep.withdraw(Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id), RESOURCE_ENERGY);
+					let this_link = Memory.rooms[creep.room.name].defense.links;
+					if (this_link && (this_link = this_link[creep.memory.need]) && (this_link = Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id)))
+					{
+						creep.withdraw(this_link, RESOURCE_ENERGY);
+					}
 				}
 
 				//Does a creep (other than a builder) want to move towards us?
