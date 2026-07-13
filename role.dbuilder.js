@@ -16,7 +16,7 @@ var roleDBuilder =
 		{
 			filter: function(structure)
 			{
-				return ((structure.structureType == STRUCTURE_RAMPART));
+				return ((structure.structureType === STRUCTURE_RAMPART));
 			}
 		})
 		.concat(
@@ -24,7 +24,7 @@ var roleDBuilder =
 			{
 				filter: function(structure)
 				{
-					return ((structure.structureType == STRUCTURE_TOWER || structure.structureType == STRUCTURE_WALL));
+					return ((structure.structureType === STRUCTURE_TOWER || structure.structureType === STRUCTURE_WALL));
 				}
 			})
 		);
@@ -34,10 +34,10 @@ var roleDBuilder =
 			return false;
 		}
 
-		let farwalls = undefined;
+		let farwalls;
 		for (let c = 0; c < sites.length; c++)
 		{
-			if (creep.pos.inRangeTo(sites[c], 3) && creep.build(sites[c]) == OK)	//If we're near a site, build on one.
+			if (creep.pos.inRangeTo(sites[c], 3) && creep.build(sites[c]) === OK)	//If we're near a site, build on one.
 			{
 				test = true;
 				//If we built a rampart, we need to update it immediately so it can receive repairs.
@@ -97,22 +97,6 @@ var roleDBuilder =
 
 	repair: function(creep)
 	{
-		//console.log("Repairing.");
-		//Get our structures that need to be repaired.
-		/*let rstructures = creep.room.find(FIND_STRUCTURES,
-		{
-			filter: function(structure)
-			{
-				return (structure.structureType == STRUCTURE_RAMPART && structure.hits < structure.hitsMax);
-			}
-		}).concat(creep.room.find(FIND_STRUCTURES,
-		{
-			filter: function(structure)
-			{
-				return ((structure.structureType == STRUCTURE_TOWER || structure.structureType == STRUCTURE_WALL) && structure.hits < structure.hitsMax);
-			}
-		}));*/
-
 		//Get repairable structures in range of the repairer.
 		let rstructures = [];
 		let temprstructure;
@@ -273,7 +257,8 @@ var roleDBuilder =
 				return true;	//If we withdrew, then move on.
 			}
 		}
-		if (creep.carry.energy == 0)
+
+		if (!creep.carry.energy)
 		{
 			//console.log("Withdrawing from ruins.");
 			let withdraw_ruins = roleDBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
@@ -286,7 +271,9 @@ var roleDBuilder =
 				if (withdraw_ruins !== OK)
 				{
 					let this_link = Memory.rooms[creep.room.name].defense.links;
-					if (this_link && (this_link = this_link[creep.memory.need]) && (this_link = Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id)))
+
+					//Assign within comparison.
+					if (this_link && this_link[creep.memory.need] && (this_link = Game.getObjectById(this_link[creep.memory.need].id)))
 					{
 						creep.withdraw(this_link, RESOURCE_ENERGY);
 					}
