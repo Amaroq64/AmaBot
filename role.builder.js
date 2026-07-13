@@ -23,11 +23,11 @@ var roleBuilder =
 
 		for (let c = 0; c < sites.length; c++)
 		{
-			if (creep.pos.inRangeTo(sites[c], 3) && creep.build(sites[c]) == OK)	//If we're near a site, build on one.
+			if (creep.pos.inRangeTo(sites[c], 3) && creep.build(sites[c]) === OK)	//If we're near a site, build on one.
 			{
 				test = true;
 				//If it was an extension or a spawn, we need to repopulate our extensions list.
-				if (sites[c].structureType == STRUCTURE_EXTENSION || sites[c].structureType == STRUCTURE_SPAWN)
+				if (sites[c].structureType === STRUCTURE_EXTENSION || sites[c].structureType === STRUCTURE_SPAWN)
 				{
 					require('calculate').extensions[creep.room.name] = undefined;
 				}
@@ -46,16 +46,24 @@ var roleBuilder =
 			filter: function(structure)
 			{
 				//Repair roads when they're missing 100. Repair everything else if it's not at max.
-				return ((structure.structureType == STRUCTURE_ROAD && structure.hitsMax - structure.hits > 99) || (structure.structureType != STRUCTURE_ROAD && structure.hits < structure.hitsMax
-					&& ((structure.structureType != STRUCTURE_WALL && creep.name.indexOf("Builder") != -1) || (structure.structureType == STRUCTURE_WALL && creep.name.indexOf("Dbuilder") != -1))));	//Only Dbuilders should repair walls.
+				return ((structure.structureType === STRUCTURE_ROAD && structure.hitsMax - structure.hits > 99) || (structure.structureType !== STRUCTURE_ROAD && structure.hits < structure.hitsMax
+					&& ((structure.structureType !== STRUCTURE_WALL && creep.name.indexOf("Builder") != -1) || (structure.structureType === STRUCTURE_WALL && creep.name.indexOf("Dbuilder") != -1))));	//Only Dbuilders should repair walls.
 			}
 		});
 
 		for (let r = 0; r < rstructures.length; r++)
 		{
-			if (creep.pos.inRangeTo(rstructures[r], 3) && creep.repair(rstructures[r]) == OK)
+			if (creep.pos.inRangeTo(rstructures[r], 3))
 			{
-				return true;	//We've performed our repair action for this tick.
+				//Ramparts we place in our base prevent construction sites near them from being built. We need to deal with that.
+				if (rstructures[r].structureType === STRUCTURE_RAMPART && creep.room.find(FIND_CONSTRUCTION_SITES, {filter: function(site) {return creep.pos.inRangeTo(site, 3);}}).length)
+				{
+					return false;
+				}
+				else if (creep.repair(rstructures[r]) === OK)
+				{
+					return true;
+				}
 			}
 		}
 
@@ -67,7 +75,7 @@ var roleBuilder =
 	run: function(creep, s = false)
 	{
 		//Create roads wherever we go.
-		if (Memory.creeps[creep.name].movenow.length == 0)
+		if (!Memory.creeps[creep.name].movenow.length)
 		{
 			creep.room.createConstructionSite(creep.pos, STRUCTURE_ROAD);
 		}
@@ -80,12 +88,12 @@ var roleBuilder =
 				return true;	//If we withdrew, then move on.
 			}
 		}
-		if (creep.carry.energy == 0)
+		if (!creep.carry.energy)
 		{
 			roleBuilder.transport.withdrawRuins(creep);	//Clean up ruins.
 
 			//If we're on the way but we run out, we should go back.
-			if (Memory.creeps[creep.name].path == 4 && creep.name.indexOf("Builder") != -1)
+			if (Memory.creeps[creep.name].path === 4 && creep.name.indexOf("Builder") !== -1)
 			{
 				Memory.creeps[creep.name].path = 5;
 			}
