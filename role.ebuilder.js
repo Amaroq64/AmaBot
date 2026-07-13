@@ -6,7 +6,7 @@ var roleEBuilder =
 	run: function(creep, s)
 	{
 		//We only exist to build the extensions.
-		let sites = Game.rooms[creep.room.name].find(FIND_MY_CONSTRUCTION_SITES, {filter: function(site) {return site.structureType === STRUCTURE_EXTENSION}});
+		let sites = Game.rooms[creep.room.name].find(FIND_MY_CONSTRUCTION_SITES, {filter: {structureType: STRUCTURE_EXTENSION}});
 		let mfat_in_memory = Memory.rooms[creep.room.name].sources[s].mfat[0];
 		let clevel = Game.rooms[creep.room.name].controller.level;
 
@@ -14,7 +14,7 @@ var roleEBuilder =
 		if (!sites.length)
 		{
 			sites = Game.rooms[creep.room.name].find(FIND_MY_CONSTRUCTION_SITES, {filter: function(site) {return site.structureType === STRUCTURE_CONTAINER
-				&& site.pos.x === mfat_in_memory.x && site.pos.y === mfat_in_memory.y}});	//Only build our own container.
+				&& site.pos.x === mfat_in_memory.x && site.pos.y === mfat_in_memory.y;}});	//Only build our own container.
 
 			if (!sites.length && clevel >= 4)
 			{
@@ -22,10 +22,16 @@ var roleEBuilder =
 			}
 		}
 
+		//If we have defenses that aren't covered by a dbuilder, they will need to be built.
+		if (!sites.length)
+		{
+			sites = Game.rooms[creep.room.name].find(FIND_MY_CONSTRUCTION_SITES, {filter: function(site) {return site.structureType === STRUCTURE_WALL || site.structureType === STRUCTURE_RAMPART;}});
+		}
+
 		//Prevent a traffic jam.
 		let creeps = Game.rooms[creep.room.name].find(FIND_MY_CREEPS, {filter: function(bcreep) {return creep.pos.isNearTo(bcreep) && (bcreep.pos.x !== creep.pos.x || bcreep.pos.y !== creep.pos.y)
-			&& (bcreep.pos.x !== mfat_in_memory.x || bcreep.pos.y !== mfat_in_memory.y);}});
-		if (creeps.length && creeps[0].memory.direction === creeps[0].pos.getDirectionTo(creep))
+			&& (bcreep.pos.x !== mfat_in_memory.x || bcreep.pos.y !== mfat_in_memory.y) && bcreep.memory.direction === bcreep.pos.getDirectionTo(creep);}});
+		if (creeps.length)
 		{
 			creep.move(creeps[0]);
 		}
@@ -39,7 +45,7 @@ var roleEBuilder =
 			{
 				if (creep.build(sites) !== OK)
 				{
-					creep.moveTo(sites, {range: 3});
+					creep.moveTo(sites, {range: 3, maxRooms: 1});
 				}
 			}
 
@@ -82,7 +88,7 @@ var roleEBuilder =
 				}
 				else
 				{
-					creep.moveTo(target.x, target.y);
+					creep.moveTo(target.x, target.y, {maxRooms: 1});
 				}
 			}
 		}
