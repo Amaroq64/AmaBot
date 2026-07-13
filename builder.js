@@ -1,5 +1,6 @@
 var body;	//This is assigned later, but only if we could build something.
 var calculate = require('calculate');
+var control = require('control');
 
 var builder =
 {
@@ -303,6 +304,24 @@ var builder =
 					//options.memory.movenow.pop();
 					break;
 				}
+				case 'etransport':
+				{
+					options.memory.direction = Memory.rooms[room_name].sources[need].minedir2;
+					options.memory.path = 4;
+					options.memory.dtarget = {};
+					if (Memory.rooms[room_name].sources[need].defpaths && Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need])
+					{
+						options.memory.dtarget.x = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].x;
+						options.memory.dtarget.y = Memory.rooms[room_name].sources[need].defpaths[Memory.rooms[room_name].defense.need].slice(-1)[0].y;
+					}
+					options.memory.dtrip = true;
+					options.memory.need = Memory.rooms[room_name].defense.need;
+					direction = [Memory.rooms[room_name].spawns[spawn_index].dir.minedir[need]];	//It goes to a source.
+					//This one needs temporary instructions to get to a source. Then it loops between the source and the defense builder on its own.
+					options.memory.movenow = Memory.rooms[room_name].sources[need].mclean.b;
+					//options.memory.movenow.pop();
+					break;
+				}
 				case 'builder':
 				{
 					options.memory.direction = Memory.rooms[room_name].sources[need].minedir2;
@@ -414,10 +433,111 @@ var builder =
 			//Assign the direction into our options to be passed to the spawner.
 			options.directions = direction;
 
-			//Sort the extensions and spawners for efficient energy usage. Don't do this if there are extension construction sites.
+			//Sort the extensions and spawners for efficient energy usage. Don't do this if there are extension construction sites. //Why?
 			if (myextensions.length === Memory.rooms[room_name].sources.reduce(calculate.sourcereducer.idealextensions, 0))
 			{
 				options.energyStructures = calculate.sortExtensions(room_name);
+
+				//We should optimize by preferring the extensions that the mtransports will fill next.
+				let found_near_creep = false;
+				if (calculate.extensions[room_name])
+				{
+					let priority_extensions = [];
+					for (let i = 0, sources_in_memory = Memory.rooms[room_name].sources, extensions_in_memory = calculate.extensions[room_name], path_in_memory = Memory.rooms[room_name].path; i < sources_in_memory.length; i++)
+					{
+						priority_extensions[i] = {};
+						for (let mt = 0, dir, mtransport, pos, steps, creeps_in_memory = sources_in_memory[i].creeps.mtransport; mt < creeps_in_memory.length; mt++)
+						{
+							mtransport = Game.creeps[creeps_in_memory[mt]];
+							if (!mtransport.store.energy)
+							{
+								continue;
+							}
+
+							//Now check for extensions while iterating its next steps.
+							for (let st = 0, safety = 0, stops = Math.floor(mtransport.store.energy / EXTENSION_ENERGY_CAPACITY[mtransport.room.controller.level]); stops > 0 && safety < 200; safety++)
+							{
+								//Get its next position.
+								dir = mtransport.memory.direction;
+								pos = new RoomPosition(mtransport.pos.x + calculate.dxdy[dir].dx, mtransport.pos.y + calculate.dxdy[dir].dy, room_name);
+
+								for (let x = -1, tempx; x < 2; x++)
+								{
+									tempx = pos.x + x;
+									for (let y = -1, tempy; y < 2; y++)
+									{
+										tempy = pos.y + y;
+
+										if (calculate.check_xy(tempx, tempy, extensions_in_memory))
+										{
+											calculate.mark_found(tempx, tempy, priority_extensions[i]);
+											stops--;
+											found_near_creep = true;
+										}
+									}
+								}
+
+								//Change direction if needed. Stop the search if we've hit a flipper.
+								if (calculate.findtile(room_name, pos.x, pos.y, control.paths[mtransport.memory.path], i))
+								{
+									if (path_in_memory[pos.x][pos.y].flipper && path_in_memory[pos.x][pos.y].flipper[control.paths[mtransport.memory.path]])
+									{
+										break;
+									}
+									else
+									{
+										dir = path_in_memory[pos.x][pos.y][control.paths[mtransport.memory.path]];
+									}
+								}
+							}
+						}
+					}
+
+					//Now rearrange it. But interleave them like usual.
+					if (found_near_creep)
+					{
+						options.energyStructures = options.energyStructures.slice();	//Don't modify the original.
+						let moves_made = 0;	//We want to preserve the order of the elements we're shifting.
+						while (priority_extensions.length)	//Once each source has been depleted of potential extensions, we end there.
+						{
+							for (let p = 0, p_found = []; p < priority_extensions.length; p++)
+							{
+								for (let es = 0; es < options.energyStructures.length; es++)
+								{
+									if (!Object.keys(priority_extensions[p]).length)
+									{
+										//If we've removed the last extension from this source, remove the source.
+										priority_extensions.splice(p, 1);
+										p--;
+										break;
+									}
+									else if (priority_extensions[p][options.energyStructures[es].x] && priority_extensions[p][options.energyStructures[es].x][options.energyStructures[es].y])
+									{
+										//Move it to the top, but order them by the order we found them.
+										options.energyStructures.splice(moves_made, 0, options.energyStructures.splice(es, 1)[0]);
+
+										//Remove the one we used, then move on to the next source.
+										delete priority_extensions[p][options.energyStructures[moves_made].x][options.energyStructures[moves_made].y];
+										if (!Object.keys(priority_extensions[p][options.energyStructures[moves_made].x]).length)
+										{
+											delete priority_extensions[p][options.energyStructures[moves_made].x];
+										}
+
+										if (!Object.keys(priority_extensions[p]).length)
+										{
+											//If we've removed the last extension from this source, remove the source.
+											priority_extensions.splice(p, 1);
+											p--;
+										}
+
+										moves_made++;
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 
 			//Build what's needed.
@@ -449,9 +569,22 @@ var builder =
 					//We probably got here due to an edge case where the room is out of energy but the third spawn (which we're not using) has some energy.
 					//So try again without the restraint on energy sources.
 					delete options.energyStructures;
-					console.log(spawn.spawnCreep(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable), name, options));
+					if(spawn.spawnCreep(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable), name, options) === OK)
+					{
+						if (need !== '')
+						{
+							if (Array.isArray(Memory.rooms[room_name].sources[need].creeps[role]))
+							{
+								Memory.rooms[room_name].sources[need].creeps[role].push(name);
+							}
+						}
+						else if (Array.isArray(Memory.rooms[room_name].creeps[role]))
+						{
+							Memory.rooms[room_name].creeps[role].push(name);
+						}
+					}
 					console.log(room_name + ' ' + role + ' ' + Game.rooms[room_name].energyAvailable + ' / ' +
-						calculate.bodyCost(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable)));
+					calculate.bodyCost(body[[role, 'minbuilder'][+(role === 'builder' && Game.rooms[room_name].find(FIND_MY_CONSTRUCTION_SITES).length === 0)]](Game.rooms[room_name].energyAvailable)));
 					break;
 				}
 				case ERR_NOT_OWNER:
