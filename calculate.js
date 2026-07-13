@@ -22,7 +22,7 @@ var calculate =
 		let idealTransport = [];
 		for (let s = 0; s < Memory.rooms[room].sources.length; s++)
 		{
-			roundTrip.push({miner: Memory.rooms[room].sources[s].mine.length + Memory.rooms[room].sources[s].mreturn.length - 1, upgrader: Memory.rooms[room].sources[s].upgrade.length + Memory.rooms[room].sources[s].ureturn.length - 2});
+			roundTrip.push({miner: Memory.rooms[room].sources[s].mlength + Memory.rooms[room].sources[s].mrlength - 1, upgrader: Memory.rooms[room].sources[s].ulength + Memory.rooms[room].sources[s].urlength - 2});
 			if (Game.rooms[room].controller.level > 2)	//If we have more than 3 extensions on a source, we might need both paths now.
 			{
 				roundTrip[roundTrip.length - 1].miner += roundTrip[roundTrip.length - 1].upgrader;
@@ -1342,7 +1342,7 @@ var calculate =
 							break;
 						case 0:
 						case 3:
-							paths[i][ptypes[p - 1]].concat(recreated_path);
+							paths[i][ptypes[p - 1]] = paths[i][ptypes[p - 1]].concat(recreated_path);
 					}
 				}
 			}
