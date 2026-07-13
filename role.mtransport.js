@@ -79,7 +79,7 @@ var roleMTransport =
 			else if (sneed === 'mine')
 			{
 				//In order to travel along mreturn, we need to be flipped from ureturn. (If there is a ureturn.)
-				console.log('Mtransport ' + creep.room.name + ' ' + s + ' taking mine path.');
+				//console.log('Mtransport ' + creep.room.name + ' ' + s + ' taking mine path.');
 				if (Memory.rooms[creep.room.name].sources[s].ureturn[0])
 				{
 					creep.memory.path = 3;
@@ -88,7 +88,7 @@ var roleMTransport =
 			else	//sneed is 'upgrade' if we get here.
 			{
 				//In order to travel along upgrade, we need to be flipped from mine.
-				console.log('Mtransport ' + creep.room.name + ' ' + s + ' taking upgrade path.');
+				//console.log('Mtransport ' + creep.room.name + ' ' + s + ' taking upgrade path.');
 				creep.memory.path = 0;
 			}
 		}
