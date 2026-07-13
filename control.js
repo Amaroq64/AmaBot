@@ -14,6 +14,8 @@ var control =
 	mtransport: require('role.mtransport'),
 	utransport: require('role.utransport'),
 
+	etransport: require('role.etransport'),
+
 	builder: require('role.builder'),
 	ebuilder: require('role.ebuilder'),
 	dbuilder: require('role.dbuilder'),
@@ -36,7 +38,7 @@ var control =
 				control.calculate.getExtensions(room_name);
 			}
 
-			//Initialize the containers, pickups, and construction sites if necessary.
+			//Initialize the containers, pickups, construction sites, and per-source extension status if necessary.
 			if (!control.transport.room_containers[room_name])
 			{
 				control.transport.room_containers[room_name] = [];
@@ -52,6 +54,10 @@ var control =
 			if (!control.builder.sites[room_name])
 			{
 				control.builder.sites[room_name] = [];
+			}
+			if (!control.calculate.pathextensions[room_name])
+			{
+				control.calculate.pathextensions[room_name] = [];
 			}
 
 			for (let creep_type in Memory.rooms[room_name].creeps)	//Enumerate creep roles assigned to this room.
@@ -90,7 +96,7 @@ var control =
 				}
 			}
 
-			//We're going to track our containers, pickups, and construction sites once per tick. Reset them here in preparation for the next tick.
+			//We're going to track our containers, pickups, construction sites, and per-source extension status once per tick. Reset them here in preparation for the next tick.
 			control.transport.room_containers[room_name].length = 0;
 			control.transport.room_energy[room_name].length = 0;
 			control.transport.room_ruins[room_name].length = 0;
@@ -98,6 +104,7 @@ var control =
 			control.transport.ruins_tested[room_name] = false;
 			control.builder.sites[room_name].length = 0;
 			control.builder.sites_tested[room_name] = false;
+			control.calculate.pathextensions[room_name].length = 0;
 		}
 	},
 
@@ -291,7 +298,15 @@ var control =
 						}
 						else if (creep.memory.path === 5)
 						{
-							creep.memory.dtrip = false;
+							if (role === 'etransport')	//The etransport exists to supply the defense.
+							{
+								creep.memory.path = 4;
+							}
+							else
+							{
+								creep.memory.dtrip = false;
+								creep.memory.path = 1;	//We've completed our return from the defender and are going to the spawn next via mreturn.
+							}
 
 							//dreturn ultimately goes to mreturn.
 							/*if (Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine && Memory.rooms[room_name].path[pos.x][pos.y].flipper.mine[source])
@@ -302,8 +317,6 @@ var control =
 							{
 								creep.memory.path = 0;	//We're traversing mine for a bit to get to mreturn.
 							}*/
-
-							creep.memory.path = 1;	//We've completed our return from the defender and are going to the spawn next via mreturn.
 
 							//If we're switching to a completely new path, we need to override our previous direction change.
 							if (Array.isArray(flipper[control.paths[creep.memory.path]]))
