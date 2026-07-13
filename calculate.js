@@ -1281,7 +1281,7 @@ var calculate =
 				}
 			}
 
-			for (let sp = 0, spawn; sp < 3; sp++)
+			for (let sp = 0, spawn; sp < 2; sp++)
 			{
 				spawn = Game.getObjectById(Memory.rooms[room_name].spawns[sp].id);
 				if (spawn)
