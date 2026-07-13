@@ -142,7 +142,7 @@ var roleDBuilder =
 			}
 		}
 
-		if (creep.repair(chosen) == OK)
+		if (creep.repair(chosen) === OK)
 		{
 			//If the repaired structure would have the highest hp, record it.
 			let new_hits = chosen.hits + (Math.min(creep.memory.repair, creep.store.getUsedCapacity(RESOURCE_ENERGY)) * (100 + (100 * [0, 0.5, 0.8, 1][creep.memory.t])));
@@ -187,14 +187,14 @@ var roleDBuilder =
 			{
 				filter: function(tower)
 				{
-					return (tower.structureType == STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) >= 500);	//If a tower is more than half empty, we should fill it.
+					return (tower.structureType === STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) >= 500);	//If a tower is more than half empty, we should fill it.
 				}
 			})
 				.concat(creep.room.find(FIND_CONSTRUCTION_SITES,
 			{
 				filter: function(tower)
 				{
-					return (tower.structureType == STRUCTURE_WALL || tower.structureType == STRUCTURE_RAMPART || tower.structureType == STRUCTURE_TOWER);	//If a wall, rampart, or tower needs to be built, we should build it.
+					return (tower.structureType === STRUCTURE_WALL || tower.structureType === STRUCTURE_RAMPART || tower.structureType === STRUCTURE_TOWER);	//If a wall, rampart, or tower needs to be built, we should build it.
 				}
 			}));
 			tlength = towers.length;	//This is the number of structures in the room that absolutely need to be serviced.
@@ -204,7 +204,7 @@ var roleDBuilder =
 		{
 			filter: function(tower)
 			{
-				return (tower.structureType == STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
+				return (tower.structureType === STRUCTURE_TOWER && tower.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
 			}
 		});
 
@@ -212,16 +212,16 @@ var roleDBuilder =
 		towers = creep.pos.findInRange(towers, 1);
 		if (towers.length != 0)
 		{
-			if (creep.transfer(towers[0], RESOURCE_ENERGY) == OK)	//We've deposited this tick.
+			if (creep.transfer(towers[0], RESOURCE_ENERGY) === OK)	//We've deposited this tick.
 			{
 				if (creep.carry.energy <= towers[0].store.getFreeCapacity(RESOURCE_ENERGY))
 				{
 					//If depositing is going to empty us out, we should return.
-					if (Memory.creeps[creep.name].path == 6)
+					if (Memory.creeps[creep.name].path === 6)
 					{
 						Memory.creeps[creep.name].path = 7;
 					}
-					else if (Memory.creeps[creep.name].path == 7)
+					else if (Memory.creeps[creep.name].path === 7)
 					{
 						Memory.creeps[creep.name].path = 6;
 					}
