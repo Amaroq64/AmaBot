@@ -102,6 +102,7 @@ var roleScout =
 				path = creep.pos.findPathTo(pickup.pos.x, pickup.pos.y, roleScout.path_options).concat(pickup.pos.findPathTo(target.x, target.y, roleScout.path_options));
 				if (path.length)
 				{
+					creep.memory.direction = path[0].direction;
 					path.unshift({x: creep.pos.x, y: creep.pos.y, direction: path[0].direction});
 				}
 				creep.memory.movenow = calculate.cleanthispath(path, true);
@@ -117,6 +118,7 @@ var roleScout =
 				path = creep.pos.findPathTo(target.x, target.y, roleScout.path_options);
 				if (path.length)
 				{
+					creep.memory.direction = path[0].direction;
 					path.unshift({x: creep.pos.x, y: creep.pos.y, direction: path[0].direction});
 				}
 				creep.memory.movenow = calculate.cleanthispath(path, true);
