@@ -140,7 +140,7 @@ var tower =
 
 			//Find the farwall with the lowest hp.
 			let farwalls = [];
-			let leasthp = Infinity;
+			let leasthp = Memory.rooms[room_name].defense.highmil * 1000000;	//Only repair farwalls that are lower than our current breakpoint.
 			let choice;
 			for (let f = 0; f < Memory.rooms[room_name].defense.farwalls.length; f++)
 			{

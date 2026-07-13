@@ -6,6 +6,7 @@ var calculate =
 	spawns: {},
 	sortedextensions: {},
 	pathextensions: {},
+	//towers: {},
 	nuke: {},
 
 	idealTransports: function(room)
@@ -1497,6 +1498,20 @@ var calculate =
 
 		return needed;	//Modifications to needed are saved, so be careful.
 	},
+
+	/*towersAlongPaths: function(room_name)
+	{
+		//First get each defense patrol path.
+		let patrols = [];
+		let towers = [];
+		for (let need = 0, patrols_in_memory = Memory.rooms[room_name].defense.patrol, need < patrols_in_memory.length; need++)
+		{
+			if (patrols_in_memory[need])
+			{
+				//Now get the towers along the paths.
+			}
+		}
+	},*/
 
 	findouterstone: function(room_name, x_start, y_start, existing_stone = false)	//Find contiguous outer perimiter of a natural wall formation.
 	{
