@@ -5,6 +5,7 @@ var calculate =
 	extensions: {},
 	spawns: {},
 	sortedextensions: {},
+	pathextensions: {},
 	nuke: {},
 
 	idealTransports: function(room)
@@ -1210,10 +1211,6 @@ var calculate =
 			{
 				extension_positions[existing_extensions[e].pos.x] = {};
 			}
-			/*if (!extension_positions[existing_extensions[e].pos.x][existing_extensions[e].pos.y])
-			{
-				extension_positions[existing_extensions[e].pos.x][existing_extensions[e].pos.y] = {};
-			}*/
 
 			extension_positions[existing_extensions[e].pos.x][existing_extensions[e].pos.y] = existing_extensions[e].id;	//In roomPlanner.check() and calculate.sortExtensions(), we will make sure to erase the cache if anything changes.
 		}
@@ -1242,6 +1239,7 @@ var calculate =
 	{
 		//Make sure we have the efficient [x][y] list of extensions.
 		let arranged_extensions;
+		let paths;
 		if (calculate.extensions[room_name])
 		{
 			arranged_extensions = calculate.extensions[room_name];
@@ -1265,44 +1263,143 @@ var calculate =
 			while (more_extensions)
 			{
 				more_extensions = false;
+				//Iterate one extension from the current source. Then prepare to do the next one.
 				for (i = 0; i < s.length; i++)
 				{
-					if (s[i] < Memory.rooms[room_name].sources[i].buildings.extensions.length &&
-						arranged_extensions
-							[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x] &&//x
-						arranged_extensions
-							[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x]	//x
-							[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y]	//y
-						)
+					extensions_in_memory = Memory.rooms[room_name].sources[i].buildings.extensions;
+					if (s[i] < extensions_in_memory.length && arranged_extensions[extensions_in_memory[s[i]].x] && arranged_extensions[extensions_in_memory[s[i]].x][extensions_in_memory[s[i]].y])
 					{
-						//Iterate one extension from the current source. Then prepare to do the next one.
-						//console.log(room_name + ", x: " + Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x + ", y: "  + Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y);
-						current_extension = Game.getObjectById
-						(
-							arranged_extensions
-								[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].x]	//x
-								[Memory.rooms[room_name].sources[i].buildings.extensions[s[i]].y]	//y
-						);
+						//console.log(room_name + ", x: " + extensions_in_memory[s[i]].x + ", y: "  + extensions_in_memory[s[i]].y);
+						current_extension = Game.getObjectById(arranged_extensions[extensions_in_memory[s[i]].x][extensions_in_memory[s[i]].y]);
 						if (current_extension && current_extension.structureType == STRUCTURE_EXTENSION)
 						{
-							sorted_extensions.push(current_extension);
+							sorted_extensions.push({id: current_extension.id, x: current_extension.pos.x, y: current_extension.pos.y, s: i});
 							more_extensions = true;
 						}
 					}
 					s[i]++;
 				}
 			}
-			for (let sp = 0, spawn; sp < 2; sp++)	//We don't want to use our lab spawn's energy, since it's so difficult to refill.
+
+			for (let sp = 0, spawn; sp < 3; sp++)
 			{
 				spawn = Game.getObjectById(Memory.rooms[room_name].spawns[sp].id);
 				if (spawn)
 				{
-					sorted_extensions.push(spawn);
+					sorted_extensions.push({id: spawn.id, x: spawn.pos.x, y: spawn.pos.y});
 				}
 			}
-			calculate.sortedextensions[room_name] = sorted_extensions;
+			calculate.sortedextensions[room_name] = calculate.extensionsAlongPaths(room_name, sorted_extensions);
 			return sorted_extensions;
 		}
+	},
+
+	extensionsAlongPaths: function(room_name, sorted_extensions)	//Mark extensions along each source's mine and upgrade path (and back) to show which path they're on. (Mine takes precedence.)
+	{
+		if (!sorted_extensions)
+		{
+			sorted_extensions = calculate.sortedextensions[room_name];
+		}
+
+		//Make sure we have the efficient [x][y] list of extensions.
+		let arranged_extensions;
+		if (calculate.extensions[room_name])
+		{
+			arranged_extensions = calculate.extensions[room_name];
+		}
+		else
+		{
+			arranged_extensions = calculate.getExtensions(room_name);
+		}
+
+		let paths = [];
+		let paths_xy = [];
+		let ptypes = require('control').paths;
+		let sources_in_memory = Memory.rooms[room_name].sources;
+
+		//First get the paths for each source.
+		for (let i = 0; i < sources_in_memory.length; i++)
+		{
+			paths[i] = {};
+			for (let p = 0, order = [1, 0, 2, 3], recreated_path; p <= 3; p++)
+			{
+				if (sources_in_memory[i][ptypes[order[p]]][0])
+				{
+					recreated_path = calculate.recreatePath(room_name, ptypes[order[p]], sources_in_memory[i][ptypes[order[p]]][0].x, sources_in_memory[i][ptypes[order[p]]][0].y, i);
+				}
+				else
+				{
+					recreated_path = [];
+				}
+
+				if (recreated_path.length)
+				{
+					switch(order[p])	//The spawns were placed along paths in this order: mreturn, mine, upgrade, ureturn.
+					{
+						default:
+							paths[i][ptypes[p]] = recreated_path;	//Though the order is wonky, we are still calling them the mine path and the upgrade path.
+							break;
+						case 0:
+						case 3:
+							paths[i][ptypes[p - 1]].concat(recreated_path);
+					}
+				}
+			}
+		}
+
+		//Iterate the paths, marking all adjacent spaces. The mine path should overwrite the upgrade path.
+		for (let i = 0; i < paths.length; i++)	//One set for each source.
+		{
+			paths_xy[i] = {};
+			for (let p = 2; p >= 0; p -= 2)	//Each path type. (upgrade, then mine.)
+			{
+				//Now iterate the path.
+				if (paths[i][ptypes[p]])
+				{
+					for (let pstep = 0; pstep < paths[i][ptypes[p]].length; pstep++)
+					{
+						for (let x = -1, tempx, tempy; x < 2; x++)
+						{
+							tempx = paths[i][ptypes[p]][pstep].x + x;
+							for (let y = -1; y < 2; y++)
+							{
+								tempy = paths[i][ptypes[p]][pstep].y + y;
+
+								//Whenever mine and upgrade have a space in common, mine will overwrite.
+								calculate.mark_found(tempx, tempy, paths_xy[i], ptypes[p]);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		//Now mark the extensions so they can be differentiated.
+		for (let s = 0, temp_obj, spawns = Memory.rooms[room_name].spawns; s < sorted_extensions.length; s++)	//Iterate the list of extensions.
+		{
+			if (sorted_extensions[s].s === undefined && ((sorted_extensions[s].x === spawns[0].x && sorted_extensions[s].y === spawns[0].y) || (sorted_extensions[s].x === spawns[1].x && sorted_extensions[s].y === spawns[1].y)))
+			{
+				//We have a spawn. The first two spawns belong to the mine path, and belong to all sources.
+				sorted_extensions[s].p = 'mine';
+				temp_obj = {};
+				for (i = 0; i < sources_in_memory.length; i++)
+				{
+					temp_obj[i] = true;
+				}
+				sorted_extensions[s].s = temp_obj;
+			}
+			else if (paths_xy[sorted_extensions[s].s] && paths_xy[sorted_extensions[s].s][sorted_extensions[s].x] && paths_xy[sorted_extensions[s].s][sorted_extensions[s].x][sorted_extensions[s].y])
+			{
+				//Mark it with 'mine' or 'upgrade' here.
+				sorted_extensions[s].p = paths_xy[sorted_extensions[s].s][sorted_extensions[s].x][sorted_extensions[s].y];
+				temp_obj = {};
+				temp_obj[sorted_extensions[s].s] = true;
+				sorted_extensions[s].s = temp_obj;
+			}
+		}
+
+		//Our sorted extensions should now contain usable source and path associations.
+		return sorted_extensions;
 	},
 
 	countextensions: function(room_name = false)
@@ -1325,19 +1422,80 @@ var calculate =
 		return e;
 	},
 
-	extensionsfilled: function(room_name, s)
+	extensionsFilled: function(room_name, s)
 	{
-		let extension_positions = calculate.getExtensions(room_name);
+		let extension_positions;
+
+		if (calculate.extensions[room_name])
+		{
+			extension_positions = calculate.extensions[room_name];
+		}
+		else
+		{
+			extension_positions = calculate.getExtensions(room_name);
+		}
+
 		for (let e = 0, textension, extensions = Memory.rooms[room_name].sources[s].buildings.extensions; e < extensions.length; e++)
 		{
-			textension = Game.getObjectById(extension_positions[extensions[e].x][extensions[e].y]);
-			if (textension && textension.store.getFreeCapacity(RESOURCE_ENERGY))
+			//Assign within comparison.
+			if (extension_positions[extensions[e].x] && (textension = Game.getObjectById(extension_positions[extensions[e].x][extensions[e].y])) && textension.store.getFreeCapacity(RESOURCE_ENERGY))
 			{
 				return false;
 			}
 		}
 
 		return true;
+	},
+
+	extensionsNeedFilling: function(room_name)
+	{
+		//The first time this is called per tick, it detects and records which path for each source has an empty extension, prioritizing mine.
+		let needed = calculate.pathextensions[room_name];	//Modifications to needed are saved, so be careful.
+
+		if (!needed.length)	//This was set to 0 at the end of the last tick. Fill it out here.
+		{
+			let sources_in_memory = Memory.rooms[room_name].sources;
+			needed.length = sources_in_memory.length;
+			let extensions_in_memory = calculate.sortedextensions[room_name];
+
+			if (extensions_in_memory)	//This isn't ready on the fist tick after an upload.
+			{
+				for (let e = 0, s, skeys, sk, textension; e < extensions_in_memory.length; e++)
+				{
+					if (extensions_in_memory[e].s === undefined)
+					{
+						continue;	//This is the third spawn.
+					}
+
+					skeys = Object.keys(extensions_in_memory[e].s);
+					textension = Game.getObjectById(extensions_in_memory[e].id);
+					for (sk = 0; sk < skeys.length; sk++)	//Extensions belong to one source. The first two spawns belong to every source in the room. The third spawn doesn't belong to a source.
+					{
+						s = skeys[sk];
+
+						//Assign within comparison.
+						if ((!needed[s] || needed[s] === 'upgrade') && textension.store.getFreeCapacity(RESOURCE_ENERGY))
+						{
+							//If we found an extension that's not full, mark which path it's on. Mine takes precedence over upgrade.
+							needed[s] = extensions_in_memory[e].p;
+
+							//Since we performed a marking, check every source's marking.
+							//If we find an upgrade or an undefined, we better continue the check.
+							for (let n = 0, nend = needed.length - 1; needed[n] === 'mine' && n <= nend; n++)
+							{
+								//If we made it to the end, they were all mine. We can return early.
+								if (n === nend)
+								{
+									return needed;	//Modifications to needed are saved, so be careful.
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return needed;	//Modifications to needed are saved, so be careful.
 	},
 
 	findouterstone: function(room_name, x_start, y_start, existing_stone = false)	//Find contiguous outer perimiter of a natural wall formation.
