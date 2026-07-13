@@ -71,6 +71,14 @@ var roleMTransport =
 					|| (bcreep.memory._move && bcreep.memory._move.dest.x === creep.pos.x && bcreep.memory._move.dest.y === creep.pos.y));}});	//Ebuilders don't have a direction in their memory.
 				if (creeps.length)
 				{
+					for (let c = 0; c < creeps.length; c++)
+					{
+						//If it's another mtransport, we should get going to avoid a traffic jam.
+						if (creeps[c].name.indexOf('Mtransport') === -1)
+						{
+							return true;
+						}
+					}
 					creep.move(roleMTransport.calculate.direction_opposite[creep.memory.direction]);
 				}
 
