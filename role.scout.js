@@ -36,17 +36,19 @@ var roleScout =
 					if (eff[e].effect === EFFECT_COLLAPSE_TIMER)
 					{
 						roleScout.scouted[creep.room.name] = Game.time + eff[e].ticksRemaining;
-						console.log('Invader Bunker Detected!');
+						console.log('Invader Bunker Detected in ' + creep.room.name + '! ' + eff[e].ticksRemaining + ' ticks remaining.');
+						Game.notify('Invader Bunker Detected in ' + creep.room.name + '! ' + eff[e].ticksRemaining + ' ticks remaining.', 240);
 						break;
 					}
 				}
 			}
 			else
 			{
+				Game.notify('Player tower detected in ' + creep.room.name + '!', 240);
 				roleScout.scouted[creep.room.name] = Game.time + 25000;
 			}
 		}
-		else
+		else if (roleScout.scouted[creep.room.name] < Game.time)
 		{
 			roleScout.scouted[creep.room.name] = Game.time;
 		}
@@ -64,27 +66,37 @@ var roleScout =
 					continue;
 				}
 
-				if (!scouted[exits[e]])	//This room has never been scouted.
+				if (scouted[exits[e]] === undefined)	//This room has never been scouted.
 				{
 					scouted[exits[e]] = lowest_scouted = 0;
 					creep.memory.next = exits[e];
 					dir = e;
 					break;
 				}
-				else if (exits[e] && scouted[exits[e]] < lowest_scouted)	//Get the room that we haven't scouted in the longest time.
+				else if (scouted[exits[e]] < lowest_scouted)	//Get the room that we haven't scouted in the longest time.
 				{
 					creep.memory.next = exits[e];
 					dir = e;
+					lowest_scouted = scouted[exits[e]];
 				}
 			}
 
 			//Get a path to the targeted room.
-			let target = creep.pos.findClosestByPath(creep.room.find(dir));	//The FIND_EXIT_ constants are directions.
+			let target = creep.pos.findClosestByPath(dir);	//The FIND_EXIT_ constants are directions.
 			//console.log(dir);
 			//console.log(JSON.stringify(creep.room.find(dir)));
-			let pickup = creep.room.find(FIND_SCORES);
+			let pickup;
+			if (FIND_SCORES)
+			{
+				pickup = creep.room.find(FIND_SCORES);
+			}
+			else
+			{
+				pickup = [];
+			}
+
 			let path;
-			if (pickup.length && target)	//For the season, we're looking for pickups.
+			if (pickup.length)	//For the season, we're looking for pickups.
 			{
 				pickup = pickup[0];
 				path = creep.pos.findPathTo(pickup.pos.x, pickup.pos.y, roleScout.path_options).concat(pickup.pos.findPathTo(target.x, target.y, roleScout.path_options));
@@ -96,8 +108,12 @@ var roleScout =
 				creep.memory.found = true;
 				Game.notify('Pickup detected in ' + creep.room.name + ' at ' + Game.time, 240);
 			}
-			else if (target)
+			else
 			{
+				if (!target)
+				{
+					Game.notify('Target invalid in room ' + creep.room.name + ' at ' + creep.pos.x + ', ' + creep.pos.y + '.', 240);
+				}
 				path = creep.pos.findPathTo(target.x, target.y, roleScout.path_options);
 				if (path.length)
 				{
@@ -105,6 +121,12 @@ var roleScout =
 				}
 				creep.memory.movenow = calculate.cleanthispath(path, true);
 				creep.memory.found = undefined;
+			}
+
+			//Mark the room we selected so the other scouts don't follow us in.
+			if (roleScout.scouted[creep.memory.next] < Game.time)
+			{
+				roleScout.scouted[creep.memory.next] = Game.time;
 			}
 
 			roleScout.move(creep);
@@ -124,7 +146,33 @@ var roleScout =
 		return false;	//This creep will decide its own movement.
 	},
 
-	path_options: {ignoreRoads: true, swampCost: 1, maxRooms: 1}
+	path_options:
+	{ignoreRoads: true, swampCost: 1, maxRooms: 1,
+		costCallback: function(roomName, costMatrix)
+		{
+			//Avoid invaders. (Most of the time.)
+			let invaders = Game.rooms[roomName].find(FIND_HOSTILE_CREEPS, {filter: function(creep)
+			{
+				return creep.owner.username === 'Source Keeper';
+			}});
+
+			for (let i = 0, tempx, tempy, terrain = Game.map.getRoomTerrain(roomName); i < invaders.length; i++)
+			{
+				for (let x = -3; x < 4; x++)
+				{
+					tempx = invaders[i].pos.x + x;
+					for (let y = -3; y < 4; y++)
+					{
+						tempy = invaders[i].pos.y + y;
+						if (terrain.get(tempx, tempy) !== TERRAIN_MASK_WALL)
+						{
+							costMatrix.set(tempx, invaders[i].pos.y + y, 10);
+						}
+					}
+				}
+			}
+		}
+	}
 };
 
 module.exports = roleScout;
