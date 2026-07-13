@@ -245,7 +245,7 @@ var roleCustodian =
 				if (creep.memory.lmission[0] !== 4 && creep.memory.s === creep.memory.d_s	//If we're coming back from the controller, we've already flipped.
 					&& Memory.rooms[creep.room.name].sources[creep.memory.s].upgrade.slice[0]	//If we have a hybrid, then this is null.
 					&& creep.pos.x === Memory.rooms[creep.room.name].sources[creep.memory.s].upgrade.slice(-1)[0].x && creep.pos.y === Memory.rooms[creep.room.name].sources[creep.memory.s].upgrade.slice(-1)[0].y
-					&& calculate.extensionsfilled(creep.room.name, creep.memory.s))
+					&& calculate.extensionsFilled(creep.room.name, creep.memory.s))
 				{
 					if (creep.memory.s < Memory.rooms[creep.room.name].sources.length - 1)
 					{
@@ -350,7 +350,7 @@ var roleCustodian =
 						&& creep.pos.x === Memory.rooms[creep.room.name].sources[creep.memory.s].upgrade.slice(-1)[0].x && creep.pos.y === Memory.rooms[creep.room.name].sources[creep.memory.s].upgrade.slice(-1)[0].y)
 						|| (Memory.rooms[creep.room.name].sources[creep.memory.s].upgrade[0] === null	//If we don't have a hybrid, we need to make sure we're not entering this block just by sitting next to the source.
 						&& creep.pos.x === Memory.rooms[creep.room.name].sources[creep.memory.s].mine.slice(-1)[0].x && creep.pos.y === Memory.rooms[creep.room.name].sources[creep.memory.s].mine.slice(-1)[0].y))
-						&& calculate.extensionsfilled(creep.room.name, creep.memory.s))	//Have we filled all of this source's extensions?
+						&& calculate.extensionsFilled(creep.room.name, creep.memory.s))	//Have we filled all of this source's extensions?
 					{
 						console.log("We've filled all of source " + creep.memory.s + "'s extensions. Upgrade the controller.");
 						creep.memory.lmission.unshift(creep.memory.mission);	//Always remember our latest non-selecting, non-waiting mission.

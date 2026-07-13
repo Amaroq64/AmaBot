@@ -149,7 +149,8 @@ var roleTransport =
 			{
 				//We deposited into the dbuilder.
 			}
-			else if (creep.memory.dtrip && Memory.rooms[creep.room.name].defense.links && creep.pos.isNearTo(Memory.rooms[creep.room.name].defense.links[creep.memory.need].x, Memory.rooms[creep.room.name].defense.links[creep.memory.need].y))	//If we're going to the dbuilder, try depositing into a link.
+			else if (creep.memory.dtrip && Memory.rooms[creep.room.name].defense.links
+				&& creep.pos.isNearTo(Memory.rooms[creep.room.name].defense.links[creep.memory.need].x, Memory.rooms[creep.room.name].defense.links[creep.memory.need].y))	//If we're going to the dbuilder, try depositing into a link.
 			{
 				creep.transfer(Game.getObjectById(Memory.rooms[creep.room.name].defense.links[creep.memory.need].id), RESOURCE_ENERGY);
 			}

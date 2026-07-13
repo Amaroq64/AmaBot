@@ -118,7 +118,7 @@ module.exports.loop = function()
 	//Generate a pixel.
 	if (Game.cpu.bucket >= PIXEL_CPU_COST)
 	{
-		if (Game.cpu.generatePixel() == OK)
+		if (Game.cpu.generatePixel() === OK)
 		{
 			console.log("Generated a Pixel!");
 		}

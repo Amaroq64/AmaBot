@@ -110,13 +110,13 @@ var roomPlanner =
 				roomideal.extractor = 0;
 				roomideal.handler = 0;
 			case 6:
-				roomideal.custodian = 1;
+				roomideal.custodian = 0;	//The custodian is too expensive for a level 6 room.
 			case 8:
-				roomideal.custodian = 1;
 				require('defender').checkDefense(room_name);
 				Memory.rooms[room_name].goals.labs = CONTROLLER_STRUCTURES.lab[Game.rooms[room_name].controller.level];
 				if (Game.rooms[room_name].controller.level === 8)
 				{
+					roomideal.custodian = 1;
 					roomPlanner.powerSpawn.set(room_name);
 				}
 		}
@@ -129,6 +129,7 @@ var roomPlanner =
 			{
 				sourceideal[i].harvester = 1;
 				sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
+				sourceideal[i].etransport = 0;
 				if (Game.rooms[room_name].controller.level <= 8)
 				{
 					sourceideal[i].ebuilder = 1;						//This builds our extensions faster.
@@ -140,6 +141,7 @@ var roomPlanner =
 			{
 				sourceideal[i].hybrid = 1;
 				sourceideal[i].mtransport = transports[i].miner;	//This is an alias.
+				sourceideal[i].etransport = 0;
 				if (Game.rooms[room_name].controller.level <= 8)
 				{
 					sourceideal[i].ebuilder = 1;						//This builds our extensions faster.
