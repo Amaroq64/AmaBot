@@ -66,7 +66,8 @@ var init =
 				for (let i = 0; i < len; i++)
 				{
 					//Current entities start at zero. Ideal entity amounts will be populated by roomPlanner.
-					Memory.rooms[room_name].sources[i] = {id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], hybrid: [], mtransport: [], ebuilder: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
+					Memory.rooms[room_name].sources[i] =
+						{id: sources[i].id, pos: sources[i].pos, creeps: {harvester: [], hybrid: [], mtransport: [], etransport: [], ebuilder: [], utransport: [], builder: []}, buildings: {miningcontainer: [], extensions: []}, ideal: {}};
 				}
 
 				//Move sources to end of array until the closest one is [0].

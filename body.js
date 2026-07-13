@@ -443,6 +443,7 @@ body.utransport = function(energy)
 {
 	return body.transport(energy, true);
 }
+body.etransport = body.transport;
 body.ptransport = function(energy)
 {
 	return body.transport(energy, false, true);
